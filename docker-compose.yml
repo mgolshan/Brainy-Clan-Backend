@@ -1,0 +1,110 @@
+# Brainy Clan backend - local development stack.
+#
+#   One-time setup:  powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+#   Start:           docker compose --profile workers up -d
+#   Stop:            docker compose --profile workers down
+#
+# Host ports: API/admin 8080, MySQL 3307, Redis 6380, Mailpit 8025 (UI) / 1025 (SMTP).
+
+name: brainy-clan-backend
+
+# Shared settings for every container that runs the Laravel code (app, horizon,
+# scheduler). They all use the single image built by the "app" service.
+x-php: &php
+    image: brainy-clan-backend-php
+    working_dir: /var/www/html
+    volumes:
+        - .:/var/www/html
+        - composer-cache:/home/brainy/.composer/cache
+    depends_on:
+        mysql:
+            condition: service_healthy
+        redis:
+            condition: service_healthy
+    extra_hosts:
+        - "host.docker.internal:host-gateway"
+
+services:
+    app:
+        <<: *php
+        build:
+            context: ./docker/php
+            dockerfile: Dockerfile
+            args:
+                UID: ${HOST_UID:-1000}
+                GID: ${HOST_GID:-1000}
+        restart: unless-stopped
+
+    nginx:
+        image: nginx:stable-alpine
+        ports:
+            - "8080:80"
+        volumes:
+            - .:/var/www/html:ro
+            - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+        depends_on:
+            - app
+        restart: unless-stopped
+
+    mysql:
+        image: mysql:8.4
+        environment:
+            MYSQL_DATABASE: brainy_clan
+            MYSQL_USER: brainy
+            MYSQL_PASSWORD: secret
+            MYSQL_ROOT_PASSWORD: root
+        ports:
+            - "3307:3306"
+        volumes:
+            - mysql-data:/var/lib/mysql
+        healthcheck:
+            # -h 127.0.0.1 forces TCP, which is only up once the init scripts have finished.
+            test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+            interval: 5s
+            timeout: 5s
+            retries: 30
+            start_period: 20s
+        restart: unless-stopped
+
+    redis:
+        image: redis:7-alpine
+        ports:
+            - "6380:6379"
+        volumes:
+            - redis-data:/data
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 5s
+            timeout: 3s
+            retries: 20
+        restart: unless-stopped
+
+    # Queue workers. In the "workers" profile so they only start once vendor/ exists:
+    #   docker compose --profile workers up -d
+    horizon:
+        <<: *php
+        pull_policy: never
+        command: ["php", "artisan", "horizon"]
+        stop_signal: SIGTERM
+        stop_grace_period: 30s
+        restart: unless-stopped
+        profiles: ["workers"]
+
+    scheduler:
+        <<: *php
+        pull_policy: never
+        command: ["php", "artisan", "schedule:work"]
+        restart: unless-stopped
+        profiles: ["workers"]
+
+    mailpit:
+        image: axllent/mailpit
+        ports:
+            - "8025:8025"
+            - "1025:1025"
+        restart: unless-stopped
+
+volumes:
+    mysql-data:
+    redis-data:
+    composer-cache:
