@@ -4,7 +4,7 @@
 #
 # Builds the PHP image, starts MySQL/Redis/Mailpit, runs docker/scripts/bootstrap.sh in
 # the app container (composer, .env, package installers, migrations, admin user), starts
-# the full stack and finally runs the interactive Laravel Boost installer.
+# the full stack and finally installs Laravel Boost (non-interactive, choices in boost.json).
 #
 # Works in Windows PowerShell 5.1 and PowerShell 7. No PHP or Composer is needed on
 # Windows: everything PHP-related runs inside Docker.
@@ -120,12 +120,8 @@ try {
     docker compose --profile workers up -d
     Assert-LastExit 'Could not start the stack'
 
-    Write-Step 'Laravel Boost installer (interactive)'
-    Write-Host '    Answer the prompts. When asked which agents/editors to configure, select'
-    Write-Host '    "Claude Code" (and PhpStorm / Junie if it is offered and you use it).'
-    Write-Host '    The MCP config it writes is replaced with a Docker-based one right afterwards.'
-    Write-Host ''
-    docker compose exec app php artisan boost:install
+    Write-Step 'Laravel Boost (guidelines + MCP for Claude Code, choices read from boost.json)'
+    docker compose exec -T app php artisan boost:install --no-interaction
     Assert-LastExit 'php artisan boost:install failed'
 
     Write-Step 'Pointing the Boost MCP server (.mcp.json) at the Docker container'
@@ -137,7 +133,7 @@ try {
     Write-Host '    API             http://localhost:8080          (health check: /up)'
     Write-Host '    Admin panel     http://localhost:8080/admin    admin@brainyclan.test / password'
     Write-Host '    Horizon         http://localhost:8080/horizon'
-    Write-Host '    Mailpit         http://localhost:8025'
+    Write-Host '    Mailpit         http://localhost:8026'
     Write-Host '    MySQL (host)    127.0.0.1:3307                 brainy / secret, database brainy_clan'
     Write-Host '    Redis (host)    127.0.0.1:6380'
     Write-Host ''

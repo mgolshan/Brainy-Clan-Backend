@@ -2,24 +2,23 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+/**
+ * `php artisan migrate:fresh --seed` builds a complete local dataset. Every seeder is
+ * safe to re-run (`php artisan db:seed`).
+ */
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            PolicySeeder::class,
+            AdminUserSeeder::class,
+            CategorySeeder::class,
+            ChallengeTypeSeeder::class,
+            ContentSeeder::class,
+            DemoFamilySeeder::class,
         ]);
     }
 }

@@ -13,7 +13,7 @@ Project rules and architecture notes for AI assistants and developers: [CLAUDE.m
 
 - Windows 11 with **Docker Desktop** using the **WSL 2 backend** (Settings > General >
   "Use the WSL 2 based engine"). Docker Desktop must be running.
-- Free host ports: 8080 (web), 3307 (MySQL), 6380 (Redis), 8025 and 1025 (Mailpit).
+- Free host ports: 8080 (web), 3307 (MySQL), 6380 (Redis), 8026 and 1026 (Mailpit; a Laragon Mailpit usually holds 8025/1025).
   MySQL and Redis use non-default ports so they do not clash with Laragon or other local
   installs.
 
@@ -34,8 +34,8 @@ The script:
    `composer install`, writes `.env`, adds Filament, Horizon, Sanctum, Boost, IDE Helper,
    Larastan and Pest, runs their installers and the migrations, and creates the admin user,
 3. starts the whole stack (app, nginx, Horizon, scheduler),
-4. runs `php artisan boost:install` interactively. When it asks which agents or editors to
-   configure, select **Claude Code** (and PhpStorm / Junie if it is listed and you use it),
+4. runs `php artisan boost:install --no-interaction` (choices in `boost.json`: Claude Code,
+   guidelines + MCP),
 5. rewrites `.mcp.json` so the Boost MCP server runs inside Docker.
 
 The first run downloads a lot and can take 5 to 10 minutes. It is safe to run again; steps
@@ -86,7 +86,7 @@ After changing `docker/php/Dockerfile` or `docker/php/php.ini`, rebuild:
 | API | http://localhost:8080 (health check: http://localhost:8080/up) | Sanctum tokens |
 | Admin panel (Filament) | http://localhost:8080/admin | `admin@brainyclan.test` / `password` |
 | Horizon dashboard | http://localhost:8080/horizon | open in the local environment |
-| Mailpit (caught e-mails) | http://localhost:8025 | - |
+| Mailpit (caught e-mails) | http://localhost:8026 | - |
 | MySQL from the host | `127.0.0.1:3307`, database `brainy_clan` | `brainy` / `secret` (root: `root`) |
 | Redis from the host | `127.0.0.1:6380` | - |
 
@@ -113,6 +113,37 @@ Inside the containers the services are reached by name: `mysql:3306`, `redis:637
   `php artisan boost:install` or `boost:update` rewrites `.mcp.json` with a plain `php`
   command, restore the Docker version with
   `docker compose exec -T app php docker/scripts/write-mcp-json.php`.
+
+## Seeded data (`php artisan migrate:fresh --seed`)
+
+| Who | How to sign in |
+| --- | --- |
+| Admin panel (staff) | `admin@brainyclan.test` / `password` |
+| Mom (family owner, admin) | `POST /api/v1/auth/login` `mom@brainyclan.test` / `password` |
+| Dad (adult) | `dad@brainyclan.test` / `password` |
+| Sam (child, 9) | `Authorization: Bearer demo-sam-child-token` |
+| Alex (teen, 14) | `Authorization: Bearer demo-alex-teen-token` |
+| Join as a new child / teen | `POST /api/v1/auth/join` with code `CUBS2222` / `TEEN2828` (re-run `php artisan db:seed --class=DemoFamilySeeder` to reset) |
+
+```sh
+curl http://localhost:8080/api/v1/health
+curl -X POST http://localhost:8080/api/v1/auth/login -H "Accept: application/json" -H "Content-Type: application/json" \
+  -d '{"email":"mom@brainyclan.test","password":"password","device_name":"curl","platform":"web"}'
+curl http://localhost:8080/api/v1/me -H "Accept: application/json" -H "Authorization: Bearer demo-sam-child-token"
+curl http://localhost:8080/api/v1/categories -H "Accept: application/json" -H "Authorization: Bearer demo-sam-child-token"
+```
+
+## Performance (important on a Windows drive)
+
+Each PHP file check over the Windows bind mount is slow, which made API requests take 6–14 s.
+The setup now caches config and `.env` can switch off OPcache timestamp checks:
+
+- `.env`: `PHP_OPCACHE_VALIDATE_TIMESTAMPS=0` (fast mode). **After changing PHP code run
+  `docker compose restart app horizon`.** Remove the line (or set `1`) to see edits instantly but slower.
+- **After changing `.env` or `config/*.php` run `docker compose exec app php artisan config:cache`**
+  (or `config:clear` to stop caching).
+- Tests are unaffected: they always use in-memory SQLite and ignore the dev caches.
+- The first request per PHP worker after a restart still takes ~10 s; then ~0.5 s.
 
 ## Windows performance note
 

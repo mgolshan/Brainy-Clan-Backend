@@ -4,7 +4,7 @@
 #   Start:           docker compose --profile workers up -d
 #   Stop:            docker compose --profile workers down
 #
-# Host ports: API/admin 8080, MySQL 3307, Redis 6380, Mailpit 8025 (UI) / 1025 (SMTP).
+# Host ports: API/admin 8080, MySQL 3307, Redis 6380, Mailpit 8026 (UI) / 1026 (SMTP).
 
 name: brainy-clan-backend
 
@@ -16,6 +16,15 @@ x-php: &php
     volumes:
         - .:/var/www/html
         - composer-cache:/home/brainy/.composer/cache
+        # Mounted (not only baked into the image) so php.ini edits need just a restart.
+        - ./docker/php/php.ini:/usr/local/etc/php/conf.d/zz-brainy-clan.ini:ro
+    environment:
+        # OPcache file-timestamp checks. On a Windows-drive bind mount every check is a slow
+        # cross-VM stat, so requests take seconds. "Fast mode": set
+        # PHP_OPCACHE_VALIDATE_TIMESTAMPS=0 in .env, then run
+        # `docker compose restart app horizon` after changing PHP code. See README.
+        PHP_OPCACHE_VALIDATE_TIMESTAMPS: ${PHP_OPCACHE_VALIDATE_TIMESTAMPS:-1}
+        PHP_OPCACHE_REVALIDATE_FREQ: ${PHP_OPCACHE_REVALIDATE_FREQ:-2}
     depends_on:
         mysql:
             condition: service_healthy
@@ -100,8 +109,8 @@ services:
     mailpit:
         image: axllent/mailpit
         ports:
-            - "8025:8025"
-            - "1025:1025"
+            - "${MAILPIT_UI_PORT:-8026}:8025"
+            - "${MAILPIT_SMTP_PORT:-1026}:1025"
         restart: unless-stopped
 
 volumes:

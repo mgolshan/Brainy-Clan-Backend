@@ -6,17 +6,20 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
+        // Identity: email and password only for adults; children have neither.
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
+            $table->string('display_name', 60);
+            $table->string('avatar', 30)->nullable();
+            $table->string('email')->nullable()->unique();
             $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
+            $table->string('password')->nullable();
+            $table->unsignedSmallInteger('birth_year')->nullable();
+            $table->unsignedTinyInteger('birth_month')->nullable();
+            $table->string('locale', 10)->default('en');
+            $table->boolean('is_staff')->default(false)->comment('May sign in to the Filament admin');
             $table->rememberToken();
             $table->timestamps();
         });
@@ -37,9 +40,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('users');

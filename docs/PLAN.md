@@ -4,6 +4,24 @@ Laravel 13 (PHP 8.5) REST API under `/api/v1` plus the Filament 5 admin, run wit
 The full product and architecture design is in the design doc linked in `CLAUDE.md`; this file
 turns it into ordered backend milestones. Track status in `docs/PROGRESS.md`.
 
+The app ↔ API interface is defined in **`docs/API.md`** (the contract). Implement endpoints exactly
+as written there; if something must change, update `docs/API.md` first and note it in its changelog.
+
+## Decisions taken during development
+
+- **Response format (2026-10-10):** plain Laravel `JsonResource` envelope `{ "data": ... }` with
+  snake_case keys, not full JSON:API (`type`/`attributes`). Errors always carry a machine `code`.
+  Reason: much simpler to type in the TypeScript client; still versioned and consistent.
+- **Age-adaptive UI theme (2026-10-10):** each age band's policy JSON includes a `ui_theme`
+  (`child → playful`, `teen → sleek`, `adult → modern`, `senior → classic`) plus accessibility
+  defaults (seniors: larger text, calm timers). Editable in the admin like the rest of the policy.
+  Members can pick another theme in their accessibility settings; it never changes rules.
+- **Age bands seeded:** child 0–12, teen 13–17, adult 18–64, senior 65+ (`senior` added to the
+  design doc's bands so the classic theme and calmer defaults have a home).
+- **Adults joining by invite** may set email + password during join; children never do.
+- **Parallel development:** the frontend is built in parallel against `docs/API.md`, so the
+  contract is fixed before each milestone starts.
+
 ## Working rules
 
 - One milestone at a time. At the end of each, stop, summarize what was built and explain how to test it.

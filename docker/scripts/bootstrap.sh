@@ -19,7 +19,6 @@ cd /var/www/html
 export COMPOSER_NO_INTERACTION=1
 export PEST_NO_SUPPORT=true
 
-ADMIN_NAME="Admin"
 ADMIN_EMAIL="admin@brainyclan.test"
 ADMIN_PASSWORD="password"
 
@@ -221,18 +220,11 @@ heading "Database migrations"
 
 php artisan migrate --force --no-interaction
 
-heading "Local admin user"
+heading "Seed data (admin user, age bands, settings, categories, content, demo family)"
 
-if php artisan make:filament-user \
-    --name="$ADMIN_NAME" \
-    --email="$ADMIN_EMAIL" \
-    --password="$ADMIN_PASSWORD" \
-    --panel=admin \
-    --no-interaction; then
-    info "Created $ADMIN_EMAIL"
-else
-    info "Could not create $ADMIN_EMAIL (it most likely exists already), continuing."
-fi
+# Every seeder is idempotent, so re-running the bootstrap is safe. The staff account
+# ($ADMIN_EMAIL / $ADMIN_PASSWORD) comes from database/seeders/AdminUserSeeder.php.
+php artisan db:seed --force --no-interaction
 
 # --------------------------------------------------------------------------------------
 
@@ -245,6 +237,14 @@ php artisan ide-helper:models -N --no-interaction || warn "ide-helper:models fai
 
 # --------------------------------------------------------------------------------------
 
+heading "Config cache (big speed-up on Windows bind mounts)"
+
+# Re-run after editing .env or config/*.php (or run `php artisan config:clear`).
+# Tests are unaffected: phpunit.xml points APP_CONFIG_CACHE elsewhere.
+php artisan config:cache --no-interaction
+
+# --------------------------------------------------------------------------------------
+
 heading "Done"
 
 cat <<EOF
@@ -252,7 +252,7 @@ cat <<EOF
     API             http://localhost:8080          (health check: /up)
     Admin panel     http://localhost:8080/admin    $ADMIN_EMAIL / $ADMIN_PASSWORD
     Horizon         http://localhost:8080/horizon  (needs: docker compose --profile workers up -d)
-    Mailpit         http://localhost:8025
+    Mailpit         http://localhost:8026
     MySQL (host)    127.0.0.1:3307                 brainy / secret, database brainy_clan
     Redis (host)    127.0.0.1:6380
 

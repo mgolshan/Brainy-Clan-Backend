@@ -7,3 +7,7 @@ parameters:
 
     # 0 = loosest, 10 = strictest. Raise gradually as the codebase grows.
     level: 5
+
+    # Sanctum's currentAccessToken() is documented as PersonalAccessToken but can be a
+    # TransientToken at runtime; runtime instanceof checks must stay.
+    treatPhpDocTypesAsCertain: false

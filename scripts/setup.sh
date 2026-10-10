@@ -7,7 +7,7 @@
 #
 # Builds the PHP image, starts MySQL/Redis/Mailpit, runs docker/scripts/bootstrap.sh in
 # the app container (composer, .env, package installers, migrations, admin user), starts
-# the full stack and finally runs the interactive Laravel Boost installer.
+# the full stack and finally installs Laravel Boost (non-interactive, choices in boost.json).
 
 set -euo pipefail
 
@@ -71,14 +71,8 @@ docker compose run --rm app bash docker/scripts/bootstrap.sh
 step "Starting the full stack (app, nginx, horizon, scheduler)"
 docker compose --profile workers up -d
 
-step "Laravel Boost installer (interactive)"
-cat <<'EOF'
-    Answer the prompts. When asked which agents/editors to configure, select
-    "Claude Code" (and PhpStorm / Junie if it is offered and you use it).
-    The MCP config it writes is replaced with a Docker-based one right afterwards.
-
-EOF
-docker compose exec app php artisan boost:install
+step "Laravel Boost (guidelines + MCP for Claude Code, choices read from boost.json)"
+docker compose exec -T app php artisan boost:install --no-interaction
 
 step "Pointing the Boost MCP server (.mcp.json) at the Docker container"
 docker compose exec -T app php docker/scripts/write-mcp-json.php
@@ -89,7 +83,7 @@ cat <<'EOF'
     API             http://localhost:8080          (health check: /up)
     Admin panel     http://localhost:8080/admin    admin@brainyclan.test / password
     Horizon         http://localhost:8080/horizon
-    Mailpit         http://localhost:8025
+    Mailpit         http://localhost:8026
     MySQL (host)    127.0.0.1:3307                 brainy / secret, database brainy_clan
     Redis (host)    127.0.0.1:6380
 

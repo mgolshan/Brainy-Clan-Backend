@@ -52,7 +52,9 @@ RUN groupadd --non-unique --gid "${GID}" brainy \
 USER brainy
 
 # The project is bind-mounted from the host, so its owner differs from this user.
-RUN git config --global --add safe.directory '*'
+# /tmp/opcache holds OPcache's file cache (see php.ini).
+RUN git config --global --add safe.directory '*' \
+    && mkdir -p /tmp/opcache
 
 WORKDIR /var/www/html
 
