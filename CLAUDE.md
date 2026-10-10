@@ -3,7 +3,7 @@
 Brainy Clan is a family learning / quiz mobile app. This repository is its backend:
 a **Laravel 13** REST API for the mobile app plus a **Filament 5** (Livewire 4) admin panel.
 
-Design doc: <link>
+Design doc: https://claude.ai/code/artifact/47b231d3-1586-470a-865b-5ea4b6349434 (read it fully before starting a build step)
 
 The design doc holds the full architecture and data design. Read it before larger changes.
 
@@ -50,3 +50,9 @@ code, restart the workers: `docker compose restart horizon`.
 - Write Pest tests for Actions and API endpoints; keep Pint and Larastan clean.
 
 Laravel Boost adds its own guidelines below (`php artisan boost:install` / `boost:update`).
+
+## Plan, progress and commits
+
+- Read `docs/PLAN.md` and `docs/PROGRESS.md` at the start of every session; work on the next milestone only.
+- Update `docs/PROGRESS.md` at the end of every session (status table, next up, log entry).
+- Never run `git commit`, `git push` or any history-changing git command. Moe reviews and commits.
