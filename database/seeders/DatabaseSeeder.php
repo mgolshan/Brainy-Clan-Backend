@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             ChallengeTypeSeeder::class,
             ContentSeeder::class,
             DemoFamilySeeder::class,
+            DemoActivitySeeder::class,
         ]);
     }
 }

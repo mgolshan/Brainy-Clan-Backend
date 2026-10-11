@@ -6,6 +6,7 @@ use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Support\FamilyClock;
 use App\Modules\Scoring\Models\Streak;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Carbon;
 
 /**
  * Updates a member's streak for activity on a day (family timezone): same day = no change,
@@ -27,7 +28,7 @@ class RecordDailyActivity
 
         $streak->current = $last !== null && $last->addDay()->equalTo($today) ? $streak->current + 1 : 1;
         $streak->longest = max($streak->longest, $streak->current);
-        $streak->last_active_date = $today->toDateString();
+        $streak->last_active_date = Carbon::parse($today->toDateString());
         $streak->save();
 
         return $streak;

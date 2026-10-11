@@ -2,6 +2,7 @@
 
 use App\Modules\Content\Models\ContentItem;
 use App\Modules\Family\Models\Invite;
+use App\Modules\Goals\Models\GoalPlan;
 use App\Modules\Identity\Models\User;
 use App\Modules\Policy\Models\AgeBand;
 use App\Modules\Policy\Models\Setting;
@@ -15,6 +16,7 @@ it('renders every admin page for staff', function (string $url) {
     addMember($owner->family, 9);
     Invite::factory()->create(['family_id' => $owner->family_id]);
     $item = ContentItem::factory()->create();
+    GoalPlan::factory()->create(['family_id' => $owner->family_id])->categories()->attach($item->category_id);
 
     $url = str_replace(
         ['{family}', '{ageBand}', '{setting}', '{item}', '{category}'],
@@ -45,6 +47,7 @@ it('renders every admin page for staff', function (string $url) {
     '/admin/content-batches/create',
     '/admin/content-preview',
     '/admin/content-preview?item={item}&band=teen',
+    '/admin/goal-plans',
 ]);
 
 it('logs admin changes to the audit log', function () {

@@ -36,7 +36,7 @@ code, restart the workers: `docker compose restart horizon`.
   `Models`, `Actions`, `Events`, `Listeners`, `Http`, `Policies`.
   Modules: `Identity`, `Family`, `Content`, `ChallengeTypes`, `Play`, `Scoring`, `Goals`,
   `Policy`, `Billing`, `Notifications`. Existing: `Core` (shared API plumbing), `Identity`, `Policy`,
-  `Family`, `Content`, `ChallengeTypes`, `Play` and `Scoring` (B5, partly built). Each module has a
+  `Family`, `Content`, `ChallengeTypes`, `Play`, `Scoring` and `Goals`. Each module has a
   `<Name>ServiceProvider` (extends `App\Modules\Core\ModuleServiceProvider`) registered in
   `bootstrap/providers.php`; its routes live in `Http/routes.php` under `/api/v1`.
 - **Thin controllers.** Controllers validate (Form Requests), call one Action class and

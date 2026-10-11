@@ -178,6 +178,7 @@ Session:
 `status`: `active` | `redemption` (redemption round in progress) | `failed` (blunder cap hit; a
 second chance may still be possible) | `completed` (target reached) | `abandoned`.
 `second_chance` is meaningful when `status = failed`.
+`answered` counts answered **regular** items only (redemption answers never change it, right or wrong).
 
 Session item (answers stripped):
 ```json
@@ -194,16 +195,22 @@ Session item (answers stripped):
   → `{ data: { is_correct: true, correct_response: { ... }, explanation: null | "...",
   points_awarded: 1, session: Session } }`. Answering an already answered item → 409 `item_already_answered`.
   1 point per correct answer. Reaching `target_points` → `completed`; reaching `blunder_cap`
-  mistakes → `failed`.
+  mistakes → `failed`. A `response` that is malformed for the item (e.g. a `choice_id` that is not one
+  of the item's choices) → **422** `validation_failed` on `response.choice_id`; it is not counted as a
+  mistake. Answering while the session is not in the right state (regular item outside `active`,
+  redemption item outside `redemption`) → 409 `session_not_active`.
 - `POST /play/sessions/{session}/second-chance` — Body: `method: "free" | "ad"`, `reward_ref?`
   (AdMob reward id, verified server-side in B8). Only when `failed`. Resets `mistakes` to 0,
   status back to `active`, increments `second_chances_used`. → `{ data: { session, items } }`
-  (always **all** session items, answered ones included, plus any fresh ones). 403 `second_chance_unavailable`.
+  (always **all** session items, answered ones included, plus any fresh ones). 403 `second_chance_unavailable`;
+  409 `session_not_active` when the session is not `failed`.
 - `POST /play/sessions/{session}/redemption` — Only when `failed` and redemption is allowed.
   Status → `redemption`; adds 3 easier items with `is_redemption: true` and returns all session items.
   → `{ data: { session, items } }`. Answer them via `/answers`. All 3 correct → like a second chance
   (status `active`, mistakes 0, `second_chances_used` +1). Any wrong → status `failed` with
-  `redemption_available: false`.
+  `redemption_available: false`; the round's **unanswered** redemption items are void and are no longer
+  listed in any `items` array (answered ones stay). 409 `session_not_active` when not `failed`;
+  403 `second_chance_unavailable` when redemption is not allowed or already failed in this session.
 - `POST /play/sessions/{session}/abandon` → `{ data: Session }`
 
 ### Challenge payloads (`type` → `payload`, `response`, `correct_response`)
@@ -252,7 +259,14 @@ GoalProgress:
   "entries": [ { "member_id": 7, "nickname": "Sam", "avatar": "fox", "points": 23,
                  "target": 20, "reached": true, "rank": 1 } ] }
 ```
-`status`: `open` | `closed`. `entries` sorted by `rank` (ties share a rank).
+`status`: `open` | `closed`. `entries` sorted by `rank` (ties share a rank). `starts_at` is inclusive,
+`ends_at` **exclusive** (UTC instants of the family-timezone boundaries). The first period of a plan
+starts at `starts_on` (so it can be shorter than a full week/month); the last ends after `ends_on`.
+- `reached` (top level) is the **cooperation** result: team total ≥ `target_points`. In competition
+  mode use each entry's `reached` (points ≥ that member's `target`); the top-level value there is just
+  "at least one member reached their target".
+- `target` per entry = the member's `target_override ?? target_points`, snapshotted when the period
+  opened (plan edits apply from the next period).
 
 - `GET /goals` (needs family) → `{ data: GoalPlan[] }` active plans first, each with `current_period`.
 - `GET /goals/{plan}` → `{ data: GoalPlan }`
@@ -270,7 +284,8 @@ GoalProgress:
               "winner_member_ids": [7], "entries": [ ... ] } ],
   "meta": { "current_page": 1, "last_page": 3 } }
 ```
-  `winner_member_ids`: competition → top rank; cooperation → everyone when `reached`, else `[]`.
+  `winner_member_ids`: competition → top rank (only members with more than 0 points; ties all win);
+  cooperation → every plan member when `reached`, else `[]`.
 - A scheduled job closes ended periods (writes `result`), opens the next one, and dispatches
   `PeriodClosed` / `GoalReached`.
 
@@ -279,3 +294,4 @@ GoalProgress:
 - 2026-10-10 — Member gains `default_ui_theme`; senior `text_scale` default is 1.0 (classic theme carries the larger type); redemption returns all session items, like second-chance.
 - 2026-10-10 — Goals (B6/F4): goal plans, progress, history; `limits.max_active_goals`; `goal_limit_reached`.
 - 2026-10-10 — Error code `item_already_answered` (409) for answering a session item twice.
+- 2026-10-11 — Clarifications (B5/B6): malformed answer `response` → 422 (not a mistake); `answered` counts regular items only; void unanswered redemption items are dropped from `items` after a failed round; 409 `session_not_active` listed for `/second-chance` and `/redemption`; GoalProgress `reached` is the cooperation result (competition: per-entry `reached`), `ends_at` exclusive, first period clipped to `starts_on`, targets snapshotted per period.

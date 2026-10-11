@@ -16,6 +16,11 @@ return [
     'name' => env('APP_NAME', 'Laravel'),
 
     /*
+     * Application version, shown in the generated API docs (Scramble).
+     */
+    'version' => env('APP_VERSION', '0.1.0'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------

@@ -26,7 +26,7 @@ class SessionItemResource extends JsonResource
         return [
             'id' => $item->id,
             'position' => $item->position,
-            'type' => $content?->type_key ?? 'unknown',
+            'type' => $content !== null ? $content->type_key : 'unknown',
             'is_redemption' => $item->is_redemption,
             'payload' => $content !== null && $registry->has($content->type_key) ? $registry->get($content->type_key)->forClient($content) : (object) [],
             'answered' => $item->isAnswered(),

@@ -15,6 +15,18 @@ abstract class ChoiceChallenge implements ChallengeType
 
     protected const int MAX_CHOICES = 6;
 
+    public function validateResponse(ContentItem $item, array $response): array
+    {
+        $given = $response['choice_id'] ?? null;
+        $choiceIds = array_column((array) ($item->payload['choices'] ?? []), 'id');
+
+        if (! is_string($given) || ! in_array($given, $choiceIds, true)) {
+            return ['response.choice_id' => ['Pick one of the choices of this item.']];
+        }
+
+        return [];
+    }
+
     public function check(ContentItem $item, array $response): bool
     {
         $given = $response['choice_id'] ?? null;

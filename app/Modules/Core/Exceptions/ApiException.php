@@ -73,6 +73,11 @@ class ApiException extends RuntimeException
         return new self('second_chance_unavailable', $message, 403);
     }
 
+    public static function goalLimitReached(): self
+    {
+        return new self('goal_limit_reached', 'Your plan does not allow more active goals.', 403);
+    }
+
     /**
      * A 422 with field errors, for domain validation that happens inside an Action.
      */

@@ -4,6 +4,7 @@ use App\Modules\ChallengeTypes\ChallengeTypesServiceProvider;
 use App\Modules\Content\ContentServiceProvider;
 use App\Modules\Core\CoreServiceProvider;
 use App\Modules\Family\FamilyServiceProvider;
+use App\Modules\Goals\GoalsServiceProvider;
 use App\Modules\Identity\IdentityServiceProvider;
 use App\Modules\Play\PlayServiceProvider;
 use App\Modules\Policy\PolicyServiceProvider;
@@ -26,4 +27,5 @@ return [
     ContentServiceProvider::class,
     PlayServiceProvider::class,
     ScoringServiceProvider::class,
+    GoalsServiceProvider::class,
 ];

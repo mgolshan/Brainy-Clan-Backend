@@ -58,6 +58,12 @@ class SubmitAnswer
             }
 
             $handler = $this->registry->get($content->type_key);
+            $responseErrors = $handler->validateResponse($content, $response);
+
+            if ($responseErrors !== []) {
+                throw ApiException::validation((string) array_key_first($responseErrors), $responseErrors[array_key_first($responseErrors)][0]);
+            }
+
             $isCorrect = $handler->check($content, $response);
             $points = $item->is_redemption ? 0 : $handler->score($content, $isCorrect);
 

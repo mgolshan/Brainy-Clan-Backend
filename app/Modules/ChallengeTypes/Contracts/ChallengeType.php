@@ -34,6 +34,16 @@ interface ChallengeType
     public function forClient(ContentItem $item): array;
 
     /**
+     * Whether a response is well-formed for this item (e.g. the choice exists). Returns field
+     * errors keyed like "response.choice_id" (empty array = valid). A malformed response is a
+     * 422, never a mistake.
+     *
+     * @param  array<string, mixed>  $response
+     * @return array<string, list<string>>
+     */
+    public function validateResponse(ContentItem $item, array $response): array;
+
+    /**
      * Server-side check of a member's response.
      *
      * @param  array<string, mixed>  $response

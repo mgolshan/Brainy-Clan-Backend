@@ -36,6 +36,10 @@ class StartSession
                 'category_id' => $categoryId,
                 'target_points' => $rules['target_points'],
                 'blunder_cap' => $rules['blunder_cap'],
+                'mistakes' => 0,
+                'points' => 0,
+                'second_chances_used' => 0,
+                'redemption_failed' => false,
                 'status' => PlaySession::STATUS_ACTIVE,
                 'started_at' => now(),
             ]);

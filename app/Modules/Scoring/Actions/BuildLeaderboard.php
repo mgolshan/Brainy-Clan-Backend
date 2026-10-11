@@ -17,7 +17,7 @@ class BuildLeaderboard
     public const array PERIODS = ['today', 'week', 'month', 'all'];
 
     /**
-     * @return array{period: string, starts_at: string|null, ends_at: string|null, team_total: int, entries: list<array{member_id: int, nickname: string, avatar: string|null, points: int, rank: int}>}
+     * @return array{period: string, starts_at: string|null, ends_at: string|null, team_total: int, entries: list<array<string, mixed>>}
      */
     public function handle(Family $family, string $period = 'week'): array
     {
@@ -55,10 +55,8 @@ class BuildLeaderboard
     /**
      * Competition ranking on `points` (already sorted descending).
      *
-     * @template T of array{points: int}
-     *
-     * @param  list<T>  $rows
-     * @return list<T&array{rank: int}>
+     * @param  list<array<string, mixed>>  $rows  each with an int `points`
+     * @return list<array<string, mixed>> the rows with `rank` added
      */
     public static function rank(array $rows): array
     {
@@ -67,9 +65,11 @@ class BuildLeaderboard
         $rank = 0;
 
         foreach ($rows as $index => $row) {
-            if ($previous === null || $row['points'] !== $previous) {
+            $points = (int) $row['points'];
+
+            if ($previous === null || $points !== $previous) {
                 $rank = $index + 1;
-                $previous = $row['points'];
+                $previous = $points;
             }
 
             $ranked[] = [...$row, 'rank' => $rank];

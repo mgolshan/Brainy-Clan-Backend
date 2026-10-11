@@ -13,47 +13,30 @@ Milestones are defined in `docs/PLAN.md`.
 | B2 Identity, Family and invites | Done | Auth (register/login/join/logout), me, family, members, invites, PolicyResolver, Filament |
 | B3 Content | Done | Category tree, challenge type plugins + registry, content items, tags, batches, Filament (CSV import, preview page), 8 categories seeded |
 | B4 First challenge types | Done | Multiple Choice + Wisdom Card handlers; 320 MC + 50 wisdom seed items |
-| B5 Play and Scoring | In progress | /play/* endpoints + actions + events + ledger/streak listeners written and registered, but UNTESTED (no Pest tests, no smoke test). Missing: /me/stats + /family/leaderboard routes/controllers, tests, demo ledger history |
-| B6 Goals | Not started | |
+| B5 Play and Scoring | Done | All /play/* + /me/stats + /family/leaderboard; Pest-tested; live smoke-tested; demo ledger history seeded |
+| B6 Goals | Mostly done | Migration, models, factory, actions, 6 endpoints, scheduled close job, events, Filament list, tests. Remaining: see Next up |
 | B7 Remaining launch content | Not started | |
 | B8 Billing, ads and notifications | Not started | |
 | B9 Production | Not started | |
 
 ## Next up
 
-0. **State at last stop (session 2, end):** DONE but untested: Play actions (StartSession, SubmitAnswer,
-   GrantSecondChance, StartRedemption, AbandonSession, AddSessionItems/topUp, PickContentItems), resources
-   (SessionPayload returns ALL items), `Play/Http/routes.php` (6 routes live), events, Scoring actions
-   (AppendPoints, RecordDailyActivity, ComputeMemberStats, BuildLeaderboard), listeners (RecordAnswerPoints
-   sync, UpdateStreak queued, RefreshMemberTotals), Play+Scoring providers registered,
-   `limits.max_active_goals` in policy + PolicySeeder (re-run `db:seed --class=PolicySeeder` in dev).
-   REMAINING: Scoring HTTP (`GET /me/stats`, `GET /family/leaderboard` controllers + `Scoring/Http/routes.php`),
-   Pest tests for all of B5, pint/phpstan/pest run, live curl smoke test, demo ledger history seeder.
-   **Gotcha:** config is cached, which also freezes the provider list — after adding a provider run
-   `php artisan config:cache` again (then `docker compose restart app horizon`).
-1. **Finish B5** (details below). Originally on disk:
-   migration `2026_10_10_170000_create_play_and_scoring_tables` (migrated in dev), models
-   `app/Modules/Play/Models/*` and `app/Modules/Scoring/Models/*` (PointEntry throws on update/delete),
-   `App\Modules\Family\Support\FamilyClock` (tz windows), `Play/Actions/PickContentItems`.
-   Still to write:
-   - `PlayServiceProvider` + `ScoringServiceProvider` (register in `bootstrap/providers.php`); Play binds
-     `Policy\Contracts\SecondChanceUsage` (count `second_chances` method `free` since family-tz midnight).
-   - Play actions: StartSession (ResolveCategoryAccess::canPlay → 403 `category_not_allowed`; rules from
-     `PolicyResolver::playRules`; 422 on `category_id` when no content), SubmitAnswer (lock session; 409
-     `item_already_answered` / `session_not_active`; redemption items need status `redemption`), GrantSecondChance
-     (free/ad via `secondChanceForMember`, record `reward_ref`, stub verification), StartRedemption (3 easier items,
-     403 `second_chance_unavailable` when `redemption_failed` or not allowed), AbandonSession, top-up so
-     unanswered normal items ≥ (target−points)+(cap−mistakes). Update `member_item_history`.
-   - **All of `/second-chance` and `/redemption` return ALL session items** (contract changelog).
-   - Events `Play\Events\AnswerSubmitted` / `SessionCompleted`; Scoring sync listener appends the ledger
-     row inside the transaction; queued (`afterCommit`) listeners UpdateStreak + RefreshMemberTotals.
-   - `GET /me/stats`, `GET /family/leaderboard?period=` (FamilyClock windows, ties share rank, `all` → null bounds).
-   - Session/SessionItem resources (`answered` = answered non-redemption items), Pest tests, demo ledger history.
-   - Add `item_already_answered` (409) to the error table in `docs/API.md` + changelog line.
-2. **Policy `limits.max_active_goals`** (contract update): free `1`, family `null`; add settings to
-   `PolicySeeder` and the key to `PolicyResolver::build()` (not done yet — frontend type expects it).
-3. **B6 Goals** per `docs/API.md` "Goals (B6)" (not started).
-4. README: refresh fully (setup, seeded logins/codes, curl examples, admin tour). Partially updated.
+0. **State at last stop (session 3, end):** B5 finished and verified; B6 largely built and tested
+   (see log). Full suite / pint / phpstan green.
+1. **Finish B6 Goals:**
+   - No listeners yet for `Goals\Events\PeriodClosed` / `GoalReached` (notifications come in B8;
+     nothing subscribes now). Decide whether `member_period_totals` / `play_sessions.goal_period_id`
+     are still useful: one answer counts toward several plans, so goal progress is computed from the
+     ledger (`ComputeGoalProgress`) and `Scoring\Listeners\RefreshMemberTotals` stays a no-op. Either
+     drop the cache table later or fill it per (member, period) from `CloseGoalPeriods::close()`.
+   - Filament: `app/Filament/Resources/GoalPlans/GoalPlanResource.php` is a list with filters + a
+     deactivate action only; a relation manager / view page for periods and results would help support.
+   - Performance: `LoadGoalPlans` computes progress per plan with one ledger query each; fine for
+     families (few plans), revisit if needed.
+   - Members removed from the family stay in `goal_plan_members` (and period snapshots); consider
+     removing them from plans in `Family\Actions\RemoveMember`.
+2. **README** refresh (setup, seeded logins/codes, curl examples, admin tour). Partially updated.
+3. Then **B7** (remaining launch content).
 
 ## Known issues and notes
 
@@ -61,6 +44,8 @@ Milestones are defined in `docs/PLAN.md`.
   After changing PHP code: `docker compose restart app horizon`. After changing `.env` or `config/*`:
   `docker compose exec app php artisan config:cache` (or `config:clear`). First request per PHP-FPM worker
   after a restart is still slow (~10 s); warm requests ~0.5–0.8 s. Moving the repo into WSL2 removes this.
+- **API docs:** generated by Scramble at http://localhost:8080/docs/api (local env only; `viewApiDocs` gate
+  closed elsewhere). `docs/API.md` remains the contract; the generated page is a view of the current code.
 - Tests always use in-memory SQLite and never read dev caches; `tests/TestCase.php` aborts if not SQLite.
 
 - Boost: `boost.json` (committed) holds the choices (Claude Code, guidelines + MCP), so
@@ -69,6 +54,13 @@ Milestones are defined in `docs/PLAN.md`.
   8025/1025. Override with `MAILPIT_UI_PORT` / `MAILPIT_SMTP_PORT`.
 - `EnsureAppVersion` is global middleware (so 426 comes before 401); it only acts on `api/*`.
 - The test suite takes ~1 min on the Windows bind mount (first test boots slowly).
+- **OPcache file cache survives `docker compose restart`.** With `validate_timestamps=0`, modified
+  (not new) PHP files stay stale after a restart because `/tmp/opcache` (file cache) is inside the
+  container. After PHP changes run: `docker compose exec app sh -c "rm -rf /tmp/opcache/*"` then
+  `docker compose restart app horizon`.
+- Goal periods are closed by `php artisan goals:close-periods` (scheduled every 5 minutes by
+  `GoalsServiceProvider`; the `scheduler` container runs it). Current periods are also opened on
+  demand when the API reads plans.
 - PHPStan: `treatPhpDocTypesAsCertain: false` because Sanctum's `currentAccessToken()` can be a
   `TransientToken` at runtime.
 
@@ -96,7 +88,61 @@ curl http://localhost:8080/api/v1/health
   (switch a type off), Tags, Content batches, Content preview (pick an item and an age band).
 - CSV import runs on the queue (Horizon must be running).
 
+## How to test (B5)
+
+- As Sam (`demo-sam-child-token`): `POST /api/v1/play/sessions {"category_id":1}` → session + 13 items;
+  `POST /api/v1/play/sessions/{id}/answers {"session_item_id":..,"response":{"choice_id":"a"},"time_ms":1200}`;
+  three wrong answers → `failed`; then `POST .../second-chance {"method":"free"}` (Family plan, 3/day) or
+  `POST .../redemption` and answer the 3 `is_redemption` items.
+- `GET /api/v1/me/stats`, `GET /api/v1/family/leaderboard?period=today|week|month|all`.
+- `DemoActivitySeeder` adds ~2 weeks of `demo_seed` ledger rows + streaks for The Demos (runs once).
+- Tests: `tests/Feature/Api/PlayTest.php`, `tests/Feature/Api/ScoringTest.php`.
+
+## How to test (B6)
+
+- `GET /api/v1/goals` as anyone in The Demos → "Pizza Friday" (weekly cooperation, target 100,
+  Sam's target 20) with `current_period` progress.
+- As Mom (login `mom@brainyclan.test` / `password`): `POST /api/v1/goals` with `name, mode,
+  period_type, target_points, starts_on (today or later), category_ids [..], members?`;
+  `PATCH /api/v1/goals/{id}`, `DELETE /api/v1/goals/{id}`, `GET /api/v1/goals/{id}/history`.
+- `docker compose exec app php artisan goals:close-periods` closes ended periods and opens next ones.
+- Admin → Families → Goal plans.
+- Tests: `tests/Feature/Api/GoalsTest.php`.
+
 ## Log
+
+### 2026-10-11 (API documentation)
+- Added `dedoc/scramble` v0.13.47 (MIT; supports Laravel 13 / PHP 8.5). Published `config/scramble.php`:
+  `api_path` `api/v1`, title "Brainy Clan API", version from `APP_VERSION` (new `config('app.version')`,
+  default `0.1.0`), description points to `docs/API.md` as the contract, security strategy
+  `MiddlewareAuthSecurityStrategy` (Sanctum bearer on `auth:*` routes, public routes marked `security: []`).
+  `viewApiDocs` gate in `AppServiceProvider` (local only for now). README section "API documentation".
+- Docs at http://localhost:8080/docs/api, JSON at `/docs/api.json`. All 31 `/api/v1` routes documented
+  (auth, me, family, invites, members, categories, play, stats, leaderboard, goals, health);
+  `scramble:analyze` clean. Pint, Larastan clean; Pest 148 passed.
+- Weakly inferred spots (fine for now, improve with PHPDoc / typed Resources later): `POST /play/sessions/{session}/answers`
+  `data.session` is an untyped array (should be the session payload); leaderboard `entries` items only show `rank`;
+  `correct_response` is a free-form object; error responses (401/403/422 envelope) are Scramble defaults, not our
+  documented error format.
+
+### 2026-10-11 (session 3: B5 finish, B6)
+- B5: Scoring HTTP (`Scoring/Http/routes.php`, `StatsController`, `LeaderboardController`,
+  `LeaderboardRequest`). Pest: `PlayTest` (21 tests) and `ScoringTest` (6). Fixes: new sessions returned
+  `null` for `points`/`mistakes`/`second_chances_used` (now set explicitly in `StartSession`);
+  malformed responses (unknown `choice_id`) are now a 422 instead of a mistake (new
+  `ChallengeType::validateResponse()`, implemented in `ChoiceChallenge`); unanswered redemption items
+  are void and hidden from `items` after a failed round (`SessionPayload`); PHPStan fixes in
+  `BuildLeaderboard::rank()` (now generic `array<string, mixed>` rows, reused by Goals) and `Streak`.
+  `limits.max_active_goals` confirmed in PolicyResolver + PolicySeeder. `DemoActivitySeeder`.
+  Live curl smoke test against :8080 passed.
+- B6: migration `2026_10_10_180000_create_goals_tables` (migrated in dev), models `Goals/Models/*`,
+  `GoalPlanFactory`, actions `OpenGoalPeriod`, `ComputeGoalProgress`, `CloseGoalPeriods`,
+  `SaveGoalPlan` (create/update/deactivate, tier limit, locked categories, members), `LoadGoalPlans`;
+  `GoalController` + requests + `GoalPlanResource`; `goals:close-periods` command scheduled every
+  5 min; events `PeriodClosed`, `GoalReached`; `ApiException::goalLimitReached()`; Filament
+  `GoalPlanResource` (list + deactivate). Pest: `GoalsTest` (9 tests), admin page test.
+- API.md: clarifications changelog line (2026-10-11), see there.
+
 
 ### 2026-10-10 (session 2: B3–B4)
 - Content module: `categories` (tree, per-locale names, ages, active), `challenge_types`,
