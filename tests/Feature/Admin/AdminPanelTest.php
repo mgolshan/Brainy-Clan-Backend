@@ -1,5 +1,7 @@
 <?php
 
+use App\Modules\ChallengeTypes\Generators\WordSearchBuilder;
+use App\Modules\Content\Models\Category;
 use App\Modules\Content\Models\ContentItem;
 use App\Modules\Family\Models\Invite;
 use App\Modules\Goals\Models\GoalPlan;
@@ -19,8 +21,8 @@ it('renders every admin page for staff', function (string $url) {
     GoalPlan::factory()->create(['family_id' => $owner->family_id])->categories()->attach($item->category_id);
 
     $url = str_replace(
-        ['{family}', '{ageBand}', '{setting}', '{item}', '{category}'],
-        [(string) $owner->family_id, (string) AgeBand::query()->value('id'), (string) Setting::query()->value('id'), (string) $item->id, (string) $item->category_id],
+        ['{family}', '{ageBand}', '{setting}', '{item}', '{category}', '{plan}'],
+        [(string) $owner->family_id, (string) AgeBand::query()->value('id'), (string) Setting::query()->value('id'), (string) $item->id, (string) $item->category_id, (string) GoalPlan::query()->value('id')],
         $url,
     );
 
@@ -48,6 +50,7 @@ it('renders every admin page for staff', function (string $url) {
     '/admin/content-preview',
     '/admin/content-preview?item={item}&band=teen',
     '/admin/goal-plans',
+    '/admin/goal-plans/{plan}',
 ]);
 
 it('logs admin changes to the audit log', function () {
@@ -57,4 +60,19 @@ it('logs admin changes to the audit log', function () {
     AgeBand::query()->where('code', 'teen')->firstOrFail()->update(['name' => 'Teenager']);
 
     $this->assertDatabaseHas('activity_log', ['log_name' => 'admin', 'description' => 'updated', 'causer_id' => $staff->id]);
+});
+
+it('previews B7 types: word puzzles, generated samples and category generators', function () {
+    $staff = User::factory()->staff()->create();
+    $built = (new WordSearchBuilder)->build(['CAT', 'DOG'], 6, ['right', 'down'], 'admin');
+    $search = ContentItem::factory()->create(['type_key' => 'word_puzzle', 'payload' => ['variant' => 'word_search', 'grid' => $built['grid'], 'words' => ['CAT', 'DOG']], 'answer' => ['found' => $built['found']]]);
+    $anagram = ContentItem::factory()->create(['type_key' => 'word_puzzle', 'payload' => ['variant' => 'anagram', 'letters' => ['T', 'A', 'C'], 'hint' => 'An animal'], 'answer' => ['words' => ['CAT']]]);
+    $category = Category::factory()->create(['generators' => [['type' => 'sudoku', 'options' => ['size' => 6], 'min_difficulty' => 3, 'max_difficulty' => 6]]]);
+
+    $this->actingAs($staff)->get("/admin/content-preview?item={$search->id}")->assertOk()->assertSee('3 points');
+    $this->actingAs($staff)->get("/admin/content-preview?item={$anagram->id}")->assertOk()->assertSee('An animal');
+    $this->actingAs($staff)->get('/admin/content-preview?sample=sudoku-9&difficulty=7&seed=x')->assertOk()->assertSee('generated sample')->assertSee('8 points');
+    $this->actingAs($staff)->get('/admin/content-preview?sample=math-fractions&difficulty=6')->assertOk()->assertSee('fraction');
+    $this->actingAs($staff)->get("/admin/categories/{$category->id}/edit")->assertOk();
+    $this->actingAs($staff)->get('/admin/categories')->assertOk()->assertSee('sudoku 6');
 });

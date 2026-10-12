@@ -11,7 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Birth data is only included for the member themself and for family admins.
+ * Birth data and the email login (`email`, `has_password`) are only included for the member
+ * themself and for family admins.
  *
  * @property FamilyMember $resource
  */
@@ -37,7 +38,7 @@ class MemberResource extends JsonResource
         $band = $policy->bandForMember($member);
 
         $viewer = $this->viewer ?? $request->user();
-        $showBirth = $viewer instanceof User && $this->canSeeBirthData($member, $viewer);
+        $showPrivate = $viewer instanceof User && $this->canSeePrivateData($member, $viewer);
 
         return [
             'id' => $member->id,
@@ -47,17 +48,21 @@ class MemberResource extends JsonResource
             'role' => $member->role,
             'age_band' => $band->code ?? 'adult',
             'is_child' => $policy->isChildBand($band),
-            'birth_year' => $this->when($showBirth, $member->user->birth_year),
-            'birth_month' => $this->when($showBirth, $member->user->birth_month),
+            'birth_year' => $this->when($showPrivate, $member->user->birth_year),
+            'birth_month' => $this->when($showPrivate, $member->user->birth_month),
             'difficulty_override' => $member->difficulty_override,
             'accessibility' => Accessibility::forMember($member, $band),
             'default_ui_theme' => (string) ($band?->rule('ui_theme') ?? 'modern'),
             'status' => $member->status,
             'joined_at' => Iso::format($member->joined_at ?? $member->created_at),
+            'email' => $this->when($showPrivate, $member->user->email),
+            'has_password' => $this->when($showPrivate, $member->user->password !== null),
+            // From the band already resolved above (cached policy snapshot): no extra query per member.
+            'email_login_allowed' => $this->when($showPrivate, $policy->emailLoginAllowed($band)),
         ];
     }
 
-    private function canSeeBirthData(FamilyMember $member, User $viewer): bool
+    private function canSeePrivateData(FamilyMember $member, User $viewer): bool
     {
         if ($viewer->id === $member->user_id) {
             return true;

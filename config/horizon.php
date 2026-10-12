@@ -98,6 +98,7 @@ return [
 
     'waits' => [
         'redis:default' => 60,
+        'redis-ai:ai' => 900,
     ],
 
     /*
@@ -208,6 +209,18 @@ return [
             'memory' => 128,
             'tries' => 1,
             'timeout' => 60,
+            'nice' => 0,
+        ],
+        'supervisor-ai' => [
+            'connection' => 'redis-ai',
+            'queue' => ['ai'],
+            'balance' => 'simple',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 1,
+            'timeout' => 420,
             'nice' => 0,
         ],
     ],

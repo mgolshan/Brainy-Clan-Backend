@@ -18,6 +18,21 @@ use Illuminate\Support\Collection;
  */
 class PickContentItems
 {
+    /**
+     * Distance between an item's difficulty and a target, without ever subtracting a larger
+     * value from the column: `difficulty` is UNSIGNED on MySQL, where `difficulty - 5` with
+     * difficulty 2 overflows (SQLSTATE 22003) instead of going negative. Portable (MySQL, SQLite).
+     */
+    public const string DIFFICULTY_DISTANCE_SQL = 'CASE WHEN content_items.difficulty >= ? THEN content_items.difficulty - ? ELSE ? - content_items.difficulty END';
+
+    /**
+     * @return list<int>
+     */
+    public static function difficultyDistanceBindings(int $target): array
+    {
+        return [$target, $target, $target];
+    }
+
     public function __construct(
         private readonly CategoryTree $tree,
         private readonly PolicyResolver $policy,
@@ -61,7 +76,7 @@ class PickContentItems
         if ($picked->count() < $count) {
             $picked = $picked->merge(
                 $this->query($member, $categoryId, [...$excludeIds, ...$picked->pluck('id')->all()])
-                    ->orderByRaw('ABS(content_items.difficulty - ?)', [$difficulty['default']])
+                    ->orderByRaw(self::DIFFICULTY_DISTANCE_SQL, self::difficultyDistanceBindings($difficulty['default']))
                     ->orderByRaw('COALESCE(h.times_seen, 0)')
                     ->inRandomOrder()
                     ->limit($count - $picked->count())

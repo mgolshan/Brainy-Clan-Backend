@@ -7,7 +7,7 @@ use Illuminate\Database\Seeder;
 
 /**
  * The 8 launch categories and their sub-scopes (database/seeders/data/categories.php).
- * Matched on slug, so re-running updates names, icons, ages and order.
+ * Matched on slug, so re-running updates names, icons, ages, order and generators.
  */
 class CategorySeeder extends Seeder
 {
@@ -35,6 +35,7 @@ class CategorySeeder extends Seeder
                 'min_age' => $node['min_age'] ?? null,
                 'max_age' => $node['max_age'] ?? null,
                 'is_active' => true,
+                'generators' => $node['generators'] ?? null,
             ]);
 
             if (isset($node['children']) && is_array($node['children'])) {

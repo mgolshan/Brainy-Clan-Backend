@@ -34,6 +34,11 @@ and add a line to the changelog at the bottom.
 | `no_family` | 409 | Endpoint needs a family membership and the user has none |
 | `already_in_family` | 409 | User already belongs to a family |
 | `invite_invalid` | 422 | Invite code unknown, used or expired |
+| `sign_in_code_invalid` | 422 | Sign-in code unknown, used or expired |
+| `social_token_invalid` | 401 | Google/Facebook token could not be verified |
+| `social_signup_incomplete` | 422 | New social account: birth year/month needed (adult check) |
+| `social_account_taken` | 409 | That Google/Facebook account is linked to another user |
+| `last_sign_in_method` | 409 | Can't unlink the only way this user can sign in |
 | `session_not_active` | 409 | Play session is not in a state that allows this action |
 | `item_already_answered` | 409 | Session item was already answered |
 | `second_chance_unavailable` | 403 | No second chance of that method left / allowed |
@@ -65,7 +70,8 @@ and add a line to the changelog at the bottom.
   "age_band": "child", "is_child": true, "birth_year": 2017, "birth_month": 3,
   "difficulty_override": null,
   "accessibility": { "text_scale": 1.0, "reduced_motion": false, "calm_timers": false, "theme": null },
-  "default_ui_theme": "playful", "status": "active", "joined_at": "2026-10-10T14:00:00Z" }
+  "default_ui_theme": "playful", "status": "active", "joined_at": "2026-10-10T14:00:00Z",
+  "email": null, "has_password": false, "email_login_allowed": false }
 ```
 - `role`: `admin` | `member`. The family owner is always `admin`.
 - `age_band`: `child` | `teen` | `adult` | `senior` (codes come from the `age_bands` table).
@@ -73,6 +79,8 @@ and add a line to the changelog at the bottom.
 - `accessibility.theme`: `null` (use the policy default) or a theme key (see Policy). Lets a member
   pick another look; it never changes rules.
 - `birth_year` / `birth_month` only for the member themself and for admins.
+- `email` / `has_password` / `email_login_allowed` (from the member's band policy) only for the member themself and for admins (otherwise omitted).
+  `email` is the member's email login, `null` when they sign in with codes only.
 
 ### Policy (resolved for the signed-in member)
 ```json
@@ -85,6 +93,7 @@ and add a line to the changelog at the bottom.
   "ads_allowed": false,
   "purchases_allowed": false,
   "collect_email": false,
+  "email_login_allowed": false,
   "difficulty": { "min": 1, "max": 4, "default": 2 },
   "second_chance": { "free_per_day": 0, "free_used_today": 0, "ad_allowed": false, "redemption_allowed": true },
   "limits": { "max_members": 2, "max_categories": 3, "max_active_goals": 1 },
@@ -98,6 +107,9 @@ and add a line to the changelog at the bottom.
   `adult → modern`, `senior → classic`. Seniors also default to `calm_timers: true`. `accessibility_defaults.text_scale` stays `1.0` for every band: the `classic` theme already has a larger type scale, so a policy scale on top would compound (×1.44).
 - Seed age bands: child 0–12, teen 13–17, adult 18–64, senior 65+.
 - Before a family exists the user still gets a policy (tier `free`).
+- `collect_email`: the band may **self-register** with email + password (adults, seniors).
+  `email_login_allowed`: an admin may give a member of this band an email login (seeded: child
+  `false`, teen/adult/senior `true`), so a child who turns 13 can get one. Both editable in the admin.
 
 ## Endpoints
 
@@ -124,13 +136,49 @@ a `devices` row bound to the new token.
   email?, password?`. Creates the user from the invite (nickname, birth data) and the membership.
   `email`/`password` are accepted only when the invitee's band has `collect_email: true`
   (adults); children never send them. Codes are case-insensitive. → **201**, 422 `invite_invalid`.
+- `POST /auth/code` — sign in on a new device with a one-time **sign-in code** an admin issued
+  for a member (see Family → sign-in codes). Body: `code, device_name, platform`. Codes are
+  case-insensitive, dashes/spaces ignored. → 200, 422 `sign_in_code_invalid`. This is how children
+  (no email, no password) sign in again after a new phone, a reinstall or a sign-out.
 - `POST /auth/logout` (auth) — revokes the current token and its device. → 204
+
+- `POST /auth/social/{provider}` — sign in or sign up with `google` | `facebook` (adults only).
+  Body: `token` (Google: the **ID token**; Facebook: the **access token**), `device_name, platform`,
+  plus for a first-time sign-up `birth_year, birth_month` and optionally `display_name, locale`.
+  The server verifies the token with the provider, then: a linked account → sign in (**200**);
+  no link but a user with the same provider-verified email → link and sign in (**200**); otherwise
+  create an adult user (**201**). Without birth data on a would-be new user → 422
+  `social_signup_incomplete` (the app asks for birth year/month and retries with the same token);
+  an age below the self-registration threshold → 422 like `/auth/register`. 401 `social_token_invalid`.
+  Returns `AuthPayload`. Children never use social sign-in.
+  Google ID tokens are accepted when `aud` is any of the configured Google client IDs (web,
+  Android, iOS — Android and web tokens carry the web client ID, iOS ones may carry the iOS ID).
+  Facebook: the standard user access token (not iOS "Limited Login" tokens). A new user's
+  `display_name` defaults to the provider's name (first name) when not sent.
+  SocialAccount: `{ "provider": "google", "email": "mom@gmail.com" | null, "linked_at": "..." }`
+  (`email` is `null` when the provider shares none, e.g. a phone-only Facebook account).
+  Further rules: if the provider email matches an existing non-adult user, sign-in is 403
+  `forbidden` (linking from `/me/social-accounts` as a child/teen too). One link per provider:
+  linking another account of the same provider replaces the old link. Unlinking a provider that is
+  not linked → 404 `not_found`. Provider network errors or a server without keys → 401 `social_token_invalid`.
+
+**How members sign in (summary):** adults with an email login use `/auth/login` or Google/Facebook (`/auth/social/{provider}`); anyone — and
+always children — can be signed in on a device with an admin-issued sign-in code; first-time
+members use their invite code (`/auth/join`). No shared passwords, no parent email reuse.
 
 ### Me
 - `GET /me` (auth) → `{ "data": { "user", "member" | null, "family" | null, "policy" } }`. The app calls it on launch.
 - `PATCH /me` (auth) — Body (all optional): `display_name, avatar, locale`. → `{ data: User }`
 - `PATCH /me/accessibility` (auth, needs family) — Body (all optional): `text_scale (0.8–1.6),
   reduced_motion, calm_timers, theme (null | playful | sleek | modern | classic)`. → `{ data: Member }`
+- `GET /me/social-accounts` (auth) → `{ data: [ { "provider": "google", "email": "mom@gmail.com", "linked_at": "..." } ] }`
+- `POST /me/social-accounts/{provider}` (auth) — Body: `token`. Links Google/Facebook to the
+  signed-in adult (e.g. after joining by invite). → **201** `{ data: SocialAccount }`, 409 `social_account_taken`.
+- `DELETE /me/social-accounts/{provider}` (auth) → 204; 409 `last_sign_in_method` when the user has
+  no password and no other linked provider.
+- `PUT /me/password` (auth) — set or change the password of the user's email login. Body:
+  `password (min 8), password_confirmation, current_password` (`current_password` required only
+  when `has_password` is true). 422 when the user has no email. → 204
 - `GET /me/stats` (auth, needs family) →
   `{ "data": { "points_today": 4, "points_week": 23, "points_total": 120, "streak": { "current": 3, "longest": 7 } } }`
 
@@ -140,8 +188,20 @@ a `devices` row bound to the new token.
 - `GET /family` (auth, needs family) → `{ data: { family: Family, members: Member[] } }`
 - `PATCH /family` (admin) — `name?, timezone?` → `{ data: Family }`
 - `PATCH /family/members/{member}` (admin) — Body (all optional): `nickname, avatar,
-  difficulty_override (null | 1–10), birth_year, birth_month, role, accessibility { ... }`.
-  An admin cannot demote the owner. → `{ data: Member }`
+  difficulty_override (null | 1–10), birth_year, birth_month, role, accessibility { ... },
+  email (null | email)`. An admin cannot demote the owner. `email` adds, changes or removes the
+  member's email login: 422 on `email` when the member's policy has `email_login_allowed: false`
+  or the address is taken; only the owner may change the owner's email (403 `forbidden`). Removing it (`null`) also clears the password (signed-in devices stay signed in; sign them out via devices). After an email is added
+  the member sets a password on their own device (`PUT /me/password`). → `{ data: Member }`
+- `POST /family/members/{member}/sign-in-codes` (admin) — issue a one-time sign-in code for that
+  member's new device. → **201** `{ data: { "code": "K7QM4XPA", "member_id": 7, "expires_at": "..." } }`.
+  Same alphabet as invites, valid **15 minutes**, single use; issuing a new one voids the member's
+  older unused codes.
+- `GET /family/members/{member}/devices` (admin, or the member themself) →
+  `{ data: [ { "id": 5, "name": "Sam's iPad", "platform": "ios", "app_version": "1.0.0",
+  "last_seen_at": "...", "is_current": false } ] }` — signed-in devices.
+- `DELETE /family/members/{member}/devices/{device}` (admin, or the member themself) — signs that
+  device out (revokes its token). → 204
 - `DELETE /family/members/{member}` (admin, not the owner) → 204
 - `POST /family/invites` (admin) — Body: `nickname, birth_year, birth_month, avatar?`.
   → **201** `{ data: Invite }`, 403 `member_limit_reached` (members + pending invites ≥ limit).
@@ -183,8 +243,10 @@ second chance may still be possible) | `completed` (target reached) | `abandoned
 Session item (answers stripped):
 ```json
 { "id": 55, "position": 1, "type": "multiple_choice", "is_redemption": false,
-  "payload": { ... }, "answered": false }
+  "points": 1, "payload": { ... }, "answered": false }
 ```
+`points`: what a correct answer is worth (1 for most types; bigger puzzles are worth more, see
+Challenge payloads). A wrong answer is always 1 mistake.
 
 - `POST /play/sessions` — Body: `category_id`. Server picks items (category subtree, member's
   difficulty range, least-seen first). Target and cap come from settings (default target 10,
@@ -194,7 +256,7 @@ Session item (answers stripped):
 - `POST /play/sessions/{session}/answers` — Body: `session_item_id, response, time_ms`.
   → `{ data: { is_correct: true, correct_response: { ... }, explanation: null | "...",
   points_awarded: 1, session: Session } }`. Answering an already answered item → 409 `item_already_answered`.
-  1 point per correct answer. Reaching `target_points` → `completed`; reaching `blunder_cap`
+  A correct answer earns the item's `points`. Reaching `target_points` → `completed`; reaching `blunder_cap`
   mistakes → `failed`. A `response` that is malformed for the item (e.g. a `choice_id` that is not one
   of the item's choices) → **422** `validation_failed` on `response.choice_id`; it is not counted as a
   mistake. Answering while the session is not in the right state (regular item outside `active`,
@@ -219,9 +281,36 @@ Session item (answers stripped):
 | --- | --- | --- | --- |
 | `multiple_choice` | `{ "question": "Capital of Peru?", "choices": [ { "id": "a", "text": "Lima" }, ... ], "image_url": null }` | `{ "choice_id": "a" }` | `{ "choice_id": "a" }` |
 | `wisdom_card` | `{ "card": { "text": "We suffer more in imagination than in reality.", "author": "Seneca", "source": "Letters to Lucilius" }, "question": "What is the main idea?", "choices": [ { "id": "a", "text": "..." } ] }` | `{ "choice_id": "b" }` | `{ "choice_id": "b" }` |
-| `sudoku` (B7) | `{ "size": 4, "grid": [[0,1,0,0], ...] }` (0 = empty) | `{ "grid": [[...]] }` | `{ "valid": true }` |
-| `word_puzzle` (B7) | defined in B7 | | |
-| `math_sprint` (B7) | defined in B7 | | |
+| `sudoku` | `{ "size": 4, "box": [2, 2], "grid": [[0,1,0,0], ...] }` — `size` 4, 6 or 9; `box` = [rows, cols] of a box (4→[2,2], 6→[2,3], 9→[3,3]); 0 = empty | `{ "grid": [[...]] }` (the full grid) | `{ "grid": [[...]] }` (the solution) |
+| `math_sprint` | `{ "question": "7 × 8", "answer_format": "integer", "time_limit_ms": 10000 }` — `answer_format`: `integer` \| `decimal` \| `fraction` | `{ "value": "56" }` (string; fractions as `"3/4"`) | `{ "value": "56" }` |
+| `word_puzzle` | by `variant`, see below | see below | see below |
+
+**`sudoku`** — solved on the device, verified on submit: correct when the submitted grid keeps
+every given and is a valid complete solution. Worth 3 points (4×4), 5 (6×6) or 8 (9×9). A wrong
+or incomplete grid is a mistake and `correct_response` shows the solution. The app may check
+rows/columns/boxes for duplicates locally (pure Sudoku rules) but never knows the solution.
+
+**`math_sprint`** — generated per session by the server, age-scaled (times tables, mental math,
+fractions). "Simplify …" questions accept only the fully reduced fraction (`"7/8"`, not `"14/16"` or `"0.875"`; anything else is a wrong answer, not a 422). Answers may be negative in every format (`"-12"`, `"-0.5"`, `"-3/4"`). Equivalent answers are accepted (`"0.5"` for `"1/2"` when the format allows, `"3/4"` =
+`"6/8"`). `time_limit_ms` is **advisory** (a countdown bar; `null` = no timer): answering late
+still counts; the app hides the bar when the member has `calm_timers`.
+
+**`word_puzzle`** variants (`payload.variant`):
+| variant | payload | response | correct_response | points |
+| --- | --- | --- | --- | --- |
+| `anagram` | `{ "variant": "anagram", "letters": ["T","A","C"], "hint": "An animal" }` | `{ "word": "cat" }` | `{ "word": "CAT" }` | 1 |
+| `missing_letter` | `{ "variant": "missing_letter", "pattern": "EL_PHANT", "hint": null }` (`_` = one missing letter, maybe several) | `{ "word": "elephant" }` | `{ "word": "ELEPHANT" }` | 1 |
+| `word_search` | `{ "variant": "word_search", "grid": [["C","A","T"], ...], "words": ["CAT", "DOG"] }` (words run in 8 directions) | `{ "found": [ { "word": "CAT", "start": [0,0], "end": [0,2] } ] }` ([row, col], zero-based) | `{ "found": [ ... ] }` (all placements) | 3 |
+Words are compared case-insensitively and Unicode-aware (NFC-normalized, `mb_` case folding, so
+French accents work); an anagram accepts any listed valid word made of exactly those letters. A word
+search is correct when every word is found at a valid placement; `start`/`end` may be given in
+either order (reading direction or reversed).
+
+**Sessions and generated items:** Sudoku and Math Sprint items are generated by the server from a
+seed when a session starts (they are not content rows); the API shape is the same, and an
+item's payload never changes once generated (re-fetching the session returns the same payload). A session in a
+category with big puzzles still uses `target_points` (e.g. two 9×9 Sudokus reach 10 points); the
+server sizes the initial batch so the target is reachable within the blunder cap.
 
 ### Leaderboard
 - `GET /family/leaderboard?period=today|week|month|all` (default `week`, computed in the family's
@@ -276,7 +365,7 @@ starts at `starts_on` (so it can be shorter than a full week/month); the last en
   → **201** `{ data: GoalPlan }`. 403 `goal_limit_reached`; 403 `category_not_allowed` for locked categories.
 - `PATCH /goals/{plan}` (admin) — same fields, all optional, plus `is_active`. Changes apply from the
   next period; the open period keeps its target. → `{ data: GoalPlan }`
-- `DELETE /goals/{plan}` (admin) → 204 (soft: deactivates, history kept).
+- `DELETE /goals/{plan}` (admin) → 204. Soft delete: the plan disappears from `GET /goals` and `GET /goals/{plan}` (404); its periods and ledger history are kept in the database. Pausing is `PATCH is_active: false` (stays listed).
 - `GET /goals/{plan}/history?page=1` → closed periods, newest first, 20 per page:
 ```json
 { "data": [ { "period_id": 30, "starts_at": "...", "ends_at": "...", "status": "closed",
@@ -289,9 +378,55 @@ starts at `starts_on` (so it can be shorter than a full week/month); the last en
 - A scheduled job closes ended periods (writes `result`), opens the next one, and dispatches
   `PeriodClosed` / `GoalReached`.
 
+### Billing, push and notifications (B8)
+**Subscriptions** are bought in the app through RevenueCat (F6); the server learns about them only
+from RevenueCat webhooks and never trusts the app for the tier.
+- RevenueCat `app_user_id` = `family-{family_id}` (one entitlement per family; the paying adult's
+  purchase upgrades the whole family). Entitlement id `family`.
+- `POST /webhooks/revenuecat` (public, not under `/api/v1` auth; `Authorization: Bearer <REVENUECAT_WEBHOOK_SECRET>`)
+  — idempotent by `event.id` (`webhook_events`); updates `subscriptions` and the family's `tier`
+  (`family` while the entitlement is active incl. grace period, else `free`). → 200 (also for
+  duplicates and ignored event types), 401 on a wrong secret.
+- `GET /family/subscription` (admin) → `{ "data": { "tier": "family", "status": "active" | "grace" |
+  "expired" | "none", "store": "app_store" | "play_store" | "stripe" | null, "product_id": "...",
+  "expires_at": "...", "will_renew": true, "revenuecat_app_user_id": "family-1" } }`.
+  The app passes `revenuecat_app_user_id` to `Purchases.logIn()`.
+- Family members over the free limits keep their data when a subscription ends; limits apply to
+  new members/goals/categories only.
+
+**Rewarded ads:** `POST /play/sessions/{session}/second-chance` with `method: "ad"` requires
+`reward_ref` = the AdMob server-side-verification `transaction_id`. `GET /webhooks/admob-ssv` (public)
+receives AdMob's signed SSV callback (verified against Google's published keys) and stores the reward;
+a second chance with an unknown or already used `reward_ref` → 403 `second_chance_unavailable`.
+Custom data in the ad request: `session_id`.
+
+**Push notifications** (Expo push service):
+- `PUT /me/push-token` (auth) — Body: `token` (Expo push token `ExponentPushToken[...]`), `platform`.
+  Stored on the current device. → 204. `DELETE /me/push-token` → 204 (also cleared on logout).
+- `GET /me/notification-preferences` (auth, needs family) → `{ "data": { "types": { "goal_reached": true,
+  "period_closed": true, "family_activity": true, "daily_reminder": false }, "quiet_from": "20:00",
+  "quiet_to": "07:30", "reminder_time": "17:00" } }` (times in the family timezone; children default
+  to quiet hours 19:30–07:30). `PATCH /me/notification-preferences` — same shape, all optional.
+  Admins may also `PATCH /family/members/{member}/notification-preferences` (children's quiet hours).
+- Sent by the server (queued; never during quiet hours: delayed until quiet hours end, dropped
+  when older than 12 h): `goal_reached` (cooperation target reached / race winner), `period_closed` (results),
+  `family_activity` (a member finished a session, max 1 per member per hour, not to themself),
+  `daily_reminder` (at `reminder_time` if the member hasn't played today). Push `data`:
+  `{ "type": "goal_reached", "goal_id": 2 }` etc. so the app can deep-link.
+
 ## Changelog
 - 2026-10-10 — Initial contract for B1–B5 / F1–F3.
 - 2026-10-10 — Member gains `default_ui_theme`; senior `text_scale` default is 1.0 (classic theme carries the larger type); redemption returns all session items, like second-chance.
 - 2026-10-10 — Goals (B6/F4): goal plans, progress, history; `limits.max_active_goals`; `goal_limit_reached`.
 - 2026-10-10 — Error code `item_already_answered` (409) for answering a session item twice.
 - 2026-10-11 — Clarifications (B5/B6): malformed answer `response` → 422 (not a mistake); `answered` counts regular items only; void unanswered redemption items are dropped from `items` after a failed round; 409 `session_not_active` listed for `/second-chance` and `/redemption`; GoalProgress `reached` is the cooperation result (competition: per-entry `reached`), `ends_at` exclusive, first period clipped to `starts_on`, targets snapshotted per period.
+- 2026-10-11 — Member sign-in without email: `POST /auth/code` with admin-issued sign-in codes (`POST /family/members/{member}/sign-in-codes`), member devices list/revoke, admin-managed member `email` (`PATCH /family/members/{member}`), `PUT /me/password`; Member gains `email`, `has_password`; Policy gains `email_login_allowed`; error `sign_in_code_invalid`.
+- 2026-10-11 — B7/F5 challenge types: `sudoku`, `math_sprint`, `word_puzzle` (variants `anagram`, `missing_letter`, `word_search`) payload/response shapes; SessionItem gains `points` (value of a correct answer); points per correct answer = item `points`.
+- 2026-10-11 — Social sign-in (B6b/F4b): `POST /auth/social/{provider}` (google, facebook), `/me/social-accounts` list/link/unlink; errors `social_token_invalid`, `social_signup_incomplete`, `social_account_taken`, `last_sign_in_method`.
+- 2026-10-11 — Member gains `email_login_allowed` (self/admin only); `DELETE /goals/{plan}` hides the plan (soft delete, 404 afterwards) instead of looking paused.
+- 2026-10-11 — Only the family owner can change the owner's email login (403 `forbidden` for co-admins).
+- 2026-10-11 — B7 clarifications: Unicode-aware case-insensitive word comparison; word-search placements accepted in either direction; math answers may be negative in any format; generated item payloads are stable for the session.
+- 2026-10-11 — Social sign-in clarifications: Google `aud` = any configured client ID; Facebook standard access tokens only; `display_name` defaults from the provider; SocialAccount `email` nullable.
+- 2026-10-11 — Social sign-in edge rules: non-adult email match → 403 `forbidden`; one link per provider (re-link replaces); unlink of an unlinked provider → 404; provider/network failure → 401 `social_token_invalid`.
+- 2026-10-11 — Math Sprint: "Simplify" questions require the fully reduced fraction.
+- 2026-10-11 — B8 contract: RevenueCat webhook + `GET /family/subscription` (`family-{id}` app user id), AdMob SSV `reward_ref`, push token + notification preferences, notification types.

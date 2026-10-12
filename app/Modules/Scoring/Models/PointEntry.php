@@ -16,7 +16,6 @@ use LogicException;
  * @property int $id
  * @property int $family_id
  * @property int $member_id
- * @property int|null $goal_period_id
  * @property int $category_id
  * @property int|null $play_session_id
  * @property int|null $session_item_id
@@ -24,7 +23,7 @@ use LogicException;
  * @property string $reason
  * @property Carbon $created_at
  */
-#[Fillable(['family_id', 'member_id', 'goal_period_id', 'category_id', 'play_session_id', 'session_item_id', 'amount', 'reason', 'created_at'])]
+#[Fillable(['family_id', 'member_id', 'category_id', 'play_session_id', 'session_item_id', 'amount', 'reason', 'created_at'])]
 class PointEntry extends Model
 {
     public const string REASON_CORRECT_ANSWER = 'correct_answer';

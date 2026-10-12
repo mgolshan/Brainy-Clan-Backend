@@ -13,10 +13,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
  * A family goal: competition (members ranked) or cooperation (team total), per day/week/month.
+ * Soft deleted by `DELETE /goals/{plan}` (hidden from the API, periods and history kept);
+ * pausing is `is_active: false`.
  *
  * @property int $id
  * @property int $family_id
@@ -29,6 +32,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $ends_on
  * @property bool $is_active
  * @property Carbon|null $created_at
+ * @property Carbon|null $deleted_at
  * @property-read Family $family
  * @property-read Collection<int, Category> $categories
  * @property-read Collection<int, GoalPlanMember> $planMembers
@@ -39,7 +43,7 @@ use Illuminate\Support\Carbon;
 class GoalPlan extends Model
 {
     /** @use HasFactory<GoalPlanFactory> */
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     public const string MODE_COMPETITION = 'competition';
 

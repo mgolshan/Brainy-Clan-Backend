@@ -2,6 +2,8 @@
 
 namespace App\Modules\Play\Actions;
 
+use App\Modules\ChallengeTypes\ChallengeTypeRegistry;
+use App\Modules\ChallengeTypes\Support\GeneratorSpec;
 use App\Modules\Content\Models\ContentItem;
 use App\Modules\Play\Models\MemberItemHistory;
 use App\Modules\Play\Models\PlaySession;
@@ -9,13 +11,26 @@ use App\Modules\Play\Models\SessionItem;
 use Illuminate\Support\Collection;
 
 /**
- * Appends items to a session and counts them as "seen" in the member's item history.
- * `topUp()` makes sure enough unanswered regular items remain to reach the target even if
- * every remaining mistake is used: (target − points) + (cap − mistakes).
+ * Appends items to a session: content items (counted as "seen" in the member's item history)
+ * mixed with generated items (Sudoku, Math Sprint) from the generators the category subtree
+ * declares. Each slot picks a source at random: every generator and "content" (when there is
+ * any) weigh the same.
+ *
+ * Items carry `points` (what a correct answer is worth). A batch is cut to the shortest prefix
+ * that keeps the target reachable even if every remaining allowed mistake lands on the most
+ * valuable unanswered items (see isReachable()). With 1-point items that is exactly the old
+ * rule: (target − points) + (cap − mistakes) unanswered items. Redemption rounds always get
+ * exactly $count items (they score no points).
  */
 class AddSessionItems
 {
-    public function __construct(private readonly PickContentItems $pick) {}
+    private const int UNIQUE_ATTEMPTS = 20;
+
+    public function __construct(
+        private readonly PickContentItems $pick,
+        private readonly PickGeneratedItems $generated,
+        private readonly ChallengeTypeRegistry $registry,
+    ) {}
 
     /**
      * @return Collection<int, SessionItem>
@@ -23,8 +38,14 @@ class AddSessionItems
     public function handle(PlaySession $session, int $count, bool $redemption = false): Collection
     {
         $member = $session->member;
+        $pending = $redemption ? [] : $this->pendingPoints($session);
+
+        if ($count <= 0 || (! $redemption && $this->reachable($session, $pending))) {
+            return new Collection;
+        }
+
         $existingIds = SessionItem::query()->where('play_session_id', $session->id)->whereNotNull('content_item_id')->pluck('content_item_id')->map(fn ($id) => (int) $id)->all();
-        $hasItems = $existingIds !== [];
+        $hasItems = SessionItem::query()->where('play_session_id', $session->id)->exists();
 
         $contentItems = $this->pick->handle($member, $session->category_id, $count, $existingIds, easier: $redemption, allowRepeats: $hasItems);
 
@@ -33,25 +54,16 @@ class AddSessionItems
             $contentItems = $contentItems->merge($this->pick->handle($member, $session->category_id, $count - $contentItems->count(), [], easier: true));
         }
 
-        $position = (int) SessionItem::query()->where('play_session_id', $session->id)->max('position');
-        $added = new Collection;
+        $specs = $this->generated->specs($member, $session->category_id);
 
-        foreach ($contentItems as $contentItem) {
-            /** @var ContentItem $contentItem */
-            $added->push(SessionItem::query()->create([
-                'play_session_id' => $session->id,
-                'content_item_id' => $contentItem->id,
-                'position' => ++$position,
-                'is_redemption' => $redemption,
-            ]));
-
-            $history = MemberItemHistory::query()->firstOrNew(['member_id' => $member->id, 'content_item_id' => $contentItem->id]);
-            $history->times_seen = ($history->times_seen ?? 0) + 1;
-            $history->last_seen_at = now();
-            $history->save();
+        if ($redemption && $specs !== []) {
+            $easiest = min(array_map(fn (GeneratorSpec $spec) => $spec->minDifficulty, $specs));
+            $specs = array_values(array_filter($specs, fn (GeneratorSpec $spec) => $spec->minDifficulty === $easiest));
         }
 
-        return $added;
+        $slots = $this->plan($session, $count, $redemption, $contentItems->values()->all(), $specs, $pending);
+
+        return $this->store($session, $slots, $redemption);
     }
 
     public function topUp(PlaySession $session): void
@@ -66,5 +78,216 @@ class AddSessionItems
         if ($needed > $unanswered) {
             $this->handle($session, $needed - $unanswered);
         }
+    }
+
+    /**
+     * Whether unanswered items worth $points can still reach $remainingTarget when the next
+     * $spareMistakes wrong answers all land on the most valuable of them.
+     *
+     * @param  list<int>  $points
+     */
+    public static function isReachable(array $points, int $remainingTarget, int $spareMistakes): bool
+    {
+        if ($remainingTarget <= 0) {
+            return true;
+        }
+
+        rsort($points);
+
+        return array_sum(array_slice($points, max(0, $spareMistakes))) >= $remainingTarget;
+    }
+
+    /**
+     * A generated item whose question is not already in the session (e.g. "1/3 + 1/3" twice, or
+     * the same text as a content item). Small generator pools may run out: after a few tries
+     * the last build is kept.
+     *
+     * @param  array<string, true>  $seen  question keys in the session; the new key is added
+     * @return array{type_key: string, category_id: int, seed: string, difficulty: int, points: int, payload: array<string, mixed>, answer: array<string, mixed>}
+     */
+    private function buildUnique(GeneratorSpec $spec, PlaySession $session, bool $redemption, array &$seen): array
+    {
+        for ($attempt = 0; $attempt < self::UNIQUE_ATTEMPTS; $attempt++) {
+            $built = $this->generated->build($spec, $session->member, easier: $redemption);
+            $key = self::questionKey($built['payload']);
+
+            if ($key === null || ! isset($seen[$key])) {
+                break;
+            }
+        }
+
+        if ($key !== null) {
+            $seen[$key] = true;
+        }
+
+        return $built;
+    }
+
+    /**
+     * Question keys of the items already in the session plus the content items about to be added.
+     *
+     * @param  list<array{content: ContentItem}|array{spec: GeneratorSpec}>  $slots
+     * @return array<string, true>
+     */
+    private function questionKeys(PlaySession $session, array $slots): array
+    {
+        $payloads = SessionItem::query()
+            ->where('play_session_id', $session->id)
+            ->with('contentItem:id,payload')
+            ->get(['id', 'content_item_id', 'payload'])
+            ->map(fn (SessionItem $item) => $item->payload ?? $item->contentItem?->payload)
+            ->all();
+
+        foreach ($slots as $slot) {
+            if (isset($slot['content'])) {
+                $payloads[] = $slot['content']->payload;
+            }
+        }
+
+        $keys = [];
+
+        foreach ($payloads as $payload) {
+            $key = is_array($payload) ? self::questionKey($payload) : null;
+
+            if ($key !== null) {
+                $keys[$key] = true;
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Normalized question text ("1/3 + 1/3" = "1/3+1/3"), or the whole payload for types without
+     * a question (Sudoku grids).
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public static function questionKey(array $payload): ?string
+    {
+        if (is_string($payload['question'] ?? null)) {
+            $text = (string) preg_replace('/\s+/u', '', mb_strtolower($payload['question']));
+
+            return $text !== '' ? 'q:'.$text : null;
+        }
+
+        return $payload !== [] ? 'p:'.md5((string) json_encode($payload)) : null;
+    }
+
+    /**
+     * @param  list<ContentItem>  $content
+     * @param  list<GeneratorSpec>  $specs
+     * @param  list<int>  $pending
+     * @return list<array{content: ContentItem}|array{spec: GeneratorSpec}>
+     */
+    private function plan(PlaySession $session, int $count, bool $redemption, array $content, array $specs, array $pending): array
+    {
+        $slots = [];
+        $points = $pending;
+
+        for ($i = 0; $i < $count; $i++) {
+            $sources = count($specs) + ($content !== [] ? 1 : 0);
+
+            if ($sources === 0) {
+                break;
+            }
+
+            $choice = random_int(0, $sources - 1);
+
+            if ($choice < count($specs)) {
+                $slots[] = ['spec' => $specs[$choice]];
+                $points[] = $this->generated->points($specs[$choice]);
+            } else {
+                /** @var ContentItem $item */
+                $item = array_shift($content);
+                $slots[] = ['content' => $item];
+                $points[] = $this->contentPoints($item);
+            }
+
+            if (! $redemption && $this->reachable($session, $points)) {
+                break;
+            }
+        }
+
+        return $slots;
+    }
+
+    /**
+     * @param  list<array{content: ContentItem}|array{spec: GeneratorSpec}>  $slots
+     * @return Collection<int, SessionItem>
+     */
+    private function store(PlaySession $session, array $slots, bool $redemption): Collection
+    {
+        $member = $session->member;
+        $position = (int) SessionItem::query()->where('play_session_id', $session->id)->max('position');
+        $added = new Collection;
+        $seen = $this->questionKeys($session, $slots);
+
+        foreach ($slots as $slot) {
+            if (isset($slot['spec'])) {
+                $built = $this->buildUnique($slot['spec'], $session, $redemption, $seen);
+
+                $added->push(SessionItem::query()->create([
+                    'play_session_id' => $session->id,
+                    'content_item_id' => null,
+                    'type_key' => $built['type_key'],
+                    'category_id' => $built['category_id'],
+                    'seed' => $built['seed'],
+                    'position' => ++$position,
+                    'is_redemption' => $redemption,
+                    'points' => $built['points'],
+                    'payload' => $built['payload'],
+                    'answer' => $built['answer'],
+                ]));
+
+                continue;
+            }
+
+            $contentItem = $slot['content'];
+
+            $added->push(SessionItem::query()->create([
+                'play_session_id' => $session->id,
+                'content_item_id' => $contentItem->id,
+                'type_key' => $contentItem->type_key,
+                'position' => ++$position,
+                'is_redemption' => $redemption,
+                'points' => $this->contentPoints($contentItem),
+            ]));
+
+            $history = MemberItemHistory::query()->firstOrNew(['member_id' => $member->id, 'content_item_id' => $contentItem->id]);
+            $history->times_seen = ($history->times_seen ?? 0) + 1;
+            $history->last_seen_at = now();
+            $history->save();
+        }
+
+        return $added;
+    }
+
+    /**
+     * @param  list<int>  $points
+     */
+    private function reachable(PlaySession $session, array $points): bool
+    {
+        return self::isReachable($points, $session->target_points - $session->points, $session->blunder_cap - $session->mistakes);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function pendingPoints(PlaySession $session): array
+    {
+        return SessionItem::query()
+            ->where('play_session_id', $session->id)
+            ->where('is_redemption', false)
+            ->whereNull('answered_at')
+            ->pluck('points')
+            ->map(fn ($points) => (int) $points)
+            ->values()
+            ->all();
+    }
+
+    private function contentPoints(ContentItem $item): int
+    {
+        return $this->registry->has($item->type_key) ? max(1, $this->registry->get($item->type_key)->points($item)) : 1;
     }
 }

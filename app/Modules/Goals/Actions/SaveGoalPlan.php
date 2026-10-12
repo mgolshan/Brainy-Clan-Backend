@@ -104,11 +104,20 @@ class SaveGoalPlan
     }
 
     /**
-     * Soft delete: deactivates the plan; periods and history are kept.
+     * Pause: the plan stays listed with `is_active: false` (admin panel support action).
      */
     public function deactivate(GoalPlan $plan): void
     {
         $plan->forceFill(['is_active' => false])->save();
+    }
+
+    /**
+     * `DELETE /goals/{plan}`: soft delete. The plan disappears from the API (404 afterwards) and no
+     * longer counts toward the tier limit; its periods and history stay in the database.
+     */
+    public function delete(GoalPlan $plan): void
+    {
+        $plan->delete();
     }
 
     /**

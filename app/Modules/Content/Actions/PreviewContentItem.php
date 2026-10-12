@@ -15,7 +15,7 @@ class PreviewContentItem
     public function __construct(private readonly ChallengeTypeRegistry $registry) {}
 
     /**
-     * @return array{type: string, payload: array<string, mixed>, correct_response: array<string, mixed>, explanation: string|null, served: bool, reasons: list<string>, ui_theme: string}
+     * @return array{type: string, payload: array<string, mixed>, correct_response: array<string, mixed>, explanation: string|null, points: int, served: bool, reasons: list<string>, ui_theme: string}
      */
     public function handle(ContentItem $item, AgeBand $band, ?int $age = null): array
     {
@@ -38,7 +38,7 @@ class PreviewContentItem
             $reasons[] = "Status is {$item->status}; only published items are served.";
         }
 
-        if (! $item->category->allowsAge($age)) {
+        if ($item->category_id !== null && ! $item->category->allowsAge($age)) {
             $reasons[] = 'The category is hidden for this age.';
         }
 
@@ -47,6 +47,7 @@ class PreviewContentItem
             'payload' => $handler->forClient($item),
             'correct_response' => $handler->correctResponse($item),
             'explanation' => $handler->explanation($item),
+            'points' => $handler->points($item),
             'served' => $reasons === [],
             'reasons' => $reasons,
             'ui_theme' => (string) $band->rule('ui_theme', 'modern'),

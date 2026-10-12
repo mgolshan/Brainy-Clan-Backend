@@ -46,9 +46,9 @@ abstract class ChoiceChallenge implements ChallengeType
         return is_string($explanation) && $explanation !== '' ? $explanation : null;
     }
 
-    public function score(ContentItem $item, bool $isCorrect): int
+    public function points(ContentItem $item): int
     {
-        return $isCorrect ? 1 : 0;
+        return 1;
     }
 
     /**

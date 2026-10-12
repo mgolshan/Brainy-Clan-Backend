@@ -13,9 +13,17 @@ class IssueDeviceToken
 {
     public function handle(User $user, string $deviceName, string $platform, ?string $appVersion = null): string
     {
+        return $this->issue($user, $deviceName, $platform, $appVersion)['token'];
+    }
+
+    /**
+     * @return array{token: string, device: Device}
+     */
+    public function issue(User $user, string $deviceName, string $platform, ?string $appVersion = null): array
+    {
         $token = $user->createToken($deviceName);
 
-        Device::query()->create([
+        $device = Device::query()->create([
             'user_id' => $user->id,
             'personal_access_token_id' => $token->accessToken->getKey(),
             'name' => $deviceName,
@@ -24,6 +32,6 @@ class IssueDeviceToken
             'last_seen_at' => now(),
         ]);
 
-        return $token->plainTextToken;
+        return ['token' => $token->plainTextToken, 'device' => $device];
     }
 }

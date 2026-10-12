@@ -24,18 +24,20 @@ use Filament\Tables\Table;
 use UnitEnum;
 
 /**
- * Generation / import runs. The AI batch generator page arrives in B7; for now batches can be
- * recorded by hand and their items reviewed in Content items.
+ * Raw view of generation / import runs (hand-made batches, debugging). AI batches are created
+ * and reviewed on the "AI batch generator" page (AiBatchGenerator).
  */
 class ContentBatchResource extends Resource
 {
     protected static ?string $model = ContentBatch::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSparkles;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     protected static string|UnitEnum|null $navigationGroup = 'Content';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 8;
+
+    protected static ?string $navigationLabel = 'Batches (raw)';
 
     public static function form(Schema $schema): Schema
     {

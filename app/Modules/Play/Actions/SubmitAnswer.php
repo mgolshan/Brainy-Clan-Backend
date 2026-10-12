@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * The server is the referee: checks a response with the item's challenge type plugin, awards
- * points (1 per correct regular answer), counts mistakes and moves the session through
+ * points (the item's `points` per correct regular answer), counts mistakes and moves the session through
  * active → completed / failed. Redemption items decide the redemption round instead.
  */
 class SubmitAnswer
@@ -51,7 +51,7 @@ class SubmitAnswer
                 throw ApiException::sessionNotActive();
             }
 
-            $content = $item->contentItem;
+            $content = $item->playable();
 
             if ($content === null) {
                 throw ApiException::sessionNotActive('This item is no longer available.');
@@ -65,7 +65,7 @@ class SubmitAnswer
             }
 
             $isCorrect = $handler->check($content, $response);
-            $points = $item->is_redemption ? 0 : $handler->score($content, $isCorrect);
+            $points = $isCorrect && ! $item->is_redemption ? $item->points : 0;
 
             $item->forceFill([
                 'response' => $response,
@@ -75,10 +75,10 @@ class SubmitAnswer
                 'answered_at' => now(),
             ])->save();
 
-            if ($isCorrect) {
+            if ($isCorrect && $item->content_item_id !== null) {
                 MemberItemHistory::query()
                     ->where('member_id', $session->member_id)
-                    ->where('content_item_id', $content->id)
+                    ->where('content_item_id', $item->content_item_id)
                     ->increment('times_correct');
             }
 
@@ -86,7 +86,7 @@ class SubmitAnswer
                 ? $this->applyRedemptionAnswer($session, $isCorrect)
                 : $this->applyRegularAnswer($session, $isCorrect, $points);
 
-            AnswerSubmitted::dispatch($item->id, $session->id, $session->family_id, $session->member_id, $content->category_id, $isCorrect, $points, $item->is_redemption);
+            AnswerSubmitted::dispatch($item->id, $session->id, $session->family_id, $session->member_id, $item->content_item_id !== null ? $content->category_id : ($item->category_id ?? $session->category_id), $isCorrect, $points, $item->is_redemption);
 
             if ($completed) {
                 SessionCompleted::dispatch($session->id, $session->family_id, $session->member_id, $session->points);

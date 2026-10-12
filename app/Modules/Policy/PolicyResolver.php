@@ -37,6 +37,7 @@ class PolicyResolver
         'play.blunder_cap_pct' => 30,
         'play.redemption_items' => 3,
         'invites.ttl_days' => 7,
+        'sign_in_codes.ttl_minutes' => 15,
         'feature_flags' => [],
     ];
 
@@ -97,6 +98,7 @@ class PolicyResolver
             'ads_allowed' => $adsAllowed,
             'purchases_allowed' => (bool) ($band?->rule('purchases_allowed') ?? false),
             'collect_email' => $this->collectsEmail($band),
+            'email_login_allowed' => $this->emailLoginAllowed($band),
             'difficulty' => $this->difficulty($band, $member?->difficulty_override),
             'second_chance' => [
                 'free_per_day' => $this->freeSecondChancesPerDay($tier, $band),
@@ -194,6 +196,21 @@ class PolicyResolver
         return (bool) ($band?->rule('collect_email') ?? false);
     }
 
+    /**
+     * Whether an admin may give a member of this band an email login (`email_login_allowed`;
+     * seeded: child false, teen/adult/senior true). Falls back to `collect_email` for bands
+     * that predate the key.
+     */
+    public function emailLoginAllowed(?AgeBand $band): bool
+    {
+        return (bool) ($band?->rule('email_login_allowed') ?? $this->collectsEmail($band));
+    }
+
+    public function emailLoginAllowedFor(FamilyMember $member): bool
+    {
+        return $this->emailLoginAllowed($this->bandForMember($member));
+    }
+
     // ---------------------------------------------------------------------------------
     // Rules used by actions
     // ---------------------------------------------------------------------------------
@@ -221,6 +238,14 @@ class PolicyResolver
     public function inviteTtlDays(): int
     {
         return (int) $this->setting('invites.ttl_days');
+    }
+
+    /**
+     * Minutes an admin-issued sign-in code stays valid.
+     */
+    public function signInCodeTtlMinutes(): int
+    {
+        return max(1, (int) $this->setting('sign_in_codes.ttl_minutes'));
     }
 
     public function minAppVersion(): string

@@ -12,7 +12,7 @@ use App\Modules\Policy\PolicyResolver;
 /**
  * The category tree visible to a member (docs/API.md "Content"), with names in the member's
  * locale, `is_locked` on top-level categories beyond the tier limit and the challenge types
- * that have published content in each subtree.
+ * that have published content (or a generator, for Sudoku and Math Sprint) in each subtree.
  */
 class BuildCategoryTree
 {
@@ -59,6 +59,12 @@ class BuildCategoryTree
 
         $children = [];
         $types = $typesByCategory[$category->id] ?? [];
+
+        foreach ($category->generatorSpecs() as $spec) {
+            if ($this->registry->isActive($spec->type)) {
+                $types[] = $spec->type;
+            }
+        }
 
         foreach ($this->tree->childrenOf($category->id) as $child) {
             $childNode = $this->node($child, $age, $locale, $typesByCategory);

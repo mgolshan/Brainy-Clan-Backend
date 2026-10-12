@@ -3,11 +3,17 @@
 namespace App\Modules\Goals;
 
 use App\Modules\Core\ModuleServiceProvider;
+use App\Modules\Family\Events\MemberRemoved;
 use App\Modules\Goals\Console\CloseGoalPeriodsCommand;
+use App\Modules\Goals\Listeners\RemoveFromGoalPlans;
 use Illuminate\Console\Scheduling\Schedule;
 
 class GoalsServiceProvider extends ModuleServiceProvider
 {
+    protected array $listen = [
+        MemberRemoved::class => [RemoveFromGoalPlans::class],
+    ];
+
     public function boot(): void
     {
         parent::boot();

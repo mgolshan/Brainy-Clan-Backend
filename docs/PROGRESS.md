@@ -14,29 +14,45 @@ Milestones are defined in `docs/PLAN.md`.
 | B3 Content | Done | Category tree, challenge type plugins + registry, content items, tags, batches, Filament (CSV import, preview page), 8 categories seeded |
 | B4 First challenge types | Done | Multiple Choice + Wisdom Card handlers; 320 MC + 50 wisdom seed items |
 | B5 Play and Scoring | Done | All /play/* + /me/stats + /family/leaderboard; Pest-tested; live smoke-tested; demo ledger history seeded |
-| B6 Goals | Mostly done | Migration, models, factory, actions, 6 endpoints, scheduled close job, events, Filament list, tests. Remaining: see Next up |
-| B7 Remaining launch content | Not started | |
+| B6 Goals | Done | Migration, models, factory, actions, 6 endpoints, scheduled close job, events, Filament list + view page with periods/results, member removal cleanup, batched progress (no N+1), tests |
+| B2b Member sign-in without email | Done | `sign_in_codes`, `POST /auth/code`, issue codes, member devices list/revoke, admin-managed `email`, `PUT /me/password`, policy `email_login_allowed`, Filament members (email login, devices, issue code, sign out device), Pest + live smoke test |
+| No-N+1 guard | Done | `Model::preventLazyLoading()` outside production; query-count tests for every list endpoint and the busy Filament tables |
+| B6a API documentation (Scramble) | Done | Module tags, contract error envelope + codes per endpoint (`ErrorResponsesExtension`, `#[ApiErrors]`), typed answer/leaderboard responses, summaries on every endpoint, spec coverage test |
+| B6b Social sign-in (Google, Facebook) | Done | Socialite 5.31, `social_accounts`, verifiers (Google ID token via JWKS, Facebook `debug_token` + `/me`), sign-in/link/unlink/list, Filament column, README setup guide, Pest + live smoke test. Needs real Google/Facebook IDs to try end to end |
+| B7 Remaining launch content | In progress | Sudoku + Math Sprint generated per session, Word Puzzles seeded, item `points`, Filament preview + category generators; **AI batch generator done** (Laravel AI SDK, Horizon `ai` queue, review/approve page; needs `ANTHROPIC_API_KEY` to run for real). Left: content for all 8 categories (generate + review batches) |
 | B8 Billing, ads and notifications | Not started | |
 | B9 Production | Not started | |
 
 ## Next up
 
-0. **State at last stop (session 3, end):** B5 finished and verified; B6 largely built and tested
-   (see log). Full suite / pint / phpstan green.
-1. **Finish B6 Goals:**
-   - No listeners yet for `Goals\Events\PeriodClosed` / `GoalReached` (notifications come in B8;
-     nothing subscribes now). Decide whether `member_period_totals` / `play_sessions.goal_period_id`
-     are still useful: one answer counts toward several plans, so goal progress is computed from the
-     ledger (`ComputeGoalProgress`) and `Scoring\Listeners\RefreshMemberTotals` stays a no-op. Either
-     drop the cache table later or fill it per (member, period) from `CloseGoalPeriods::close()`.
-   - Filament: `app/Filament/Resources/GoalPlans/GoalPlanResource.php` is a list with filters + a
-     deactivate action only; a relation manager / view page for periods and results would help support.
-   - Performance: `LoadGoalPlans` computes progress per plan with one ledger query each; fine for
-     families (few plans), revisit if needed.
-   - Members removed from the family stay in `goal_plan_members` (and period snapshots); consider
-     removing them from plans in `Family\Actions\RemoveMember`.
-2. **README** refresh (setup, seeded logins/codes, curl examples, admin tour). Partially updated.
-3. Then **B7** (remaining launch content).
+0. **State at last stop (session 7, 2026-10-11):** AI batch generator built (B7) and four app-reported play bugs fixed
+   (see log). Dev DB `migrate`d (1 migration) and `CategorySeeder` re-run (9×9 Sudoku now min_age 10). Full suite 323
+   green, Pint, PHPStan clean. **To use the generator** Moe sets `ANTHROPIC_API_KEY` in `.env` (README "AI batch
+   generator"), `config:cache`, restarts app + horizon, then generates and reviews batches to fill the 8 categories.
+   First real batch: check that 50 items fit in `CONTENT_AI_MAX_TOKENS` (20000); lower the count or raise the limit if a
+   batch fails with a JSON/length error.
+   Previous: **State at last stop (session 6, 2026-10-11):** B6b (social sign-in, incl. the coordinator's clarifications)
+   and B6a (docs polish) done; dev DB `migrate`d (1 new migration, no fresh). Full suite 290 green, Pint, PHPStan clean.
+   To try social sign-in for real, Moe creates the Google/Meta apps (README "Google and Facebook sign-in — setup")
+   and fills `GOOGLE_CLIENT_ID_*` / `FACEBOOK_CLIENT_*` in `.env`. **Sign in with Apple** is still required before
+   App Store submission (guideline 4.8) — not built.
+   Previous: **State at last stop (session 5, 2026-10-11):** B7 minus the AI generator is done and live-tested
+   (see log). Dev DB: `migrate` (1 new migration) + `CategorySeeder`, `ChallengeTypeSeeder`, `WordPuzzleSeeder`
+   (no fresh). Decision for Moe: free-tier order (see log, "category order").
+   Earlier (session 4): B2b done and live-tested; B6 leftovers done; the
+   no-N+1 guard is on with query-count tests. Full suite / Pint / PHPStan green. Dev DB migrated
+   (`migrate`, not fresh) and `PolicySeeder` re-run.
+1. **Small open decisions for Moe:**
+   - Only the owner may change the owner's email login (`PATCH /family/members/{owner}` with `email`
+     from a co-admin → 403 `forbidden`). Not spelled out in `docs/API.md`; mirrors "an admin cannot
+     demote the owner". Add a line to the contract if you agree.
+   - Removing a member's email (`email: null`) clears the password but keeps their signed-in
+     devices; sign them out via the devices endpoint if needed.
+2. `Goals\Events\PeriodClosed` / `GoalReached` still have no listeners (notifications are B8).
+3. README "admin tour" section is still thin.
+4. Next: fill content for all 8 categories with the AI generator (needs the key), Sign in with Apple (B6b follow-up), then B8.
+5. For the frontend / `docs/API.md` (coordinator): generated "Simplify a/b" math items now accept only the fully reduced
+   fraction (`answer.reduced_only: true`; "14/16" or "0.875" for 21/24 is a wrong answer, not a 422).
 
 ## Known issues and notes
 
@@ -109,7 +125,244 @@ curl http://localhost:8080/api/v1/health
 - Admin → Families → Goal plans.
 - Tests: `tests/Feature/Api/GoalsTest.php`.
 
+## How to test (B2b — member sign-in without email)
+
+- As Mom: `POST /api/v1/family/members/3/sign-in-codes` (Sam) → `{ code, member_id, expires_at }`.
+- On the new device: `POST /api/v1/auth/code {"code":"ABCD-EFGH","device_name":"Sam iPad","platform":"ios"}`
+  → AuthPayload; `GET /api/v1/me` with that token. Reusing the code, an older code, or waiting
+  15 minutes → 422 `sign_in_code_invalid`.
+- `GET /api/v1/family/members/3/devices` (admin or Sam) → devices with `is_current`;
+  `DELETE /api/v1/family/members/3/devices/{id}` signs one out (its token stops working).
+- Members in `GET /family` carry `email_login_allowed` for admins/self. `DELETE /api/v1/goals/{id}` → the plan is gone from `GET /goals` (404 on show).
+- `PATCH /api/v1/family/members/4 {"email":"alex@example.com"}` (Alex, teen) → then as Alex
+  `PUT /api/v1/me/password {"password":"...","password_confirmation":"..."}`; `email` for Sam (child) → 422.
+- Admin → Families → The Demos → Members: email login, password flag, devices; **Sign-in code**
+  and **Sign out device** row actions. Admin → Policy → Age bands: "Admins may give an email login".
+  Admin → Families → Goal plans → view: periods and results.
+- README section "Signing a member in without email" has copy-paste curl commands.
+- Tests: `tests/Feature/Api/MemberSignInTest.php`, `tests/Feature/Actions/MemberSignInActionsTest.php`,
+  `tests/Feature/Api/QueryCountTest.php`, `tests/Feature/Admin/AdminQueryCountTest.php`.
+
+## How to test (B7 — Sudoku, Math Sprint, Word Puzzles)
+
+- As Sam (`demo-sam-child-token`, 9 years, difficulty 1–4): `GET /api/v1/categories` → Math Sprint, Sudoku and
+  Word Puzzles list `math_sprint` / `sudoku` / `word_puzzle` in `challenge_types`.
+- `POST /api/v1/play/sessions {"category_id": <sudoku>}` → 4×4 and 6×6 Sudokus (`points` 3 / 5; 7–9 items instead of 13,
+  since fewer bigger items reach the target). Solve one and send `{"grid": [[...]]}`; a malformed grid is a 422,
+  an incomplete one a mistake. An adult gets 6×6 and 9×9 (`points` 5 / 8).
+- `POST /api/v1/play/sessions {"category_id": <math-sprint>}` → generated `math_sprint` items mixed with the older
+  multiple-choice ones; answer `{"value": "3/4"}` (also `"6/8"`, `"0.75"`, `"-12"`), `"abc"` → 422.
+- Word Puzzles: anagram `{"word": "cat"}`, missing letter `{"word": "elephant"}`, word search
+  `{"found": [{"word": "CAT", "start": [0,0], "end": [0,2]}]}` (3 points).
+- Ledger: each correct answer appends one `point_entries` row with `amount` = the item's `points`.
+- Admin: Content → Content preview → "…or a generated sample" (Sudoku 4/6/9, math modes; difficulty, seed);
+  word puzzle items render too. Content → Categories → edit Sudoku / Math Sprint sub-scopes → "Generated items".
+- Tests: `tests/Feature/Actions/GeneratedChallengeTypesTest.php`, `tests/Feature/Api/GeneratedPlayTest.php`,
+  `QueryCountTest` (payload with generated items), `AdminPanelTest` (B7 preview).
+
+## How to test (B7 — AI batch generator)
+
+- Without a key: Admin → Content → **AI batch generator** shows "AI generation is not configured", form disabled.
+- With a key (README "AI batch generator"): pick a category, type, difficulty, ages, locale, count, note → **Generate
+  drafts** → batch `queued` → `running` (Horizon `/horizon`, queue `ai`) → `review`. **Review** → preview per draft →
+  approve / edit / reject, bulk, or "Approve all drafts" → batch `done`; approved items are `published` with
+  `reviewed_by`. A failed batch shows the error and offers **Retry**.
+- Tests: `tests/Feature/Actions/AiBatchGeneratorTest.php` (faked model via `ContentBatchAgent::fake()`: valid items,
+  invalid dropped, duplicates skipped, provider error / bad JSON / nothing usable → failed, wisdom-card public-domain
+  rule, word puzzle variants, queueing + validation, job failure, approve/reject), `tests/Feature/Admin/AiBatchAdminTest.php`
+  (page states, form → job, retry, review actions, query counts for the batch table and the review list).
+
+## How to test (play fixes, session 7)
+
+- `POST /api/v1/play/sessions {"category_id":28}` as `demo-alex-teen-token` → 201 (was 500 on MySQL).
+- Math Sprint sessions never contain the same question twice (nor a content item's question).
+- "Simplify 21/24": `{"value":"7/8"}` correct, `"14/16"` / `"0.875"` wrong.
+- Sam (9) no longer sees the 9×9 Sudoku scope (`min_age` 10).
+- Tests: `tests/Feature/Api/PlayFixesTest.php`.
+
+## How to test (B6b — Google / Facebook sign-in, B6a — API docs)
+
+- Without credentials: `POST /api/v1/auth/social/google {"token":"x","device_name":"curl","platform":"web"}` → 401
+  `social_token_invalid` ("not configured"). As Mom: `GET /api/v1/me/social-accounts` → `{"data":[]}`;
+  `DELETE /api/v1/me/social-accounts/google` → 404 `not_found`.
+- With real IDs: README "Google and Facebook sign-in — setup" (Step 4: OAuth Playground ID token, Graph API Explorer
+  access token, curl calls: 422 `social_signup_incomplete` → retry with birth data → 201 → later 200; link/list/unlink).
+- Admin → Families → a family → Members: "Google / Facebook" column.
+- Docs: http://localhost:8080/docs/api — 7 module groups; every error response shows `{message, code, errors?}` with
+  the possible codes; `POST /play/sessions/{session}/answers` → `session` is `SessionResource`, typed `correct_response`;
+  leaderboard entries fully typed.
+- Tests: `tests/Feature/Api/SocialSignInTest.php` (faked verifiers, every path incl. rate limit),
+  `tests/Feature/Actions/SocialTokenVerifiersTest.php` (real RS256 JWTs with a throwaway key + `Http::fake`, Facebook
+  `debug_token` + mocked Socialite), `tests/Feature/Api/ApiDocsTest.php` (every `/api/v1` route in the spec, tags,
+  error envelope), `QueryCountTest` (social accounts), `AdminQueryCountTest` (members with linked accounts).
+
 ## Log
+
+### 2026-10-11 (session 7: B7 AI batch generator, play bug fixes)
+- **Package:** `laravel/ai` **v1.2.0** (Laravel AI SDK, MIT, released 2026-10-07; supports Laravel 12/13, PHP ^8.3;
+  approved for the content generator in the design doc). Config not published; the package's `config/ai.php` reads
+  `ANTHROPIC_API_KEY`.
+- **Pipeline** (`app/Modules/Content`): migration `2026_10_11_200000_add_generation_fields_to_content_batches_table`
+  (locale, variant, difficulty and age range, requested_count, note, input/output tokens, skipped JSON, error,
+  started/finished_at; old statuses mapped: generating → running, approved/rejected → done). `ContentBatch` statuses
+  queued → running → review → done | failed (+ `draft` for hand-made batches), factory. `Generation/`: `ContentBatchAgent`
+  (SDK agent, structured output `{"items": [...]}`, provider/model/max_tokens/timeout from `config/content_generator.php`,
+  `isConfigured()`), `GenerationTypes` (multiple_choice, wisdom_card, word_puzzle:anagram|missing_letter|word_search:
+  item JSON schema, type guidance, mapping through the handler's `fromFlatRow()` + `validate()`; wisdom quotes need
+  author + source + an author death year at least 71 years ago), `BatchPromptBuilder` (content rules as system prompt;
+  category path, ranges, note and up to 40 existing items "do not repeat"), `ContentFingerprint` (normalized question /
+  card text / word / sorted word list; `source_ref` = `ai:{locale}:{sha1}`). Actions `QueueContentBatch` (validates,
+  count ≤ 50, dispatches), `GenerateContentBatch` (drops invalid, skips duplicates against all items of the type+locale
+  incl. archived, clamps difficulty, stores drafts via `SaveContentItem`, records tokens/model/prompt/errors),
+  `ReviewContentBatchItems` (approve = `ChangeContentStatus` publish with reviewer; reject = archive + reviewer; batch →
+  done when no drafts are left). Job `GenerateContentBatchJob` on connection `redis-ai` / queue `ai` (new queue
+  connection, retry_after 600; new Horizon `supervisor-ai`, timeout 420, 1 process, tries 1; `failed()` marks the batch failed).
+- **Filament:** page `AiBatchGenerator` (Content; form + batches table with `creator` eager-loaded and `withCount`
+  items/drafts, polling, Retry for failed batches), hidden page `AiBatchReview` (batch summary, dropped/duplicate list,
+  prompt, per-draft phone preview via the new shared partial `filament/partials/content-phone`, which Content preview now
+  uses too; approve / edit / reject, bulk, approve all). The old "Content batches" resource is now "Batches (raw)".
+- **Decisions:** reject = archive (not delete) so the same item is never generated again; duplicates are checked across
+  all categories; 0 usable items → `failed`; no automatic retries (a retry pays twice). `phpunit.xml` forces
+  `ANTHROPIC_API_KEY=""` and `CONTENT_AI_QUEUE_CONNECTION=sync` so tests never call a provider.
+- **Play bugs (from the app):** (1) `ORDER BY ABS(difficulty - ?)` overflowed MySQL's UNSIGNED column → 500; now a
+  portable `CASE` distance (`PickContentItems::DIFFICULTY_DISTANCE_SQL`). (2) Generated items are de-duplicated within a
+  session by normalized question (also against content items in the session; up to 20 rebuilds). (3) "Simplify" math
+  items set `answer.reduced_only` (and `allow_decimal: false`); `Rational::parse()` reports `reduced`. (4) 9×9 Sudoku
+  scope `min_age` 9 → 10 (`database/seeders/data/categories.php`), `CategorySeeder` re-run in dev.
+- Tests: full suite 323 passed (new: 15 generator action tests, 10 admin tests, 8 play-fix tests). Pint, PHPStan clean.
+- Dev: `migrate` (1 migration), `CategorySeeder`, `config:cache`, OPcache cleared, app/horizon restarted (Horizon shows
+  `supervisor-ai`). Live: the failing `POST /play/sessions {"category_id":28}` as Alex → 201 (left 2 extra active demo
+  sessions for Alex); `/admin/ai-batch-generator` renders 200 for staff with the "not configured" state.
+### 2026-10-11 (session 6: B6b social sign-in, B6a docs polish)
+- **Packages:** `laravel/socialite` **v5.31.0** (MIT, supports Laravel 13; Moe approved Socialite in PLAN.md). It pulls in
+  `firebase/php-jwt` v7.2.1, `phpseclib/phpseclib` 4.0.2 and `league/oauth1-client` v1.12.0. No extra provider package is
+  needed (Google and Facebook drivers are built in). `firebase/php-jwt` is used directly by the Google verifier but is only a
+  transitive dependency — suggest adding it to `composer.json` explicitly (`^7.0`), not done without approval.
+- **B6b** per `docs/API.md` (incl. the coordinator's clarifications): migration `2026_10_11_150000_create_social_accounts_table`
+  (unique `provider`+`provider_user_id` and `user_id`+`provider`), `SocialAccount` model + factory, `User::socialAccounts()`.
+  `Identity/Social`: `SocialTokenVerifier` interface, `SocialTokenVerifiers` (provider → class, resolved from the container so
+  tests swap fakes), `GoogleIdTokenVerifier` (RS256 via Google JWKS, cached for `max-age`, one refetch on unknown `kid`; `iss`,
+  `aud` ∈ `services.google.client_ids` = `GOOGLE_CLIENT_ID_WEB/IOS/ANDROID`, `exp` required, 60 s leeway, email only when
+  `email_verified`; Socialite's Google driver isn't used because it accepts one client ID and ignores `email_verified`),
+  `FacebookTokenVerifier` (Graph `debug_token` with the app token: valid + our `app_id`; then Socialite `userFromToken`
+  (`appsecret_proof`) with `first_name,name,email`, id must match; JWT-looking iOS Limited Login tokens are refused).
+  Actions `SignInWithSocial`, `LinkSocialAccount`, `UnlinkSocialAccount`, `EnsureSocialSignInAllowed` (band `collect_email`
+  via PolicyResolver). Controllers `SocialAuthController`, `SocialAccountController`; `SocialAccountResource`. Routes under
+  `throttle:auth` (`/auth/social/{google|facebook}`) and `throttle:api` (`/me/social-accounts`). `ApiException`:
+  `socialTokenInvalid`, `socialSignupIncomplete` (422 with `errors.birth_year/birth_month`), `socialAccountTaken`,
+  `lastSignInMethod`, `notFound`. Filament members relation manager: "Google / Facebook" column (eager-loaded
+  `user.socialAccounts`). README setup guide (cross-references the frontend README for console steps).
+- **Behaviour decisions (not spelled out in the contract):**
+  - Linking by email to an existing **non-adult** user (a teen with an admin-given email login) → 403 `forbidden`; linking from
+    `/me/social-accounts` as a child/teen → 403 `forbidden`.
+  - One account per provider per user: linking another Google account replaces the old link (sign-in-by-email and
+    `/me/social-accounts` alike); re-linking the same account is idempotent (201).
+  - A provider without email (phone-only Facebook) creates a user with `email: null`; such users are not "child accounts":
+    `User::isChildAccount()` is now "no email **and** no linked social account" (used by `RemoveMember`).
+  - The linked account's `email` is refreshed on every sign-in; a new user's `display_name` = sent name → provider first name →
+    email local part.
+  - Misconfiguration (no client IDs / app secret) answers 401 `social_token_invalid` with "… not configured on this server"
+    (and a log warning); network errors to Google/Facebook also map to 401.
+- **B6a:** `App\Modules\Core\Docs\ErrorResponsesExtension` (Scramble operation extension, registered in `config/scramble.php`)
+  replaces Scramble's default error responses with the contract envelope and lists the possible `code`s per status: from
+  middleware (`auth:sanctum`, `family`, `family:admin`, `throttle`, app version), path ids (404), Form Requests (422) and
+  `#[ApiErrors(...)]` on controller methods (status per code in `Docs\ErrorCodes`, mirrors the API.md table). Endpoints grouped
+  by module with Scramble `#[Group]` (Health, Identity, Family, Content, Play, Scoring, Goals, ordered, with descriptions).
+  PHPDoc summaries/descriptions on every endpoint. Answers: `session` is now a `SessionResource` (same JSON) and
+  `correct_response` typed via `@response`; leaderboard entries typed via `@response`. 40 operations documented.
+- Tests: full suite 290 passed (new: 34 social sign-in/verifier tests, 3 docs tests, 1 query-count test). Pint, PHPStan clean.
+- Dev: `migrate` (1 migration), `config:cache`, OPcache cleared, `app`/`horizon` restarted. Live curl: invalid Google/Facebook
+  token → 401 contract shape; Mom `GET /me/social-accounts` → `{"data":[]}`; `/docs/api.json` 200.
+
+### 2026-10-11 (session 5: B7 without the AI generator)
+- **Item points:** `ChallengeType::score()` replaced by `points(ContentItem)` (1 for choice types, Sudoku 3/5/8
+  by size, word search 3). `session_items.points` snapshots it when the item is added; `SessionItem` resource
+  returns `points`; a correct regular answer awards it (ledger `amount` = points; redemption still 0).
+- **Batch sizing:** `AddSessionItems` cuts every batch to the shortest prefix for which the target stays reachable
+  if all remaining allowed mistakes hit the most valuable unanswered items (`isReachable()`); with 1-point items
+  that is the old `(target − points) + (cap − mistakes)`. Top-ups after second chances / redemption use the same rule.
+- **Generated items:** new `GeneratesItems` contract (`generate(seed, difficulty, options)`, `pointsForOptions`,
+  `validateOptions`). Categories declare generators in a new `categories.generators` JSON column
+  (`GeneratorSpec`: type, options, min/max difficulty), editable in Filament. `PickGeneratedItems` offers the
+  generators of the played subtree whose category is visible for the member's age and whose difficulty range
+  overlaps the member's policy range (nearest ones otherwise); the item difficulty is random in the overlap.
+  Each slot of a batch picks content or one of the generators at random (equal weight). Generated rows:
+  `content_item_id` null, `seed`, `type_key`, sub-scope `category_id`, and a `payload`/`answer` snapshot
+  (`answer` hidden, never sent); `SessionItem::playable()` turns them into an unsaved ContentItem so every
+  plugin method works unchanged. Payloads never change after generation (contract clarification).
+  Migration `2026_10_11_124250_add_generated_items_to_session_items`.
+- **Sudoku** (`SudokuGenerator`): seeded (Xoshiro256**) full-grid fill + cell removal keeping a unique solution
+  (bitmask solver, fewest-candidates branching); 4×4/6×6/9×9; givens 10→6, 22→12, 46→28 by difficulty.
+  Benchmark in the container: 9×9 at 28 givens median ~9 ms, max ~27 ms over 100 seeds → generated at request
+  time, no pool needed. Verified on submit: keeps givens + valid complete grid (any valid solution).
+  Categories: 4×4 (diff 1–3, ages ≤12), 6×6 (3–6), 9×9 easy/medium/hard (5–6 / 7–8 / 9–10) → children get 4×4/6×6.
+- **Math Sprint** (`MathSprintGenerator`): times tables, mental math (± → ×÷ → % → decimals → squares/brackets/
+  negatives), fractions (same denominator → simplify → "1/4 of 20" → different denominators → × ÷); `answer_format`,
+  advisory `time_limit_ms`; exact `Rational` comparison ("6/8" = "3/4" = "0.75", "1 1/4", decimal comma, negatives);
+  decimals for a fraction answer only when it terminates (`allow_decimal`).
+- **Word Puzzles** (`word_puzzle`, content items): anagram (any listed word of exactly those letters), missing
+  letter, word search (grid built at seed time by `WordSearchBuilder`, placements in the answer; start/end in either
+  order). Unicode-aware comparison (`Words`: NFC + `mb_` case folding; contract clarification). `WordPuzzleSeeder` +
+  `data/words.php` (216 kid-safe words, 7 themes, 3 grades): 215 anagrams, 215 missing-letter, 63 word searches.
+  CSV import supported for all three types (`fromFlatRow`). Existing MC anagrams kept.
+- **Category order (decision for Moe):** every category is playable now; top-level order is Geography, Science,
+  Wisdom (the free 3, unchanged), Math Sprint, Sudoku, Word Puzzles, History, Vocabulary. Sudoku is no longer last.
+- Filament: category "Generated items" repeater + table badge; content preview renders Sudoku grids, math, word
+  puzzles, points, and generated samples; content items helper text/summary for the new types (table still
+  eager-loads `category`, `tags`).
+
+### 2026-10-11 (session 4: no-N+1 guard, B2b, B6 leftovers)
+- **No N+1:** `Model::preventLazyLoading(! isProduction())` in `AppServiceProvider` (no `shouldBeStrict`,
+  mass-assignment behaviour unchanged). The existing suite passed with it on; Laravel only flags lazy
+  loads on models fetched in multi-row results, so new multi-row tests do the real checking.
+  Fixed the one real N+1: `GET /goals` ran ~4 queries per plan (period lookup, scope pluck, ledger,
+  members). `ComputeGoalProgress::many()` now computes all open periods with one grouped ledger query
+  (a conditional `SUM(CASE ...)` per period) plus one member query; `LoadGoalPlans` eager loads
+  `categories`, `planMembers.member.user` and fetches current periods in one query (a period is only
+  inserted when a new window starts). Goal history uses the same batch path. Explicit eager loads on the
+  goal plan table and the new members relation manager.
+  Query-count tests (2 vs 6 rows, equal counts): family, invites, member devices, leaderboard,
+  categories, goals, goal history, play session payload; Filament families, goal plans, content items,
+  content batches, tags, activities tables and the members relation manager; every list page,
+  relation manager and the new goal plan view page render with several rows.
+- **B2b** (exactly per `docs/API.md`, 2026-10-11 changelog): migration `2026_10_11_100000_create_sign_in_codes_table`
+  (`member_id`, `code_hash`, `created_by`, `expires_at`, `used_at`, `device_id`, `voided_at`).
+  **Codes are stored hashed** (HMAC-SHA256 with `APP_KEY` over the normalized code): a DB leak alone
+  gives no usable code; the plain code is only returned at issue time. Old unused codes are voided
+  (`voided_at`), not deleted, for audit. TTL is a setting (`sign_in_codes.ttl_minutes`, default 15) read
+  through `PolicyResolver::signInCodeTtlMinutes()`. Actions: `Family\IssueSignInCode`, `SignInWithCode`,
+  `ListMemberDevices`, `SignOutMemberDevice`, `UpdateMember` (email), `Identity\RevokeDevice`, `SetPassword`;
+  `IssueDeviceToken::issue()` also returns the device. Controllers `SignInCodeController`,
+  `MemberDeviceController`, `MeController::password`. `MemberResource` gains `email` / `has_password`
+  (self + admins). Policy `email_login_allowed` (PolicyResolver falls back to `collect_email` for bands
+  without the key; seeded child false, teen/adult/senior true), AgeBand form toggle + table column.
+  `RemoveMember` voids the member's unused codes. Filament members relation manager: email login,
+  password flag, devices list, "Sign-in code" (persistent notification, same Action) and "Sign out
+  device" actions. `ApiException::signInCodeInvalid()`.
+- **B6 leftovers:** `RemoveMember` dispatches `Family\Events\MemberRemoved`; Goals listens
+  (`RemoveFromGoalPlans` → `RemoveMemberFromGoals`) and drops the member from `goal_plan_members` and
+  from open periods' `member_targets` (closed results untouched). Filament goal plans: view page
+  (infolist) + `PeriodsRelationManager` (status, team total, reached, winners, per-member points from
+  the stored result, no per-row queries). **`member_period_totals` dropped** (migration
+  `2026_10_11_100100_drop_member_period_totals`, with `play_sessions.goal_period_id` and
+  `point_entries.goal_period_id`): nothing read them, progress is always computed from the ledger.
+  Removed `MemberPeriodTotal` and the no-op `RefreshMemberTotals` listener.
+- **Contract update (coordinator, same day):** Member gains `email_login_allowed` (self/admin only,
+  from the band `MemberResource` already resolves, so no extra query per member). `DELETE /goals/{plan}`
+  is now a **soft delete** (`SoftDeletes`, migration `2026_10_11_100200_add_deleted_at_to_goal_plans`,
+  `SaveGoalPlan::delete()`): hidden from `GET /goals`, 404 on show/patch/history/delete, frees the tier
+  slot, periods kept. Pausing is `PATCH is_active: false` (still listed; the admin "deactivate" action
+  stays a pause). `CloseGoalPeriods` skips periods of deleted plans (`whereHas('plan')`); member removal
+  also cleans deleted plans (`withTrashed`). Filament goal plans: "Deleted by the family" trashed filter,
+  deleted plans open via the view page.
+- **Deploy note:** a transient 500 the frontend saw (`RefreshMemberTotals` missing) came from the
+  window between deleting the class and restarting PHP-FPM (stale OPcache provider still registering
+  the listener). Fixed state: `composer dump-autoload -o` (classmap clean), `event:list` shows only
+  `RecordAnswerPoints` + `UpdateStreak` on `AnswerSubmitted` and `RemoveFromGoalPlans` on `MemberRemoved`,
+  OPcache cleared, `app`/`horizon`/`scheduler` restarted.
+- Scramble: the five new endpoints are in `/docs/api.json` (36 operations); a test checks it.
+- Dev: `migrate` (3 new migrations) + `db:seed --class=PolicySeeder` (no fresh). Live curl smoke test passed (Mom issues a
+  code for Sam → `/auth/code` with a dashed code → `/me` → Mom signs the device out → 401).
 
 ### 2026-10-11 (API documentation)
 - Added `dedoc/scramble` v0.13.47 (MIT; supports Laravel 13 / PHP 8.5). Published `config/scramble.php`:

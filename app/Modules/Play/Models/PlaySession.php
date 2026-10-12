@@ -16,7 +16,6 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $family_id
  * @property int $member_id
- * @property int|null $goal_period_id
  * @property int $category_id
  * @property int $target_points
  * @property int $blunder_cap
@@ -29,7 +28,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $completed_at
  * @property-read FamilyMember $member
  */
-#[Fillable(['family_id', 'member_id', 'goal_period_id', 'category_id', 'target_points', 'blunder_cap', 'mistakes', 'points', 'second_chances_used', 'redemption_failed', 'status', 'started_at', 'completed_at'])]
+#[Fillable(['family_id', 'member_id', 'category_id', 'target_points', 'blunder_cap', 'mistakes', 'points', 'second_chances_used', 'redemption_failed', 'status', 'started_at', 'completed_at'])]
 class PlaySession extends Model
 {
     public const string STATUS_ACTIVE = 'active';

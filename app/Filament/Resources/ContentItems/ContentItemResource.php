@@ -77,11 +77,11 @@ class ContentItemResource extends Resource
                 ])->columnSpan(3),
             ]),
             Section::make('Payload (sent to the app)')->schema([
-                JsonEditor::make('payload')->required()->helperText('multiple_choice: {"question", "choices": [{"id","text"}], "image_url"} · wisdom_card: {"card": {"text","author","source"}, "question", "choices"}'),
+                JsonEditor::make('payload')->required()->helperText('multiple_choice: {"question", "choices": [{"id","text"}], "image_url"} · wisdom_card: {"card": {"text","author","source"}, "question", "choices"} · word_puzzle: {"variant": "anagram", "letters", "hint"} | {"variant": "missing_letter", "pattern", "hint"} | {"variant": "word_search", "grid", "words"} · sudoku: {"size", "box", "grid"} · math_sprint: {"question", "answer_format", "time_limit_ms"} (Sudoku and Math Sprint are normally generated per session, see the category generators)'),
             ]),
             Section::make('Answer (stays on the server)')->schema([
                 JsonEditor::make('answer')->required()
-                    ->helperText('{"choice_id": "a", "explanation": "..." | null}')
+                    ->helperText('choice types: {"choice_id": "a", "explanation": "..." | null} · word_puzzle: {"words": [..]} (anagram) | {"word"} (missing_letter) | {"found": [{"word","start","end"}]} (word_search) · sudoku: {"solution"} · math_sprint: {"value", "allow_decimal"}')
                     ->rules([fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
                         $registry = app(ChallengeTypeRegistry::class);
                         $type = (string) $get('type_key');
@@ -196,7 +196,14 @@ class ContentItemResource extends Resource
     {
         $payload = $item->payload;
 
-        return (string) ($payload['question'] ?? '').(isset($payload['card']['text']) ? ' — “'.$payload['card']['text'].'”' : '');
+        return match (true) {
+            isset($payload['question']) => (string) $payload['question'].(isset($payload['card']['text']) ? ' — “'.$payload['card']['text'].'”' : ''),
+            ($payload['variant'] ?? null) === 'anagram' => 'Anagram: '.implode('', (array) ($payload['letters'] ?? [])),
+            ($payload['variant'] ?? null) === 'missing_letter' => 'Missing letter: '.($payload['pattern'] ?? ''),
+            ($payload['variant'] ?? null) === 'word_search' => 'Word search: '.implode(', ', (array) ($payload['words'] ?? [])),
+            isset($payload['size']) => 'Sudoku '.$payload['size'].'×'.$payload['size'],
+            default => '',
+        };
     }
 
     public static function getPages(): array

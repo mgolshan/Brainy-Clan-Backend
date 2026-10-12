@@ -28,6 +28,31 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    /*
+     * Social sign-in (README "Google and Facebook sign-in — setup").
+     * Google: the backend only verifies ID tokens, so it needs no client secret. `client_ids` is
+     * the list of accepted `aud` values: the web client ID (also used by Android and by iOS with
+     * `serverClientID`) plus, optionally, the iOS and Android client IDs.
+     */
+    'google' => [
+        'client_ids' => array_values(array_filter([
+            env('GOOGLE_CLIENT_ID_WEB'),
+            env('GOOGLE_CLIENT_ID_IOS'),
+            env('GOOGLE_CLIENT_ID_ANDROID'),
+        ])),
+    ],
+
+    /*
+     * Facebook: verified with the Graph API (`debug_token` + `/me`) through Laravel Socialite.
+     * `redirect` is unused (the app signs in natively) but Socialite expects the key.
+     */
+    'facebook' => [
+        'client_id' => env('FACEBOOK_CLIENT_ID'),
+        'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
+        'redirect' => env('FACEBOOK_REDIRECT_URI', '/'),
+        'graph_version' => env('FACEBOOK_GRAPH_VERSION', 'v23.0'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

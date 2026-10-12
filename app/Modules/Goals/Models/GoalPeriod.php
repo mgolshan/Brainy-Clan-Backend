@@ -29,6 +29,13 @@ class GoalPeriod extends Model
 
     public const string STATUS_CLOSED = 'closed';
 
+    /**
+     * GoalProgress computed by LoadGoalPlans (not a column), so resources never compute it per row.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $progress = null;
+
     protected function casts(): array
     {
         return [

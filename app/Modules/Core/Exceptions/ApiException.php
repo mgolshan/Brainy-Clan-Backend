@@ -28,6 +28,11 @@ class ApiException extends RuntimeException
         return new self('forbidden', $message, 403);
     }
 
+    public static function notFound(string $message = 'Not found.'): self
+    {
+        return new self('not_found', $message, 404);
+    }
+
     public static function noFamily(): self
     {
         return new self('no_family', 'You need to belong to a family for this.', 409);
@@ -48,9 +53,43 @@ class ApiException extends RuntimeException
         return new self('invite_invalid', 'This invite code is unknown, already used or expired.', 422);
     }
 
+    public static function signInCodeInvalid(): self
+    {
+        return new self('sign_in_code_invalid', 'This sign-in code is unknown, already used or expired.', 422);
+    }
+
     public static function invalidCredentials(): self
     {
         return new self('invalid_credentials', 'The email or password is incorrect.', 401);
+    }
+
+    public static function socialTokenInvalid(string $message = 'The sign-in token could not be verified. Please sign in again.'): self
+    {
+        return new self('social_token_invalid', $message, 401);
+    }
+
+    /**
+     * A first-time social sign-in without birth data: the app asks for birth year/month and
+     * retries with the same token.
+     */
+    public static function socialSignupIncomplete(): self
+    {
+        $message = 'Please tell us your birth year and month to finish creating your account.';
+
+        return new self('social_signup_incomplete', $message, 422, [
+            'birth_year' => ['The birth year is required for a new account.'],
+            'birth_month' => ['The birth month is required for a new account.'],
+        ]);
+    }
+
+    public static function socialAccountTaken(): self
+    {
+        return new self('social_account_taken', 'This account is already linked to another Brainy Clan user.', 409);
+    }
+
+    public static function lastSignInMethod(): self
+    {
+        return new self('last_sign_in_method', 'You can\'t remove your only way to sign in. Set a password or link another account first.', 409);
     }
 
     public static function categoryNotAllowed(): self

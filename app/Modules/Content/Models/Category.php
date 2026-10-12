@@ -2,6 +2,7 @@
 
 namespace App\Modules\Content\Models;
 
+use App\Modules\ChallengeTypes\Support\GeneratorSpec;
 use App\Modules\Content\Support\CategoryTree;
 use Database\Factories\CategoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -25,9 +26,10 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property int|null $min_age
  * @property int|null $max_age
  * @property bool $is_active
+ * @property list<array<string, mixed>>|null $generators generated challenge types (see GeneratorSpec)
  * @property-read Category|null $parent
  */
-#[Fillable(['parent_id', 'slug', 'name', 'icon', 'sort', 'min_age', 'max_age', 'is_active'])]
+#[Fillable(['parent_id', 'slug', 'name', 'icon', 'sort', 'min_age', 'max_age', 'is_active', 'generators'])]
 #[UseFactory(CategoryFactory::class)]
 class Category extends Model
 {
@@ -45,6 +47,7 @@ class Category extends Model
             'min_age' => 'integer',
             'max_age' => 'integer',
             'is_active' => 'boolean',
+            'generators' => 'array',
         ];
     }
 
@@ -84,6 +87,26 @@ class Category extends Model
     public function localizedName(string $locale = 'en'): string
     {
         return $this->name[$locale] ?? $this->name['en'] ?? $this->slug;
+    }
+
+    /**
+     * The generators this category declares itself (not its subtree).
+     *
+     * @return list<GeneratorSpec>
+     */
+    public function generatorSpecs(): array
+    {
+        $specs = [];
+
+        foreach ((array) ($this->generators ?? []) as $raw) {
+            $spec = is_array($raw) ? GeneratorSpec::fromArray($this->id, $raw) : null;
+
+            if ($spec !== null) {
+                $specs[] = $spec;
+            }
+        }
+
+        return $specs;
     }
 
     public function allowsAge(?int $age): bool

@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             ChallengeTypeSeeder::class,
             ContentSeeder::class,
+            WordPuzzleSeeder::class,
             DemoFamilySeeder::class,
             DemoActivitySeeder::class,
         ]);

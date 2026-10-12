@@ -59,8 +59,11 @@ interface ChallengeType
 
     public function explanation(ContentItem $item): ?string;
 
-    /** Points for an answer (1 per correct answer for the launch types). */
-    public function score(ContentItem $item, bool $isCorrect): int;
+    /**
+     * What a correct answer to this item is worth (SessionItem `points`): 1 for most types,
+     * more for bigger puzzles. A wrong answer is always 0 points and 1 mistake.
+     */
+    public function points(ContentItem $item): int;
 
     /**
      * Build payload + answer from a flat CSV row (column name => value) for the importer.

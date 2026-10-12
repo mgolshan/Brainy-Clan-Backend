@@ -14,7 +14,7 @@ use Spatie\Activitylog\Support\LogOptions;
 /**
  * An age range and the rules that apply to it (editable in the admin, never hard-coded).
  *
- * `policy` keys: ui_theme, is_child, ads_allowed, purchases_allowed, collect_email,
+ * `policy` keys: ui_theme, is_child, ads_allowed, purchases_allowed, collect_email, email_login_allowed,
  * redemption_allowed, difficulty {min, max, default}, accessibility_defaults
  * {text_scale, reduced_motion, calm_timers}, data_rules {...}.
  *

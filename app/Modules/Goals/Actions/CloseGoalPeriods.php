@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\DB;
  * Scheduled: closes every open period that has ended (writes the result, dispatches
  * PeriodClosed / GoalReached), opens the following period, and opens current periods for
  * active plans that have none yet (e.g. a plan starting today). Missed runs catch up period
- * by period, so history has no gaps.
+ * by period, so history has no gaps. Periods of deleted (soft-deleted) plans are skipped: they
+ * stay as they are, and deleted plans never get new periods.
  */
 class CloseGoalPeriods
 {
@@ -33,6 +34,7 @@ class CloseGoalPeriods
         do {
             $ended = GoalPeriod::query()
                 ->with('plan.family')
+                ->whereHas('plan')
                 ->where('status', GoalPeriod::STATUS_OPEN)
                 ->where('ends_at', '<=', $now)
                 ->orderBy('ends_at')

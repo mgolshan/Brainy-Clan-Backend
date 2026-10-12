@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Core\Docs\ErrorResponsesExtension;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 use Dedoc\Scramble\SecurityDocumentation\MiddlewareAuthSecurityStrategy;
 
@@ -157,7 +158,10 @@ return [
         RestrictedDocsAccess::class,
     ],
 
-    'extensions' => [],
+    'extensions' => [
+        // Contract error envelope { message, code, errors? } + per-endpoint error codes.
+        ErrorResponsesExtension::class,
+    ],
 
     /*
      * Automatically document API security (OpenAPI `security` / `securitySchemes`) based on route

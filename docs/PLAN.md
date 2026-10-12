@@ -35,6 +35,26 @@ as written there; if something must change, update `docs/API.md` first and note 
   hidden from `items` and can no longer be answered.
 - **Parallel development:** the frontend is built in parallel against `docs/API.md`, so the
   contract is fixed before each milestone starts.
+- **Member sign-in without email (2026-10-11, requested by Moe):** children have no email, so
+  an admin issues a **one-time sign-in code** (15 min, single use) for any member from their own
+  phone; the member types it on the new device (`POST /auth/code`) and gets a device-bound token.
+  Chosen over "the parent's email + a per-child code" because nobody shares a password, the
+  parent stays in control, and it also works for adults who never set a password. Admins can list
+  and sign out a member's devices (lost tablet). Admins can add, change or remove a member's
+  **email login** when the member's band allows it (policy `email_login_allowed`: child false,
+  teen/adult/senior true), e.g. once a child turns 13; the member then sets a password on their own
+  device (`PUT /me/password`). `collect_email` keeps meaning "may self-register". Milestone B2b.
+- **No N+1 queries, ever (2026-10-11, requested by Moe):** `Model::preventLazyLoading()` outside
+  production (on in tests, so a lazy load fails the suite); every API action/resource and every
+  Filament table eager-loads what it shows (`modifyQueryUsing(...->with(...))`, `withCount`,
+  `->counts()` columns); list endpoints and Filament list pages get query-count tests
+  (constant number of queries for 1 vs. many rows). Part of every milestone's definition of done.
+- **Generated challenge items and points (2026-10-11):** Sudoku and Math Sprint items are generated
+  per session from a seed (`GeneratesItems` contract, generators declared per category in
+  `categories.generators`; payload + answer snapshotted on the session item). Items carry
+  `points` (Sudoku 3/5/8 by size, word search 3, others 1); batches are sized so the target stays
+  reachable within the blunder cap. Free-tier category order: Geography, Science, Wisdom (free),
+  then Math Sprint, Sudoku, Word Puzzles, History, Vocabulary.
 - **Full API documentation with Scramble (2026-10-11, requested by Moe):** every endpoint is
   documented with [Scramble](https://scramble.dedoc.co) (`dedoc/scramble`, free, MIT). It
   generates an OpenAPI 3.1 spec from the code itself (routes, Form Requests, API Resources), so
@@ -49,6 +69,13 @@ as written there; if something must change, update `docs/API.md` first and note 
   and returns a Sanctum device token like `/auth/login`. Setup instructions (Google Cloud console,
   Meta for Developers, keys in `.env`) must ship in the README with the feature. See milestone B6b.
 
+- **AI batch generator (2026-10-11):** Laravel AI SDK (`laravel/ai`), provider Anthropic, default model
+  `claude-sonnet-5-5` (`CONTENT_AI_MODEL`), structured output per challenge type, run on Horizon's own `ai` queue
+  (long timeout, no automatic retries). Every item passes the type handler's validation; duplicates (normalized
+  question / card text / word, any category, including rejected items) are skipped; items land as drafts and are
+  published only by a reviewer. Reject = archive, never delete. Wisdom-card quotes need author, source and an author
+  who died 71+ years ago; everything else must be original text. Sudoku and Math Sprint stay code-generated.
+
 ## Working rules
 
 - One milestone at a time. At the end of each, stop, summarize what was built and explain how to test it.
@@ -58,7 +85,8 @@ as written there; if something must change, update `docs/API.md` first and note 
 - Each milestone is done when: migrations, models, factories and seeders exist for new tables;
   Pest tests cover every Action and endpoint touched and pass; Pint and PHPStan (level 5) are clean;
   a Filament resource exists for any new content or settings table; every new or changed
-  endpoint appears correctly in the Scramble docs (`/docs/api`); `PROGRESS.md` is updated.
+  endpoint appears correctly in the Scramble docs (`/docs/api`); no N+1 queries (lazy loading is
+  off in tests; list endpoints and Filament tables have query-count tests); `PROGRESS.md` is updated.
 
 ## Milestones
 
@@ -99,6 +127,11 @@ as written there; if something must change, update `docs/API.md` first and note 
 - Tables: `goal_plans`, `goal_plan_scopes`, `goal_plan_members`, `goal_periods`.
 - Periods in the family's timezone; scheduled job closes ended periods, writes results, opens the next one.
 - Competition ranking vs cooperation team total; real-world reward text; history endpoints.
+
+### B2b — Member sign-in without email
+- Per `docs/API.md` (2026-10-11 changelog): `sign_in_codes` table, `POST /family/members/{member}/sign-in-codes`,
+  `POST /auth/code`, member devices list/revoke, admin-managed member `email`, `PUT /me/password`,
+  policy `email_login_allowed`. Filament: show a member's email login and devices; issue a code for support.
 
 ### B6a — API documentation (Scramble)
 - Install `dedoc/scramble`, document all `/api/v1` endpoints with the Sanctum bearer scheme.

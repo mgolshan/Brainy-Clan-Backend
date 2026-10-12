@@ -50,7 +50,9 @@ class AgeBandResource extends Resource
             Section::make('Rules')->columns(3)->schema([
                 Select::make('policy.ui_theme')->label('Default UI theme')->options(array_combine(AgeBand::THEMES, AgeBand::THEMES))->required(),
                 Toggle::make('policy.is_child')->label('Child (under the digital-consent threshold)'),
-                Toggle::make('policy.collect_email')->label('May collect email / password'),
+                Toggle::make('policy.collect_email')->label('May self-register with email / password'),
+                Toggle::make('policy.email_login_allowed')->label('Admins may give an email login')
+                    ->helperText('A family admin can add an email + password sign-in for members of this band.'),
                 Toggle::make('policy.ads_allowed')->label('Rewarded ads allowed (free tier)'),
                 Toggle::make('policy.purchases_allowed')->label('In-app purchases allowed'),
                 Toggle::make('policy.redemption_allowed')->label('Redemption round allowed')->default(true),
@@ -87,7 +89,8 @@ class AgeBandResource extends Resource
                 TextColumn::make('policy.ui_theme')->label('Theme'),
                 IconColumn::make('policy.is_child')->label('Child')->boolean(),
                 IconColumn::make('policy.ads_allowed')->label('Ads')->boolean(),
-                IconColumn::make('policy.collect_email')->label('Email')->boolean(),
+                IconColumn::make('policy.collect_email')->label('Self sign-up')->boolean(),
+                IconColumn::make('policy.email_login_allowed')->label('Email login')->boolean(),
                 TextColumn::make('updated_at')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->recordActions([EditAction::make()]);

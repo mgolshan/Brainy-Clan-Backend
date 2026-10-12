@@ -64,6 +64,7 @@ it('builds the child policy: no ads, no purchases, redemption only', function ()
         'ads_allowed' => false,
         'purchases_allowed' => false,
         'collect_email' => false,
+        'email_login_allowed' => false,
         'difficulty' => ['min' => 1, 'max' => 4, 'default' => 2],
     ])->and($policy['second_chance'])->toBe(['free_per_day' => 0, 'free_used_today' => 0, 'ad_allowed' => false, 'redemption_allowed' => true]);
 });

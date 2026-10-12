@@ -99,9 +99,9 @@ it('enforces the free tier goal limit and locked categories', function () {
     $this->postJson('/api/v1/goals', goalBody($roots[0]))->assertCreated();
     $this->postJson('/api/v1/goals', goalBody($roots[1]))->assertForbidden()->assertJsonPath('code', 'goal_limit_reached');
 
-    // Deactivating frees the slot; reactivating while another plan is active is refused.
+    // Pausing frees the slot; reactivating while another plan is active is refused.
     $first = GoalPlan::query()->firstOrFail();
-    $this->deleteJson("/api/v1/goals/{$first->id}")->assertNoContent();
+    $this->patchJson("/api/v1/goals/{$first->id}", ['is_active' => false])->assertOk()->assertJsonPath('data.is_active', false);
     expect($first->fresh()->is_active)->toBeFalse();
     $this->postJson('/api/v1/goals', goalBody($roots[1]))->assertCreated();
     $this->patchJson("/api/v1/goals/{$first->id}", ['is_active' => true])->assertForbidden()->assertJsonPath('code', 'goal_limit_reached');
@@ -246,4 +246,47 @@ it('stops opening periods after ends_on', function () {
 
     expect(GoalPeriod::query()->count())->toBe(1)
         ->and(GoalPeriod::query()->sole()->status)->toBe('closed');
+});
+
+it('soft deletes a plan: hidden from the API, history kept, slot freed; pausing stays listed', function () {
+    $roots = Category::factory()->count(2)->sequence(fn ($s) => ['sort' => $s->index])->create();
+    $owner = familyOwner(['tier' => 'free']);
+    actingAsMember($owner);
+
+    $paused = $this->postJson('/api/v1/goals', goalBody($roots[0], ['name' => 'Paused']))->assertCreated()->json('data.id');
+    $this->patchJson("/api/v1/goals/{$paused}", ['is_active' => false])->assertOk();
+    $deleted = $this->postJson('/api/v1/goals', goalBody($roots[1], ['name' => 'Deleted']))->assertCreated()->json('data.id');
+
+    $this->deleteJson("/api/v1/goals/{$deleted}")->assertNoContent();
+
+    $this->getJson('/api/v1/goals')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Paused')->assertJsonPath('data.0.is_active', false);
+    $this->getJson("/api/v1/goals/{$deleted}")->assertNotFound()->assertJsonPath('code', 'not_found');
+    $this->getJson("/api/v1/goals/{$deleted}/history")->assertNotFound();
+    $this->patchJson("/api/v1/goals/{$deleted}", ['name' => 'Back'])->assertNotFound();
+    $this->deleteJson("/api/v1/goals/{$deleted}")->assertNotFound();
+
+    $plan = GoalPlan::withTrashed()->findOrFail($deleted);
+    expect($plan->trashed())->toBeTrue()
+        ->and($plan->periods()->count())->toBe(1)
+        ->and(GoalPlan::query()->count())->toBe(1);
+
+    // The deleted plan no longer counts toward the free tier's single active plan.
+    $this->postJson('/api/v1/goals', goalBody($roots[1], ['name' => 'New']))->assertCreated();
+});
+
+it('skips deleted plans when closing periods', function () {
+    $owner = familyOwner(['tier' => 'family']);
+    $category = Category::factory()->create();
+    actingAsMember($owner);
+    $id = $this->postJson('/api/v1/goals', goalBody($category, ['period_type' => 'daily']))->assertCreated()->json('data.id');
+    $this->deleteJson("/api/v1/goals/{$id}")->assertNoContent();
+
+    Carbon::setTestNow('2026-10-20 16:00:00');
+    Event::fake([PeriodClosed::class, GoalReached::class]);
+
+    expect(app(CloseGoalPeriods::class)->handle())->toBe(0);
+
+    $periods = GoalPeriod::query()->where('goal_plan_id', $id)->get();
+    expect($periods)->toHaveCount(1)->and($periods->first()->status)->toBe(GoalPeriod::STATUS_OPEN);
+    Event::assertNotDispatched(PeriodClosed::class);
 });

@@ -5,15 +5,21 @@ namespace App\Filament\Resources\Categories;
 use App\Filament\Resources\Categories\Pages\CreateCategory;
 use App\Filament\Resources\Categories\Pages\EditCategory;
 use App\Filament\Resources\Categories\Pages\ListCategories;
+use App\Modules\ChallengeTypes\ChallengeTypeRegistry;
+use App\Modules\ChallengeTypes\Contracts\GeneratesItems;
 use App\Modules\Content\Models\Category;
 use App\Modules\Content\Support\CategoryTree;
 use BackedEnum;
+use Closure;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\KeyValue;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -58,6 +64,30 @@ class CategoryResource extends Resource
                 TextInput::make('max_age')->numeric()->minValue(0)->maxValue(120),
                 Toggle::make('is_active')->default(true),
             ]),
+            Section::make('Generated items')
+                ->description('Sudoku and Math Sprint items are generated per session from these generators (sessions in this category or a parent include them). The difficulty range says which members it suits.')
+                ->collapsible()
+                ->schema([
+                    Repeater::make('generators')->hiddenLabel()->defaultItems(0)->columns(4)->schema([
+                        Select::make('type')->options(fn () => self::generatorTypes())->required(),
+                        KeyValue::make('options')->helperText('sudoku: size = 4 | 6 | 9 · math_sprint: mode = times_tables | mental | fractions')
+                            ->rules([fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                                $registry = app(ChallengeTypeRegistry::class);
+                                $type = (string) $get('type');
+                                $handler = $registry->has($type) ? $registry->get($type) : null;
+
+                                if ($handler instanceof GeneratesItems) {
+                                    foreach ($handler->validateOptions(is_array($value) ? $value : []) as $messages) {
+                                        foreach ($messages as $message) {
+                                            $fail($message);
+                                        }
+                                    }
+                                }
+                            }]),
+                        TextInput::make('min_difficulty')->numeric()->integer()->minValue(1)->maxValue(10)->default(1)->required(),
+                        TextInput::make('max_difficulty')->numeric()->integer()->minValue(1)->maxValue(10)->default(10)->required(),
+                    ]),
+                ]),
         ]);
     }
 
@@ -75,6 +105,8 @@ class CategoryResource extends Resource
                 TextColumn::make('icon')->badge()->toggleable(),
                 TextColumn::make('min_age')->label('Ages')->state(fn (Category $record) => ($record->min_age ?? 0).'–'.($record->max_age ?? '∞')),
                 TextColumn::make('content_items_count')->label('Items')->sortable(),
+                TextColumn::make('generators')->label('Generated')->badge()->toggleable()
+                    ->state(fn (Category $record) => array_map(fn ($spec) => $spec->type.($spec->options !== [] ? ' '.implode('/', array_map('strval', $spec->options)) : ''), $record->generatorSpecs())),
                 ToggleColumn::make('is_active')->label('Active'),
             ])
             ->filters([
@@ -87,6 +119,21 @@ class CategoryResource extends Resource
                     }),
             ])
             ->recordActions([EditAction::make()]);
+    }
+
+    /**
+     * Active challenge types that generate items (Sudoku, Math Sprint).
+     *
+     * @return array<string, string>
+     */
+    public static function generatorTypes(): array
+    {
+        $registry = app(ChallengeTypeRegistry::class);
+
+        return collect($registry->handlers())
+            ->filter(fn (string $class) => is_a($class, GeneratesItems::class, true))
+            ->mapWithKeys(fn (string $class, string $key) => [$key => $registry->get($key)->name()])
+            ->all();
     }
 
     /**

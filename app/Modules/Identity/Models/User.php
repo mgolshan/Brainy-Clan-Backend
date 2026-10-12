@@ -85,6 +85,16 @@ class User extends Authenticatable implements FilamentUser, HasName
     }
 
     /**
+     * Google / Facebook accounts linked for social sign-in.
+     *
+     * @return HasMany<SocialAccount, $this>
+     */
+    public function socialAccounts(): HasMany
+    {
+        return $this->hasMany(SocialAccount::class);
+    }
+
+    /**
      * The user's active family membership (a user belongs to at most one family for now).
      */
     public function activeMembership(): ?FamilyMember
@@ -95,9 +105,13 @@ class User extends Authenticatable implements FilamentUser, HasName
         return $member;
     }
 
+    /**
+     * No email login and no Google/Facebook account: signs in with invite / sign-in codes only.
+     * (A social-only adult may have no email, e.g. a phone-only Facebook account.)
+     */
     public function isChildAccount(): bool
     {
-        return $this->email === null;
+        return $this->email === null && ! $this->socialAccounts()->exists();
     }
 
     public function canAccessPanel(Panel $panel): bool

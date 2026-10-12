@@ -73,6 +73,25 @@ class CategoryTree
         return $ids;
     }
 
+    /**
+     * Names from the root down to this category, e.g. ["World Geography", "Capitals", "Europe"].
+     *
+     * @return list<string>
+     */
+    public function pathNames(int $id, string $locale = 'en'): array
+    {
+        $names = [];
+        $node = $this->find($id);
+        $guard = 0;
+
+        while ($node !== null && $guard++ < 50) {
+            array_unshift($names, $node->localizedName($locale));
+            $node = $node->parent_id !== null ? $this->find($node->parent_id) : null;
+        }
+
+        return $names;
+    }
+
     public function rootOf(int $id): ?Category
     {
         $node = $this->find($id);

@@ -11,7 +11,7 @@ it('resolves the launch handlers from the registry', function () {
 
     expect($registry->get('multiple_choice'))->toBeInstanceOf(MultipleChoice::class)
         ->and($registry->get('wisdom_card'))->toBeInstanceOf(WisdomCard::class)
-        ->and($registry->activeKeys())->toBe(['multiple_choice', 'wisdom_card'])
+        ->and($registry->activeKeys())->toBe(['multiple_choice', 'wisdom_card', 'sudoku', 'math_sprint', 'word_puzzle'])
         ->and(fn () => $registry->get('nope'))->toThrow(InvalidArgumentException::class);
 });
 
@@ -19,7 +19,7 @@ it('lets the admin switch a type off', function () {
     ChallengeType::query()->create(['key' => 'wisdom_card', 'name' => 'Wisdom', 'handler_class' => WisdomCard::class, 'is_active' => false]);
 
     expect(app(ChallengeTypeRegistry::class)->isActive('wisdom_card'))->toBeFalse()
-        ->and(app(ChallengeTypeRegistry::class)->activeKeys())->toBe(['multiple_choice']);
+        ->and(app(ChallengeTypeRegistry::class)->activeKeys())->toBe(['multiple_choice', 'sudoku', 'math_sprint', 'word_puzzle']);
 });
 
 it('multiple choice strips the answer and checks responses', function () {
@@ -36,8 +36,7 @@ it('multiple choice strips the answer and checks responses', function () {
         ->and($mc->check($item, []))->toBeFalse()
         ->and($mc->correctResponse($item))->toBe(['choice_id' => 'a'])
         ->and($mc->explanation($item))->toBe('Because.')
-        ->and($mc->score($item, true))->toBe(1)
-        ->and($mc->score($item, false))->toBe(0);
+        ->and($mc->points($item))->toBe(1);
 });
 
 it('multiple choice validates payload and answer', function () {

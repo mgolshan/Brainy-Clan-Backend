@@ -47,7 +47,7 @@ class GoalPlanResource extends JsonResource
                 'avatar' => $m->member->user->avatar,
                 'target_override' => $m->target_override,
             ])->values()->all(),
-            'current_period' => $period !== null ? app(ComputeGoalProgress::class)->handle($period) : null,
+            'current_period' => $period !== null ? ($period->progress ?? app(ComputeGoalProgress::class)->handle($period)) : null,
         ];
     }
 }

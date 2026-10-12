@@ -23,7 +23,16 @@ class UpdateMemberRequest extends FormRequest
             'birth_month' => ['sometimes', 'integer', 'min:1', 'max:12'],
             'role' => ['sometimes', 'string', Rule::in(FamilyMember::ROLES)],
             'accessibility' => ['sometimes', 'array'],
+            'email' => ['sometimes', 'nullable', 'string', 'email', 'max:255'],
             ...Accessibility::rules('accessibility.'),
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if (is_string($this->input('email'))) {
+            $email = strtolower(trim($this->input('email')));
+            $this->merge(['email' => $email === '' ? null : $email]);
+        }
     }
 }
