@@ -1,0 +1,29 @@
+{
+  "api_version": "1.0",
+  "event": {
+    "id": "8E1F3F5C-1A2B-4C3D-9E8F-0A1B2C3D4E5F",
+    "type": "EXPIRATION",
+    "event_timestamp_ms": 1763111460000,
+    "app_id": "app1a2b3c4d5",
+    "app_user_id": "family-1",
+    "original_app_user_id": "$RCAnonymousID:8f4c0a6b2e5d4f1a9c3b7e6d5a4f3c2b",
+    "aliases": ["$RCAnonymousID:8f4c0a6b2e5d4f1a9c3b7e6d5a4f3c2b", "family-1"],
+    "product_id": "brainy_family_monthly",
+    "entitlement_ids": ["family"],
+    "entitlement_id": null,
+    "period_type": "NORMAL",
+    "purchased_at_ms": 1760433000000,
+    "expiration_at_ms": 1763111400000,
+    "environment": "PRODUCTION",
+    "store": "APP_STORE",
+    "expiration_reason": "UNSUBSCRIBE",
+    "is_family_share": false,
+    "country_code": "CA",
+    "currency": "CAD",
+    "price": 0,
+    "price_in_purchased_currency": 0,
+    "transaction_id": "290000123456789",
+    "original_transaction_id": "290000123456789",
+    "subscriber_attributes": {}
+  }
+}

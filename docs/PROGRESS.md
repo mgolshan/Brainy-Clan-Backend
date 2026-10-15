@@ -20,12 +20,28 @@ Milestones are defined in `docs/PLAN.md`.
 | B6a API documentation (Scramble) | Done | Module tags, contract error envelope + codes per endpoint (`ErrorResponsesExtension`, `#[ApiErrors]`), typed answer/leaderboard responses, summaries on every endpoint, spec coverage test |
 | B6b Social sign-in (Google, Facebook) | Done | Socialite 5.31, `social_accounts`, verifiers (Google ID token via JWKS, Facebook `debug_token` + `/me`), sign-in/link/unlink/list, Filament column, README setup guide, Pest + live smoke test. Needs real Google/Facebook IDs to try end to end |
 | B7 Remaining launch content | In progress | Sudoku + Math Sprint generated per session, Word Puzzles seeded, item `points`, Filament preview + category generators; **AI batch generator done** (Laravel AI SDK, Horizon `ai` queue, review/approve page; needs `ANTHROPIC_API_KEY` to run for real). Left: content for all 8 categories (generate + review batches) |
-| B8 Billing, ads and notifications | Not started | |
+| B8 Billing, ads and notifications | In progress | **Billing core done** (session 8): `BillingServiceProvider`, `POST /api/v1/webhooks/revenuecat` (Bearer secret, idempotent via `webhook_events`, stale/out-of-order guard, `ApplyRevenueCatEvent` sets the family `tier`), `GET /family/subscription` (admin), factories, fixtures + 13 Pest tests, live smoke test. Dev DB migrated. **Left:** push token, notification preferences, sending notifications, AdMob SSV / rewarded-ad second chance, Filament subscription view (see Next up) |
 | B9 Production | Not started | |
 
 ## Next up
 
-0. **State at last stop (session 7, 2026-10-11):** AI batch generator built (B7) and four app-reported play bugs fixed
+0. **State at last stop (session 8, 2026-10-14):** B8 billing core done (see log); dev DB `migrate`d (billing tables,
+   no fresh); `.env` has a dev `REVENUECAT_WEBHOOK_SECRET`. **B8 left, in order:**
+   1. `PUT/DELETE /me/push-token` on the current device (the device row — and so the token — is already deleted on
+      logout by `RevokeCurrentDevice`; also clear the same token from other devices when it moves accounts).
+   2. `GET/PATCH /me/notification-preferences` with defaults (children quiet hours 19:30–07:30), admin
+      `GET` + `PATCH /family/members/{member}/notification-preferences` (GET added to the contract 2026-10-14).
+   3. Sending: Expo push client (queued jobs, quiet-hours delay, drop after 12 h), listeners for `GoalReached` /
+      `PeriodClosed`, `family_activity` (1/member/hour), `daily_reminder` scheduler.
+   4. AdMob SSV `GET /webhooks/admob-ssv` + `reward_ref` on second chance `method: "ad"`.
+   5. Filament: subscription + webhook events (read-only) on the family resource (eager-loaded, query-count test).
+   6. Optional safety net: a scheduled sweep that downgrades families whose `active`/`grace` subscription is past
+      expiry without an EXPIRATION webhook (RevenueCat normally sends it).
+   - For the coordinator / `docs/API.md`: the webhook lives at **`/api/v1/webhooks/revenuecat`** (module routes are
+     under `/api/v1`; the contract line says `POST /webhooks/revenuecat`). Its 200 body is
+     `{ "data": { "event_id", "outcome": "applied|ignored|stale|duplicate" } }`; a body without `event.id`/`event.type`
+     → 422. Point the RevenueCat dashboard at `https://<host>/api/v1/webhooks/revenuecat`.
+   Previous: **State at last stop (session 7, 2026-10-11):** AI batch generator built (B7) and four app-reported play bugs fixed
    (see log). Dev DB `migrate`d (1 migration) and `CategorySeeder` re-run (9×9 Sudoku now min_age 10). Full suite 323
    green, Pint, PHPStan clean. **To use the generator** Moe sets `ANTHROPIC_API_KEY` in `.env` (README "AI batch
    generator"), `config:cache`, restarts app + horizon, then generates and reviews batches to fill the 8 categories.
@@ -50,7 +66,7 @@ Milestones are defined in `docs/PLAN.md`.
      devices; sign them out via the devices endpoint if needed.
 2. `Goals\Events\PeriodClosed` / `GoalReached` still have no listeners (notifications are B8).
 3. README "admin tour" section is still thin.
-4. Next: fill content for all 8 categories with the AI generator (needs the key), Sign in with Apple (B6b follow-up), then B8.
+4. Next: finish B8 (item 0), fill content for all 8 categories with the AI generator (needs the key), Sign in with Apple (B6b follow-up).
 5. For the frontend / `docs/API.md` (coordinator): generated "Simplify a/b" math items now accept only the fully reduced
    fraction (`answer.reduced_only: true`; "14/16" or "0.875" for 21/24 is a wrong answer, not a 422).
 
@@ -196,7 +212,44 @@ curl http://localhost:8080/api/v1/health
   `debug_token` + mocked Socialite), `tests/Feature/Api/ApiDocsTest.php` (every `/api/v1` route in the spec, tags,
   error envelope), `QueryCountTest` (social accounts), `AdminQueryCountTest` (members with linked accounts).
 
+## How to test (B8 — billing core)
+
+- Tests: `docker compose exec app php artisan test --compact tests/Feature/Api/BillingTest.php` (fixtures in
+  `tests/Fixtures/revenuecat/*.json`).
+- Live: `.env` `REVENUECAT_WEBHOOK_SECRET=dev-revenuecat-secret`, then
+  `curl -X POST http://localhost:8080/api/v1/webhooks/revenuecat -H "Authorization: Bearer dev-revenuecat-secret" -H "Content-Type: application/json" -H "Accept: application/json" -d @payload.json`
+  with a fixture whose `app_user_id` is `family-1`, `event.id` unique and `expiration_at_ms` in the future.
+  Check `GET /api/v1/me` (`policy.tier`) and `GET /api/v1/family/subscription` as `mom@brainyclan.test`.
+  **The demo family (id 1) is seeded with tier `family` and no subscription** — after an EXPIRATION test restore it:
+  delete its `subscriptions` row + test `webhook_events` and set `families.tier = 'family'`.
+
 ## Log
+
+### 2026-10-14 (session 8: B8 billing core)
+
+- `BillingServiceProvider` registered; routes `POST /api/v1/webhooks/revenuecat` (public, Bearer secret via
+  `RevenueCatWebhookRequest`, `hash_equals`, empty secret rejects everything → 401 `unauthenticated`) and
+  `GET /api/v1/family/subscription` (`family:admin`, `FamilySubscriptionResource`, `status: none` without a row).
+- `ApplyRevenueCatEvent`: stores each event once (`webhook_events` unique provider+event_id; duplicates and races
+  return the stored row, reported as `outcome: duplicate`); finds the family from `app_user_id`, then
+  `original_app_user_id`, then `aliases` (`family-{id}`); ignores unknown families, other entitlements and unhandled
+  types (TEST, TRANSFER, SUBSCRIPTION_PAUSED, …) with 200; events older than `last_event_ms` → `stale`.
+  INITIAL_PURCHASE / RENEWAL / UNCANCELLATION / PRODUCT_CHANGE / NON_RENEWING_PURCHASE → `active`; CANCELLATION →
+  `will_renew: false`, still entitled until `expires_at`; BILLING_ISSUE → `grace` (`grace_expires_at` from
+  `grace_period_expiration_at_ms`); EXPIRATION → `expired`. Family tier = `family` iff `Subscription::isEntitled()`.
+  Tier change goes through `Family::update` (activity log).
+- Config `services.revenuecat.{webhook_secret,entitlement}`; `.env.example` gained `REVENUECAT_WEBHOOK_SECRET`,
+  `REVENUECAT_ENTITLEMENT`. `SubscriptionFactory` (was truncated) completed with `expired`/`grace` states;
+  `WebhookEventFactory` added.
+- Not started this session: push token, notification preferences, sending, AdMob SSV, Filament (Next up item 0).
+- Live smoke test (curl, family 1): wrong secret 401; purchase `applied`; redelivery `duplicate`; `/family/subscription`
+  active/app_store; EXPIRATION → `/me` `policy.tier` `free`. Demo family restored afterwards (tier `family`, smoke
+  subscription + webhook rows deleted).
+- Full suite: 336 tests, 333 passed, **3 failed in goal tests (pre-existing, time-of-day flake)**: run at ~21:40 EDT
+  (UTC already the next day) a goal plan created by the factory had no `current_period` (e.g.
+  `QueryCountTest` "lists goal plans…": `current_period` null) — the factory's `starts_on` and the family
+  timezone (America/Toronto) disagree on "today" late in the evening. Unrelated to billing; fix the factory/test to
+  use the family-local date. Billing tests 13/13 green; Pint and PHPStan clean.
 
 ### 2026-10-11 (session 7: B7 AI batch generator, play bug fixes)
 - **Package:** `laravel/ai` **v1.2.0** (Laravel AI SDK, MIT, released 2026-10-07; supports Laravel 12/13, PHP ^8.3;

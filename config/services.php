@@ -53,6 +53,15 @@ return [
         'graph_version' => env('FACEBOOK_GRAPH_VERSION', 'v23.0'),
     ],
 
+    /*
+     * RevenueCat (B8): the webhook's Authorization header must be `Bearer <webhook_secret>`
+     * (set the same value in the RevenueCat dashboard). Empty = every webhook is rejected.
+     */
+    'revenuecat' => [
+        'webhook_secret' => env('REVENUECAT_WEBHOOK_SECRET'),
+        'entitlement' => env('REVENUECAT_ENTITLEMENT', 'family'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

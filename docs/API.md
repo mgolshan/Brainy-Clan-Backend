@@ -383,10 +383,11 @@ starts at `starts_on` (so it can be shorter than a full week/month); the last en
 from RevenueCat webhooks and never trusts the app for the tier.
 - RevenueCat `app_user_id` = `family-{family_id}` (one entitlement per family; the paying adult's
   purchase upgrades the whole family). Entitlement id `family`.
-- `POST /webhooks/revenuecat` (public, not under `/api/v1` auth; `Authorization: Bearer <REVENUECAT_WEBHOOK_SECRET>`)
+- `POST /api/v1/webhooks/revenuecat` (public, no Sanctum auth; `Authorization: Bearer <REVENUECAT_WEBHOOK_SECRET>`)
   — idempotent by `event.id` (`webhook_events`); updates `subscriptions` and the family's `tier`
   (`family` while the entitlement is active incl. grace period, else `free`). → 200 (also for
-  duplicates and ignored event types), 401 on a wrong secret.
+  duplicates and ignored event types) with `{ "data": { "event_id": "...", "outcome": "applied" | "ignored" | "stale" | "duplicate" } }`,
+  401 on a wrong secret, 422 when `event.id` / `event.type` are missing.
 - `GET /family/subscription` (admin) → `{ "data": { "tier": "family", "status": "active" | "grace" |
   "expired" | "none", "store": "app_store" | "play_store" | "stripe" | null, "product_id": "...",
   "expires_at": "...", "will_renew": true, "revenuecat_app_user_id": "family-1" } }`.
@@ -407,7 +408,7 @@ Custom data in the ad request: `session_id`.
   "period_closed": true, "family_activity": true, "daily_reminder": false }, "quiet_from": "20:00",
   "quiet_to": "07:30", "reminder_time": "17:00" } }` (times in the family timezone; children default
   to quiet hours 19:30–07:30). `PATCH /me/notification-preferences` — same shape, all optional.
-  Admins may also `PATCH /family/members/{member}/notification-preferences` (children's quiet hours).
+  Admins may also `GET` / `PATCH /family/members/{member}/notification-preferences` (e.g. children's quiet hours).
 - Sent by the server (queued; never during quiet hours: delayed until quiet hours end, dropped
   when older than 12 h): `goal_reached` (cooperation target reached / race winner), `period_closed` (results),
   `family_activity` (a member finished a session, max 1 per member per hour, not to themself),
@@ -430,3 +431,5 @@ Custom data in the ad request: `session_id`.
 - 2026-10-11 — Social sign-in edge rules: non-adult email match → 403 `forbidden`; one link per provider (re-link replaces); unlink of an unlinked provider → 404; provider/network failure → 401 `social_token_invalid`.
 - 2026-10-11 — Math Sprint: "Simplify" questions require the fully reduced fraction.
 - 2026-10-11 — B8 contract: RevenueCat webhook + `GET /family/subscription` (`family-{id}` app user id), AdMob SSV `reward_ref`, push token + notification preferences, notification types.
+- 2026-10-14 — Admins can `GET /family/members/{member}/notification-preferences` (was PATCH only).
+- 2026-10-14 — RevenueCat webhook lives at `/api/v1/webhooks/revenuecat`; 200 body `{ event_id, outcome }`; 422 without `event.id`/`event.type`.

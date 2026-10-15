@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Billing\BillingServiceProvider;
 use App\Modules\ChallengeTypes\ChallengeTypesServiceProvider;
 use App\Modules\Content\ContentServiceProvider;
 use App\Modules\Core\CoreServiceProvider;
@@ -28,4 +29,5 @@ return [
     PlayServiceProvider::class,
     ScoringServiceProvider::class,
     GoalsServiceProvider::class,
+    BillingServiceProvider::class,
 ];

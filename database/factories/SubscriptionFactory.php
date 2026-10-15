@@ -39,4 +39,20 @@ class SubscriptionFactory extends Factory
     public function expired(): static
     {
         return $this->state(fn () => [
-            'status'
+            'status' => Subscription::STATUS_EXPIRED,
+            'will_renew' => false,
+            'expires_at' => now()->subDay(),
+            'last_event_type' => 'EXPIRATION',
+        ]);
+    }
+
+    public function grace(): static
+    {
+        return $this->state(fn () => [
+            'status' => Subscription::STATUS_GRACE,
+            'expires_at' => now()->subHour(),
+            'grace_expires_at' => now()->addDays(6),
+            'last_event_type' => 'BILLING_ISSUE',
+        ]);
+    }
+}
