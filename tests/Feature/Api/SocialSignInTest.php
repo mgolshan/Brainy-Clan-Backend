@@ -19,7 +19,7 @@ function fakeSocialProvider(string $provider, ?SocialIdentity $identity): void
     {
         public function __construct(private readonly ?SocialIdentity $identity) {}
 
-        public function verify(string $token): SocialIdentity
+        public function verify(string $token, ?string $nonce = null): SocialIdentity
         {
             if ($this->identity === null || $token === 'bad') {
                 throw ApiException::socialTokenInvalid();
@@ -302,4 +302,37 @@ it('answers 404 when unlinking a provider that is not linked', function () {
 
 it('requires authentication for my social accounts', function () {
     $this->getJson('/api/v1/me/social-accounts')->assertUnauthorized()->assertJsonPath('code', 'unauthenticated');
+});
+
+it('names a new Apple user from display_name, else "Player" (never the private relay address)', function () {
+    fakeSocialProvider(SocialAccount::APPLE, new SocialIdentity(SocialAccount::APPLE, 'a-1', 'x7k2@privaterelay.appleid.com', null));
+
+    $this->postJson('/api/v1/auth/social/apple', socialPayload(['birth_year' => 1985, 'birth_month' => 3, 'platform' => 'ios']))
+        ->assertCreated()
+        ->assertJsonPath('data.user.display_name', 'Player')
+        ->assertJsonPath('data.user.email', 'x7k2@privaterelay.appleid.com');
+
+    fakeSocialProvider(SocialAccount::APPLE, new SocialIdentity(SocialAccount::APPLE, 'a-2', null, null));
+
+    $this->postJson('/api/v1/auth/social/apple', socialPayload(['birth_year' => 1985, 'birth_month' => 3, 'display_name' => 'Moe']))
+        ->assertCreated()
+        ->assertJsonPath('data.user.display_name', 'Moe')
+        ->assertJsonPath('data.user.email', null);
+});
+
+it('links and unlinks Apple like the other providers', function () {
+    $user = User::factory()->aged(35)->create(['password' => null]);
+    SocialAccount::factory()->create(['user_id' => $user->id]);
+    fakeSocialProvider(SocialAccount::APPLE, new SocialIdentity(SocialAccount::APPLE, 'a-1', 'mom@icloud.com', null));
+    Sanctum::actingAs($user);
+
+    $this->postJson('/api/v1/me/social-accounts/apple', ['token' => 'provider-token', 'nonce' => 'raw'])
+        ->assertCreated()
+        ->assertJsonPath('data.provider', 'apple')
+        ->assertJsonPath('data.email', 'mom@icloud.com');
+
+    $this->getJson('/api/v1/me/social-accounts')->assertOk()->assertJsonPath('data.0.provider', 'apple');
+
+    $this->deleteJson('/api/v1/me/social-accounts/apple')->assertNoContent();
+    expect($user->socialAccounts()->sole()->provider)->toBe('google');
 });

@@ -312,11 +312,122 @@ register), the account is linked to that user and you get **200** instead of cre
 | Facebook token rejected | token from another app (Graph Explorer app picker), expired, or an iOS Limited Login token |
 | 403 `forbidden` | the matching user is not an adult (social sign-in is adults only) |
 
-In the admin, Families → a family → Members shows each member's linked Google/Facebook accounts.
+In the admin, Families → a family → Members shows each member's linked Google/Facebook/Apple accounts (column *Social sign-in*).
 Code: `app/Modules/Identity/Social/*` (verifiers), `Actions/SignInWithSocial.php`,
 `LinkSocialAccount.php`, `UnlinkSocialAccount.php`; tests fake the verifiers
 (`tests/Feature/Api/SocialSignInTest.php`) or sign real JWTs with a throwaway key
 (`tests/Feature/Actions/SocialTokenVerifiersTest.php`).
+
+## Sign in with Apple — setup
+
+Apple requires Sign in with Apple in an iOS app that offers Google/Facebook sign-in (App Store
+guideline 4.8). The app signs in natively and sends Apple's **identity token** (a JWT) to
+`POST /api/v1/auth/social/apple`; the backend verifies it against Apple's public keys
+(`https://appleid.apple.com/auth/keys`), checks `iss`, `exp`, the optional `nonce`, and that `aud` is
+one of **your** IDs. The backend needs **no secret** for sign-in — only the list of accepted IDs.
+
+### Step 1 – Apple Developer Program
+
+1. Enrol at https://developer.apple.com/programs/ (99 USD/year; an organisation needs a D-U-N-S
+   number). Note your **Team ID** (Membership details, 10 characters, e.g. `A1B2C3D4E5`).
+
+### Step 2 – App ID with the "Sign in with Apple" capability (iOS)
+
+1. https://developer.apple.com/account → **Certificates, Identifiers & Profiles** → **Identifiers** → **+**
+   → **App IDs** → **App** → Continue.
+2. Description *Brainy Clan*, **Bundle ID** *Explicit*: the app's bundle ID (the one in the Expo
+   `app.json` → `ios.bundleIdentifier`, e.g. `app.brainyclan`).
+3. Under **Capabilities** tick **Sign in with Apple** (leave "Enable as a primary App ID") → Continue → Register.
+4. In the app: Expo `ios.usesAppleSignIn: true` (expo-apple-authentication) and rebuild — the
+   provisioning profile must include the capability.
+
+The **bundle ID** is the `aud` of identity tokens from the iOS app.
+
+### Step 3 – Services ID (only for web / Android sign-in)
+
+Skip this if Apple sign-in is iOS-only. For sign-in on the web (or Android via the web flow):
+
+1. **Identifiers** → **+** → **Services IDs** → Continue. Description *Brainy Clan Web*, Identifier
+   e.g. `app.brainyclan.web` (must differ from the bundle ID) → Register.
+2. Open it → tick **Sign in with Apple** → **Configure**: Primary App ID = the App ID from Step 2;
+   **Domains and Subdomains** = your web domain (e.g. `brainyclan.app`, no `https://`);
+   **Return URLs** = the exact HTTPS URL Apple posts back to (e.g. `https://brainyclan.app/auth/apple/callback`).
+   Apple does not accept `localhost` or plain HTTP. → Next → Done → Continue → Save.
+
+The **Services ID** is the `aud` of identity tokens from the web flow.
+
+### Step 4 – Key for Sign in with Apple (later: account deletion)
+
+Not needed for sign-in itself. Account deletion (App Store guideline 5.1.1(v)) will need it to revoke
+Apple tokens — create it now so it is ready: **Keys** → **+** → name *Brainy Clan SIWA*, tick
+**Sign in with Apple** → Configure → the App ID from Step 2 → Save → Continue → Register →
+**Download** the `.p8` (only once!) and note the **Key ID**. Store the `.p8` safely (password
+manager); it is a secret and never goes in git.
+
+### Step 5 – backend `.env`
+
+```dotenv
+# comma-separated: iOS bundle ID, plus the Services ID if you use web sign-in
+APPLE_CLIENT_IDS=app.brainyclan,app.brainyclan.web
+```
+
+Then:
+
+```sh
+docker compose exec app php artisan config:cache
+docker compose restart app horizon
+```
+
+(Config: `config/services.php` → `apple.client_ids`.) Without `APPLE_CLIENT_IDS` every Apple token
+gets 401 `social_token_invalid` ("Sign in with Apple is not configured on this server.").
+
+### Step 6 – what the app sends
+
+```json
+{ "token": "<identityToken>", "nonce": "<raw nonce>", "display_name": "Moe",
+  "birth_year": 1985, "birth_month": 3, "device_name": "iPhone 16", "platform": "ios" }
+```
+
+- `nonce` (optional, recommended): the app generates a random string, passes **SHA-256 hex** of it
+  to Apple (`nonce` option of `signInAsync`), and sends the **raw** string here; the backend checks
+  `sha256(raw) == token.nonce`.
+- Apple returns the user's name (`fullName`) **only on the very first authorization** — send it as
+  `display_name` then. Without it a new user is called "Player" (a private relay email is never
+  used as a name); they can rename in `PATCH /me`.
+- The email may be a private relay (`…@privaterelay.appleid.com`); it counts as verified. A real
+  email that matches an existing adult links the Apple account to that user.
+- First time without birth data → 422 `social_signup_incomplete` → ask and retry with the same token
+  (identity tokens are valid for 10 minutes).
+
+### Step 7 – test
+
+- **Real device / TestFlight** (simplest): Sign in with Apple does not work in Expo Go for your own
+  bundle ID — use a development build on an iPhone (signed in to an Apple ID with 2FA). Log the
+  `identityToken` in a dev build if you want to replay it with curl within 10 minutes:
+
+  ```sh
+  curl -X POST http://localhost:8080/api/v1/auth/social/apple -H "Accept: application/json" -H "Content-Type: application/json" \
+    -d '{"token":"<identityToken>","device_name":"curl","platform":"ios","birth_year":1985,"birth_month":3,"display_name":"Moe"}'
+  ```
+- **Web token without the app**: open
+  `https://appleid.apple.com/auth/authorize?client_id=<Services ID>&redirect_uri=<Return URL>&response_type=code%20id_token&response_mode=form_post&scope=name%20email&nonce=<sha256 hex of a raw nonce>`
+  — Apple POSTs `id_token` to the Return URL (check your server log / a request bin you registered
+  as Return URL); send it as above with `"nonce":"<raw nonce>"`.
+- **Without Apple at all**: `docker compose exec app ./vendor/bin/pest tests/Feature/Actions/SocialTokenVerifiersTest.php`
+  signs Apple-shaped tokens with a throwaway key; a junk token must give 401:
+
+  ```sh
+  curl -X POST http://localhost:8080/api/v1/auth/social/apple -H "Accept: application/json" -H "Content-Type: application/json" \
+    -d '{"token":"junk","device_name":"curl","platform":"ios"}'
+  # -> 401 {"code":"social_token_invalid", ...}
+  ```
+
+Link / unlink for a signed-in adult: `POST` / `DELETE /api/v1/me/social-accounts/apple` (body
+`token`, optional `nonce`). The admin shows linked Apple accounts under Families → Members → *Social sign-in*.
+Code: `app/Modules/Identity/Social/AppleIdTokenVerifier.php` (shares `JwksIdTokenVerifier` with Google).
+
+**Not built yet:** account deletion (`DELETE /me`) with Apple token revocation — required before App
+Store submission (see `docs/PROGRESS.md` Next up).
 
 ## AI batch generator (Filament → Content → AI batch generator)
 

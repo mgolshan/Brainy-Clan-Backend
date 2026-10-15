@@ -9,7 +9,7 @@ use App\Modules\Identity\Social\SocialTokenVerifiers;
 use Illuminate\Support\Facades\DB;
 
 /**
- * `POST /me/social-accounts/{provider}`: links a Google/Facebook account to the signed-in adult
+ * `POST /me/social-accounts/{provider}`: links a Google/Facebook/Apple account to the signed-in adult
  * (e.g. after joining by invite). 409 `social_account_taken` when that provider account belongs
  * to another user. Linking another account of the same provider replaces the old link.
  */
@@ -20,11 +20,11 @@ class LinkSocialAccount
         private readonly EnsureSocialSignInAllowed $ensureAllowed,
     ) {}
 
-    public function handle(User $user, string $provider, string $token): SocialAccount
+    public function handle(User $user, string $provider, string $token, ?string $nonce = null): SocialAccount
     {
         $this->ensureAllowed->handle($user);
 
-        $identity = $this->verifiers->for($provider)->verify($token);
+        $identity = $this->verifiers->for($provider)->verify($token, $nonce);
 
         return DB::transaction(function () use ($user, $identity): SocialAccount {
             $owner = SocialAccount::query()

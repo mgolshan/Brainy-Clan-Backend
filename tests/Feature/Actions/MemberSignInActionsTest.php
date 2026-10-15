@@ -15,6 +15,7 @@ use App\Modules\Identity\Actions\IssueDeviceToken;
 use App\Modules\Identity\Actions\RevokeDevice;
 use App\Modules\Identity\Actions\SetPassword;
 use App\Modules\Identity\Models\Device;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -81,6 +82,7 @@ it('sets and changes a password only with an email login', function () {
 });
 
 it('removes a member who leaves the family from goal plans and open periods, keeping history', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-10-14 21:40', 'America/Toronto'));
     $owner = familyOwner(['tier' => 'family']);
     $sam = addMember($owner->family, 9);
     $category = Category::factory()->create();

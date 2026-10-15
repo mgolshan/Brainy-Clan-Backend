@@ -27,6 +27,11 @@ class SocialAccountFactory extends Factory
         ];
     }
 
+    public function apple(): static
+    {
+        return $this->state(fn () => ['provider' => SocialAccount::APPLE, 'provider_user_id' => '001234.'.fake()->unique()->md5().'.0123', 'email' => fake()->unique()->userName().'@privaterelay.appleid.com']);
+    }
+
     public function facebook(): static
     {
         return $this->state(fn () => ['provider' => SocialAccount::FACEBOOK]);

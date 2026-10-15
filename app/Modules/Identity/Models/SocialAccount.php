@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * A Google or Facebook account linked to a user (social sign-in, adults only).
+ * A Google, Facebook or Apple account linked to a user (social sign-in, adults only).
  *
  * @property int $id
  * @property int $user_id
@@ -31,7 +31,9 @@ class SocialAccount extends Model
 
     public const string FACEBOOK = 'facebook';
 
-    public const array PROVIDERS = [self::GOOGLE, self::FACEBOOK];
+    public const string APPLE = 'apple';
+
+    public const array PROVIDERS = [self::GOOGLE, self::FACEBOOK, self::APPLE];
 
     protected function casts(): array
     {

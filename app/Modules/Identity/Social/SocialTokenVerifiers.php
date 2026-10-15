@@ -7,7 +7,7 @@ use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
 
 /**
- * Provider key (`google` | `facebook`) => its token verifier, resolved from the container so
+ * Provider key (`google` | `facebook` | `apple`) => its token verifier, resolved from the container so
  * tests can swap one in with `$this->app->instance(GoogleIdTokenVerifier::class, $fake)`.
  */
 class SocialTokenVerifiers
@@ -18,6 +18,7 @@ class SocialTokenVerifiers
     public const array VERIFIERS = [
         SocialAccount::GOOGLE => GoogleIdTokenVerifier::class,
         SocialAccount::FACEBOOK => FacebookTokenVerifier::class,
+        SocialAccount::APPLE => AppleIdTokenVerifier::class,
     ];
 
     public function __construct(private readonly Container $container) {}

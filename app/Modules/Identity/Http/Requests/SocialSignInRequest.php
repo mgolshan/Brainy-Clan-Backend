@@ -16,9 +16,11 @@ class SocialSignInRequest extends FormRequest
     public function rules(): array
     {
         return [
-            /** Google: the ID token (a JWT). Facebook: the user access token. */
+            /** Google: the ID token (a JWT). Facebook: the user access token. Apple: the identity token (a JWT). */
             'token' => ['required', 'string', 'max:8192'],
-            /** Only for a first-time sign-up; defaults to the name from Google/Facebook. */
+            /** Apple only: the raw nonce whose SHA-256 (hex) the app passed to Apple; the token's `nonce` claim must match. */
+            'nonce' => ['sometimes', 'nullable', 'string', 'max:255'],
+            /** Only for a first-time sign-up; defaults to the name from Google/Facebook. Apple: send the name Apple gave the app on the first authorization. */
             'display_name' => ['sometimes', 'nullable', 'string', 'max:60'],
             'locale' => ['sometimes', 'nullable', 'string', Rule::in(User::LOCALES)],
             ...$this->birthRules(required: false),

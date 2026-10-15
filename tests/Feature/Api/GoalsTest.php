@@ -160,6 +160,30 @@ it('lists active plans first and hides other families', function () {
     $this->getJson("/api/v1/goals/{$foreign->id}")->assertNotFound();
 });
 
+it('has a current period late in the evening, when UTC is already the next day', function () {
+    // 21:40 in Toronto = 01:40 UTC on Thursday the 15th; the family's "today" is still Wednesday.
+    Carbon::setTestNow(Carbon::parse('2026-10-14 21:40', 'America/Toronto'));
+    $owner = familyOwner(['tier' => 'family']);
+    $category = Category::factory()->create();
+    $factoryPlan = GoalPlan::factory()->create(['family_id' => $owner->family_id]);
+    $factoryPlan->categories()->attach($category);
+    actingAsMember($owner);
+
+    expect($factoryPlan->starts_on->toDateString())->toBe('2026-10-14');
+
+    $this->postJson('/api/v1/goals', goalBody($category, ['name' => 'Evening plan']))
+        ->assertCreated()
+        ->assertJsonPath('data.current_period.starts_at', '2026-10-14T04:00:00Z')
+        ->assertJsonPath('data.current_period.ends_at', '2026-10-19T04:00:00Z');
+
+    $this->getJson('/api/v1/goals')
+        ->assertOk()
+        ->assertJsonCount(2, 'data')
+        ->assertJsonPath('data.0.current_period.status', 'open')
+        ->assertJsonPath('data.1.current_period.status', 'open')
+        ->assertJsonPath('data.1.current_period.starts_at', '2026-10-14T04:00:00Z');
+});
+
 it('applies edits from the next period only', function () {
     $owner = familyOwner(['tier' => 'family']);
     $category = Category::factory()->create();

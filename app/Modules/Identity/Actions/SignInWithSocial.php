@@ -5,6 +5,7 @@ namespace App\Modules\Identity\Actions;
 use App\Modules\Core\Exceptions\ApiException;
 use App\Modules\Identity\Models\SocialAccount;
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Social\AppleIdTokenVerifier;
 use App\Modules\Identity\Social\SocialIdentity;
 use App\Modules\Identity\Social\SocialTokenVerifiers;
 use App\Modules\Policy\PolicyResolver;
@@ -32,9 +33,9 @@ class SignInWithSocial
      * @param  array{birth_year?: int|null, birth_month?: int|null, display_name?: string|null, locale?: string|null}  $profile
      * @return array{user: User, token: string, created: bool}
      */
-    public function handle(string $provider, string $token, array $profile, string $deviceName, string $platform, ?string $appVersion = null): array
+    public function handle(string $provider, string $token, array $profile, string $deviceName, string $platform, ?string $appVersion = null, ?string $nonce = null): array
     {
-        $identity = $this->verifiers->for($provider)->verify($token);
+        $identity = $this->verifiers->for($provider)->verify($token, $nonce);
 
         return DB::transaction(function () use ($identity, $profile, $deviceName, $platform, $appVersion): array {
             $created = false;
@@ -86,7 +87,9 @@ class SignInWithSocial
         }
 
         $displayName = $profile['display_name'] ?? null;
-        $displayName = collect([$displayName, $identity->name, $identity->email !== null ? Str::before($identity->email, '@') : null, 'Player'])
+        // An Apple private relay address has a random local part: no use as a name.
+        $emailName = $identity->email !== null && ! AppleIdTokenVerifier::isPrivateRelay($identity->email) ? Str::before($identity->email, '@') : null;
+        $displayName = collect([$displayName, $identity->name, $emailName, 'Player'])
             ->first(fn ($value) => is_string($value) && trim($value) !== '');
 
         $user = User::query()->create([

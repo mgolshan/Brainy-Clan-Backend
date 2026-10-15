@@ -3,10 +3,11 @@
 namespace App\Modules\Identity\Social;
 
 /**
- * Who a verified Google / Facebook token belongs to. `email` is only set when the provider
- * vouches for it (Google `email_verified`; Facebook only returns confirmed emails) and may be
- * null (e.g. a phone-only Facebook account). `name` is the first name (the default
- * `display_name` of a new user), falling back to the full name.
+ * Who a verified Google / Facebook / Apple token belongs to. `email` is only set when the provider
+ * vouches for it (Google/Apple `email_verified`; Facebook only returns confirmed emails) and may be
+ * null (e.g. a phone-only Facebook account); an Apple private relay address counts as verified.
+ * `name` is the first name (the default `display_name` of a new user), falling back to the full
+ * name; always null for Apple (its token carries no name).
  */
 final readonly class SocialIdentity
 {

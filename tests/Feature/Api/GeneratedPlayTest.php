@@ -111,7 +111,10 @@ it('plays math sprint items with equivalent answers and advisory timers', functi
         ->and($data['items'][0]['payload'])->toHaveKeys(['question', 'answer_format', 'time_limit_ms']);
 
     $sessionId = $data['session']['id'];
-    $first = sessionItemRow($data['items'][0]['id']);
+    $rows = collect($data['items'])->map(fn (array $item) => sessionItemRow($item['id']));
+    // "Simplify a/b" items (reduced_only) reject unreduced equivalents by design, so pick another one here.
+    $first = $rows->first(fn (SessionItem $row) => ($row->answer['reduced_only'] ?? false) !== true);
+    expect($first)->not->toBeNull();
 
     answerItem($sessionId, $first->id, ['value' => 'banana'])->assertUnprocessable()->assertJsonValidationErrors('response.value');
 
@@ -124,7 +127,7 @@ it('plays math sprint items with equivalent answers and advisory timers', functi
         ->assertOk()->assertJsonPath('data.is_correct', true)->assertJsonPath('data.points_awarded', 1)
         ->assertJsonPath('data.correct_response', ['value' => $expected]);
 
-    $second = sessionItemRow($data['items'][1]['id']);
+    $second = $rows->first(fn (SessionItem $row) => $row->id !== $first->id);
     answerItem($sessionId, $second->id, ['value' => '99999'])->assertOk()->assertJsonPath('data.is_correct', false);
 
     expect(PointEntry::query()->where('play_session_id', $sessionId)->sum('amount'))->toBe(1);

@@ -7,6 +7,7 @@ use App\Modules\Core\CoreServiceProvider;
 use App\Modules\Family\FamilyServiceProvider;
 use App\Modules\Goals\GoalsServiceProvider;
 use App\Modules\Identity\IdentityServiceProvider;
+use App\Modules\Notifications\NotificationsServiceProvider;
 use App\Modules\Play\PlayServiceProvider;
 use App\Modules\Policy\PolicyServiceProvider;
 use App\Modules\Scoring\ScoringServiceProvider;
@@ -30,4 +31,5 @@ return [
     ScoringServiceProvider::class,
     GoalsServiceProvider::class,
     BillingServiceProvider::class,
+    NotificationsServiceProvider::class,
 ];

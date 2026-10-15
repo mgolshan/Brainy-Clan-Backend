@@ -19,7 +19,7 @@ use Throwable;
  */
 class FacebookTokenVerifier implements SocialTokenVerifier
 {
-    public function verify(string $token): SocialIdentity
+    public function verify(string $token, ?string $nonce = null): SocialIdentity
     {
         $appId = (string) config('services.facebook.client_id');
         $secret = (string) config('services.facebook.client_secret');

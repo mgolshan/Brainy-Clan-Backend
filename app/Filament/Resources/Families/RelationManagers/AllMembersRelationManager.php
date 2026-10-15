@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Members of a family with their email login, linked Google/Facebook accounts and signed-in devices. Support can issue a
+ * Members of a family with their email login, linked Google/Facebook/Apple accounts and signed-in devices. Support can issue a
  * one-time sign-in code (same Action as the API) and sign a lost device out.
  */
 class AllMembersRelationManager extends RelationManager
@@ -43,7 +43,7 @@ class AllMembersRelationManager extends RelationManager
                 TextColumn::make('user.email')->label('Email login')->placeholder('codes only'),
                 IconColumn::make('has_password')->label('Password')->boolean()
                     ->state(fn (FamilyMember $record): bool => $record->user->password !== null),
-                TextColumn::make('social_accounts')->label('Google / Facebook')
+                TextColumn::make('social_accounts')->label('Social sign-in')
                     ->state(fn (FamilyMember $record): array => $record->user->socialAccounts
                         ->map(fn (SocialAccount $account) => ucfirst($account->provider).($account->email !== null ? ' ('.$account->email.')' : ''))
                         ->all())

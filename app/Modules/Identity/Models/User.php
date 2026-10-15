@@ -85,7 +85,7 @@ class User extends Authenticatable implements FilamentUser, HasName
     }
 
     /**
-     * Google / Facebook accounts linked for social sign-in.
+     * Google / Facebook / Apple accounts linked for social sign-in.
      *
      * @return HasMany<SocialAccount, $this>
      */

@@ -142,7 +142,7 @@ a `devices` row bound to the new token.
   (no email, no password) sign in again after a new phone, a reinstall or a sign-out.
 - `POST /auth/logout` (auth) — revokes the current token and its device. → 204
 
-- `POST /auth/social/{provider}` — sign in or sign up with `google` | `facebook` (adults only).
+- `POST /auth/social/{provider}` — sign in or sign up with `google` | `facebook` | `apple` (adults only).
   Body: `token` (Google: the **ID token**; Facebook: the **access token**), `device_name, platform`,
   plus for a first-time sign-up `birth_year, birth_month` and optionally `display_name, locale`.
   The server verifies the token with the provider, then: a linked account → sign in (**200**);
@@ -153,7 +153,11 @@ a `devices` row bound to the new token.
   Returns `AuthPayload`. Children never use social sign-in.
   Google ID tokens are accepted when `aud` is any of the configured Google client IDs (web,
   Android, iOS — Android and web tokens carry the web client ID, iOS ones may carry the iOS ID).
-  Facebook: the standard user access token (not iOS "Limited Login" tokens). A new user's
+  Facebook: the standard user access token (not iOS "Limited Login" tokens).
+  Apple: `token` = the **identity token** (JWT); `aud` must be the iOS bundle ID or the web Services
+  ID; optional `nonce` (the raw nonce whose SHA-256 the app passed to Apple). Apple sends the user's
+  name only on the first authorization, so the app sends it as `display_name` then; the email may
+  be a private relay address (`…@privaterelay.appleid.com`) and counts as verified. A new user's
   `display_name` defaults to the provider's name (first name) when not sent.
   SocialAccount: `{ "provider": "google", "email": "mom@gmail.com" | null, "linked_at": "..." }`
   (`email` is `null` when the provider shares none, e.g. a phone-only Facebook account).
@@ -172,7 +176,7 @@ members use their invite code (`/auth/join`). No shared passwords, no parent ema
 - `PATCH /me/accessibility` (auth, needs family) — Body (all optional): `text_scale (0.8–1.6),
   reduced_motion, calm_timers, theme (null | playful | sleek | modern | classic)`. → `{ data: Member }`
 - `GET /me/social-accounts` (auth) → `{ data: [ { "provider": "google", "email": "mom@gmail.com", "linked_at": "..." } ] }`
-- `POST /me/social-accounts/{provider}` (auth) — Body: `token`. Links Google/Facebook to the
+- `POST /me/social-accounts/{provider}` (auth) — Body: `token`, `nonce?` (Apple). Links Google/Facebook to the
   signed-in adult (e.g. after joining by invite). → **201** `{ data: SocialAccount }`, 409 `social_account_taken`.
 - `DELETE /me/social-accounts/{provider}` (auth) → 204; 409 `last_sign_in_method` when the user has
   no password and no other linked provider.
@@ -403,17 +407,18 @@ Custom data in the ad request: `session_id`.
 
 **Push notifications** (Expo push service):
 - `PUT /me/push-token` (auth) — Body: `token` (Expo push token `ExponentPushToken[...]`), `platform`.
-  Stored on the current device. → 204. `DELETE /me/push-token` → 204 (also cleared on logout).
+  Stored on the current device (and removed from any other device that had it). → 204; 422 when the token has no device. `DELETE /me/push-token` → 204 (also cleared on logout).
 - `GET /me/notification-preferences` (auth, needs family) → `{ "data": { "types": { "goal_reached": true,
   "period_closed": true, "family_activity": true, "daily_reminder": false }, "quiet_from": "20:00",
   "quiet_to": "07:30", "reminder_time": "17:00" } }` (times in the family timezone; children default
-  to quiet hours 19:30–07:30). `PATCH /me/notification-preferences` — same shape, all optional.
+  to quiet hours 19:30–07:30, everyone else 21:30–07:00; `quiet_from`/`quiet_to` both `null` = no quiet
+  hours, only one of them → 422). `PATCH /me/notification-preferences` — same shape, all optional.
   Admins may also `GET` / `PATCH /family/members/{member}/notification-preferences` (e.g. children's quiet hours).
 - Sent by the server (queued; never during quiet hours: delayed until quiet hours end, dropped
   when older than 12 h): `goal_reached` (cooperation target reached / race winner), `period_closed` (results),
   `family_activity` (a member finished a session, max 1 per member per hour, not to themself),
   `daily_reminder` (at `reminder_time` if the member hasn't played today). Push `data`:
-  `{ "type": "goal_reached", "goal_id": 2 }` etc. so the app can deep-link.
+  `{ "type": "goal_reached", "goal_id": 2, "period_id": 31 }` (goal types carry `goal_id` + `period_id`) so the app can deep-link.
 
 ## Changelog
 - 2026-10-10 — Initial contract for B1–B5 / F1–F3.
@@ -433,3 +438,8 @@ Custom data in the ad request: `session_id`.
 - 2026-10-11 — B8 contract: RevenueCat webhook + `GET /family/subscription` (`family-{id}` app user id), AdMob SSV `reward_ref`, push token + notification preferences, notification types.
 - 2026-10-14 — Admins can `GET /family/members/{member}/notification-preferences` (was PATCH only).
 - 2026-10-14 — RevenueCat webhook lives at `/api/v1/webhooks/revenuecat`; 200 body `{ event_id, outcome }`; 422 without `event.id`/`event.type`.
+- 2026-10-15 — Sign in with Apple (B6c/F4c): provider `apple` for `/auth/social/{provider}` and `/me/social-accounts/{provider}`; identity token + optional `nonce`.
+- 2026-10-15 — `POST /me/social-accounts/{provider}` accepts `nonce` (Apple). App bundle ID / Apple `aud`: `app.brainyclan`.
+- 2026-10-15 — `nonce` is used for Apple only (ignored for Google/Facebook). Planned for account deletion (B6c): `DELETE /me` and an optional Apple `authorization_code` on sign-in (to revoke Apple tokens) — not implemented yet.
+- 2026-10-15 — Notification preferences: adult default quiet hours 21:30–07:00; both quiet times `null` = off; push token moves to the current device; 422 without a device.
+- 2026-10-15 — Push `data` for goal notifications includes `period_id`.

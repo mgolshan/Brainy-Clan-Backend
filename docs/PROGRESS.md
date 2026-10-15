@@ -19,17 +19,38 @@ Milestones are defined in `docs/PLAN.md`.
 | No-N+1 guard | Done | `Model::preventLazyLoading()` outside production; query-count tests for every list endpoint and the busy Filament tables |
 | B6a API documentation (Scramble) | Done | Module tags, contract error envelope + codes per endpoint (`ErrorResponsesExtension`, `#[ApiErrors]`), typed answer/leaderboard responses, summaries on every endpoint, spec coverage test |
 | B6b Social sign-in (Google, Facebook) | Done | Socialite 5.31, `social_accounts`, verifiers (Google ID token via JWKS, Facebook `debug_token` + `/me`), sign-in/link/unlink/list, Filament column, README setup guide, Pest + live smoke test. Needs real Google/Facebook IDs to try end to end |
+| B6c Sign in with Apple | In progress | **Sign-in done** (session 9): `AppleIdTokenVerifier` (JWKS `appleid.apple.com/auth/keys`, cached + refetch on unknown kid, `iss`, `aud` ∈ `APPLE_CLIENT_IDS`, `exp`, optional `nonce` = sha256 hex), provider `apple` on `/auth/social/{provider}` and `/me/social-accounts/{provider}`, `display_name` from the app (fallback "Player", never a private relay), Filament column "Social sign-in", README "Sign in with Apple — setup", Pest + live curl. **Left:** account deletion `DELETE /me` + Apple token revocation (App Store 5.1.1(v)) |
 | B7 Remaining launch content | In progress | Sudoku + Math Sprint generated per session, Word Puzzles seeded, item `points`, Filament preview + category generators; **AI batch generator done** (Laravel AI SDK, Horizon `ai` queue, review/approve page; needs `ANTHROPIC_API_KEY` to run for real). Left: content for all 8 categories (generate + review batches) |
-| B8 Billing, ads and notifications | In progress | **Billing core done** (session 8): `BillingServiceProvider`, `POST /api/v1/webhooks/revenuecat` (Bearer secret, idempotent via `webhook_events`, stale/out-of-order guard, `ApplyRevenueCatEvent` sets the family `tier`), `GET /family/subscription` (admin), factories, fixtures + 13 Pest tests, live smoke test. Dev DB migrated. **Left:** push token, notification preferences, sending notifications, AdMob SSV / rewarded-ad second chance, Filament subscription view (see Next up) |
+| B8 Billing, ads and notifications | In progress | **Billing core done** (session 8): `BillingServiceProvider`, `POST /api/v1/webhooks/revenuecat` (Bearer secret, idempotent via `webhook_events`, stale/out-of-order guard, `ApplyRevenueCatEvent` sets the family `tier`), `GET /family/subscription` (admin), factories, fixtures + 13 Pest tests, live smoke test. Dev DB migrated. Not touched in session 9. **Push token + notification preferences done** (session 10: `Notifications` module, 13 Pest tests). **Sending started** (session 11: Expo sender, `SendMemberNotification`, `goal_reached` / `period_closed` listeners, 7 Pest tests). **Left:** `family_activity`, `daily_reminder`, AdMob SSV / rewarded-ad second chance, Filament subscription view (see Next up) |
 | B9 Production | Not started | |
 
 ## Next up
 
-0. **State at last stop (session 8, 2026-10-14):** B8 billing core done (see log); dev DB `migrate`d (billing tables,
+0. **State at last stop (session 11, 2026-10-15):** flaky `GeneratedPlayTest` fixed (test-only); B8 item 3 (sending)
+   **partly done**: Expo push sender, `SendMemberNotification` (preferences, quiet hours, 12 h drop), queued listeners
+   for `GoalReached` / `PeriodClosed` (see log). No migrations. **Next, in order:**
+   a. B8 item 3 rest: `family_activity` (listener on the play-session-finished event; recipients = other active family
+      members; max 1 per finishing member per hour per recipient — e.g. a `Cache::add` key per member/hour; not to
+      themself) and `daily_reminder` (scheduled every 15 min: members whose `reminder_time` falls in the window in the
+      family timezone, `daily_reminder` on, not played today; one batched query). Both reuse `SendMemberNotification`.
+   b. Optional: Expo **receipts** check (`/push/getReceipts`) — currently only ticket errors clear tokens.
+   c. Then B8 items 4–6 and account deletion (item a of session 9 below).
+   Previous: **State at last stop (session 9, 2026-10-15):** goal time-of-day test failures fixed (test factory, see log) and
+   B6c Sign in with Apple **sign-in** done; no migrations this session. Push token / notification preferences were
+   not started (time budget). **Next, in order:**
+   a. **Account deletion (B6c, before App Store submission):** `DELETE /me` for adults (owner: delete or hand over the
+      family), plus Apple token revocation — the app sends the `authorizationCode` once, the server exchanges it at
+      `https://appleid.apple.com/auth/token` (client secret = ES256 JWT signed with the `.p8` key: Team ID, Key ID,
+      client id) for a refresh token, stores it encrypted on the Apple `social_accounts` row, and calls
+      `/auth/revoke` on deletion. Needs `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` and a contract change
+      (an `authorization_code` field on `/auth/social/apple` + `DELETE /me`) — coordinator decides the contract.
+   b. B8 items below — items 1 and 2 are **done** (session 10, 2026-10-15; see log); next is item 3 (sending).
+   To try Apple for real Moe follows README "Sign in with Apple — setup" and sets `APPLE_CLIENT_IDS`.
+   Previous: **State at last stop (session 8, 2026-10-14):** B8 billing core done (see log); dev DB `migrate`d (billing tables,
    no fresh); `.env` has a dev `REVENUECAT_WEBHOOK_SECRET`. **B8 left, in order:**
-   1. `PUT/DELETE /me/push-token` on the current device (the device row — and so the token — is already deleted on
+   1. ~~Done (session 10)~~ `PUT/DELETE /me/push-token` on the current device (the device row — and so the token — is already deleted on
       logout by `RevokeCurrentDevice`; also clear the same token from other devices when it moves accounts).
-   2. `GET/PATCH /me/notification-preferences` with defaults (children quiet hours 19:30–07:30), admin
+   2. ~~Done (session 10)~~ `GET/PATCH /me/notification-preferences` with defaults (children quiet hours 19:30–07:30), admin
       `GET` + `PATCH /family/members/{member}/notification-preferences` (GET added to the contract 2026-10-14).
    3. Sending: Expo push client (queued jobs, quiet-hours delay, drop after 12 h), listeners for `GoalReached` /
       `PeriodClosed`, `family_activity` (1/member/hour), `daily_reminder` scheduler.
@@ -66,7 +87,7 @@ Milestones are defined in `docs/PLAN.md`.
      devices; sign them out via the devices endpoint if needed.
 2. `Goals\Events\PeriodClosed` / `GoalReached` still have no listeners (notifications are B8).
 3. README "admin tour" section is still thin.
-4. Next: finish B8 (item 0), fill content for all 8 categories with the AI generator (needs the key), Sign in with Apple (B6b follow-up).
+4. Next: finish B8 (item 0), fill content for all 8 categories with the AI generator (needs the key), account deletion + Apple token revocation (B6c).
 5. For the frontend / `docs/API.md` (coordinator): generated "Simplify a/b" math items now accept only the fully reduced
    fraction (`answer.reduced_only: true`; "14/16" or "0.875" for 21/24 is a wrong answer, not a 422).
 
@@ -223,7 +244,115 @@ curl http://localhost:8080/api/v1/health
   **The demo family (id 1) is seeded with tier `family` and no subscription** — after an EXPIRATION test restore it:
   delete its `subscriptions` row + test `webhook_events` and set `families.tier = 'family'`.
 
+## How to test (B6c — Sign in with Apple)
+
+- Without Apple: `docker compose exec app ./vendor/bin/pest tests/Feature/Actions/SocialTokenVerifiersTest.php tests/Feature/Api/SocialSignInTest.php`
+  (Apple-shaped identity tokens signed with a throwaway RSA key; JWKS faked).
+- Live contract check: `curl -X POST http://localhost:8080/api/v1/auth/social/apple -H "Accept: application/json"
+  -H "Content-Type: application/json" -d '{"token":"junk","device_name":"curl","platform":"ios"}'` → 401
+  `{"message":"...","code":"social_token_invalid"}`.
+- Real token: README "Sign in with Apple — setup" (Step 7: device / TestFlight or the web authorize URL).
+
+## How to test (B8 — push token, notification preferences)
+
+- Tests: `docker compose exec app php artisan test --compact tests/Feature/Api/NotificationsTest.php` (13 tests).
+- Live (demo seed): `curl -H "Authorization: Bearer demo-sam-child-token" -H "Accept: application/json" http://localhost:8080/api/v1/me/notification-preferences`
+  → child defaults (quiet 19:30–07:30, reminder 17:00, `daily_reminder` off).
+- Push token: `curl -X PUT http://localhost:8080/api/v1/me/push-token -H "Authorization: Bearer demo-sam-child-token" -H "Accept: application/json" -H "Content-Type: application/json" -d '{"token":"ExponentPushToken[abc123]","platform":"android"}'` → 204;
+  `DELETE` the same URL → 204.
+
+## How to test (B8 — sending notifications)
+
+- Tests: `docker compose exec app php artisan test --compact tests/Feature/Api/PushNotificationsTest.php` (7 tests; fake
+  sender bound via `app()->instance(ExpoPushSender::class, ...)`, HTTP sender via `Http::fake`).
+- Deploy: `composer dump-autoload -o`, clear `/tmp/opcache/*`, `php artisan config:cache`, restart app + horizon
+  (new queued listeners/job). Optional `.env`: `EXPO_ACCESS_TOKEN` (only if "enhanced push security" is on in Expo).
+
 ## Log
+
+### 2026-10-15 (session 11: flaky test + B8 sending notifications, part 1)
+
+- **Flaky test fixed:** `GeneratedPlayTest` "plays math sprint items…" answered the first item with an unreduced
+  equivalent (×3). At difficulty 3 the fractions generator makes a "Simplify a/b" item half the time, and those are
+  `reduced_only` (only the reduced fraction counts, by design) → `is_correct` false. The test now picks a
+  non-`reduced_only` item for the equivalence check. Production code unchanged.
+- `Notifications\Contracts\ExpoPushSender` (bound to `Support\HttpExpoPushSender`): POST
+  `services.expo.push_url` (default `https://exp.host/--/api/v2/push/send`, optional `EXPO_ACCESS_TOKEN`) in batches
+  of ≤100, retries 2×; returns tokens whose ticket error is `DeviceNotRegistered`.
+- `Actions\SendMemberNotification`: effective preferences for all recipients in one query
+  (`GetNotificationPreferences::forMembers`), skips members with the type off, groups members by send time — now or
+  the end of their quiet hours in the family timezone (overnight windows supported) — and dispatches one
+  `Jobs\DeliverPushNotification` per group (delayed job for quiet hours). The job drops deliveries older than 12 h,
+  loads all push tokens in one query, sends, and nulls tokens Expo reported as not registered.
+- Queued listeners (`afterCommit`) `NotifyGoalReached` / `NotifyPeriodClosed`; recipients = plan members (active),
+  loaded with `family` + `planMembers.member.user` (`Support\GoalRecipients`). Push `data`:
+  `{ "type": "goal_reached" | "period_closed", "goal_id": <plan id>, "period_id": <period id> }`.
+- Tests: `tests/Feature/Api/PushNotificationsTest.php` (7: goal_reached data + disabled type, period_closed fan-out,
+  quiet-hours delay adult 07:00 / child 07:30 Berlin, 12 h drop, invalid token cleanup, constant query count for 2 vs 9
+  recipients, HTTP batching + DeviceNotRegistered).
+- For the coordinator / `docs/API.md`: push `data` also carries `period_id` (extra key, `goal_id` as documented).
+- Not done: `family_activity`, `daily_reminder`, Expo receipts (Next up 0a/0b).
+
+### 2026-10-15 (session 10: B8 push token + notification preferences)
+
+- New `Notifications` module (`NotificationsServiceProvider` registered, Scramble group `Notifications`; `ApiDocsTest`
+  tag expectation updated).
+- `PUT /me/push-token` (`UpdatePushTokenRequest`: Expo format `ExponentPushToken[...]` / `ExpoPushToken[...]`,
+  `platform` in `Device::PLATFORMS`) → `SetPushToken` stores token + platform on the device bound to the request's
+  Sanctum token and clears the same token from any other device (phone changes account). `DELETE /me/push-token`
+  clears it. Logout already deletes the device row (`RevokeCurrentDevice`), and admin device sign-out the same, so the
+  token goes with it. A request without a device row (e.g. a transient token) → 422 on `token`.
+- Migration `2026_10_15_100000_create_notification_preferences_table` (one row per `family_member_id`, `types` JSON,
+  `quiet_from`/`quiet_to` nullable TIME, `reminder_time` TIME). No row = defaults (`NotificationDefaults`): all types on
+  except `daily_reminder`, reminder 17:00; quiet hours children 19:30–07:30 (child = `PolicyResolver::isChild`, i.e.
+  the age band's `is_child` rule), everyone else **21:30–07:00** (decision this session). Quiet hours can be turned
+  off by PATCHing both to `null` (setting only one → 422).
+- `GET/PATCH /me/notification-preferences` (`family`), `GET/PATCH /family/members/{member}/notification-preferences`
+  (`family:admin`; other family → 404). Actions `GetNotificationPreferences` / `UpdateNotificationPreferences`
+  (partial update merged over current/defaults, upsert), `NotificationPreferencesResource`.
+- Tests: `tests/Feature/Api/NotificationsTest.php` (13: push token store/clear/move/format/logout, adult + child
+  defaults, partial update + clearing quiet hours, validation, no family 409, admin read/write child, non-admin 403,
+  other family 404, query-count bound). NotificationsTest + ApiDocsTest green; Pint, PHPStan clean. Full suite not
+  run (coordinator).
+- Deployed to dev: `migrate` (no fresh), opcache cleared, `config:cache`, app + horizon restarted. Live curl as Sam →
+  child defaults.
+- For `docs/API.md` (coordinator): adult default quiet hours 21:30–07:00; `quiet_from`/`quiet_to` nullable (both null =
+  no quiet hours); `PUT /me/push-token` 422 when the sign-in has no device.
+
+### 2026-10-15 (session 9: goal tz test fix, B6c Sign in with Apple)
+- **Goal test failures at night — root cause:** test setup, not production. `GoalPlanFactory` set `starts_on` to
+  `now()->toDateString()` (UTC). After 20:00 EDT the UTC date is already tomorrow, so the plan "starts tomorrow" in
+  the family's timezone (America/Toronto) and `OpenGoalPeriod::window()` correctly returns no current period.
+  Production paths were checked and are right: `SaveGoalPlan` validates `starts_on` against
+  `FamilyClock::today($family)`, `OpenGoalPeriod`/`FamilyClock::window()` compute windows in the family timezone, and
+  `DemoActivitySeeder` uses `CarbonImmutable::now($family->timezone)`. Fix: the factory computes "today" in the
+  family's timezone. Tests pinned to 21:40 Toronto (01:40 UTC next day) with `travelTo`: QueryCountTest "lists goal
+  plans…", MemberSignInActionsTest "removes a member … from goal plans", and a new GoalsTest "has a current period
+  late in the evening" (factory plan + API-created plan both have the Wed-04:00Z period).
+- **B6c Apple sign-in:** `Identity/Social/JwksIdTokenVerifier` (new abstract base: JWKS fetch/cache with `max-age`,
+  refetch once on an unknown `kid`, RS256 decode, `sub`/`exp` required, `email_verified` bool or `"true"`);
+  `GoogleIdTokenVerifier` now extends it (behaviour unchanged, its tests still green); `AppleIdTokenVerifier`
+  (`iss` `https://appleid.apple.com`, `aud` ∈ `services.apple.client_ids` from comma-separated `APPLE_CLIENT_IDS`,
+  optional nonce: `hash_equals(sha256(raw), token.nonce)`, name always null). `SocialTokenVerifier::verify()` gained
+  `?string $nonce`; `SocialAccount::APPLE` added to `PROVIDERS` (routes pick it up via `whereIn`);
+  `SocialSignInRequest`/`LinkSocialAccountRequest` accept optional `nonce`; `SignInWithSocial`/`LinkSocialAccount`
+  pass it. New user's `display_name`: request → provider name → email local part (skipped for
+  `@privaterelay.appleid.com`) → "Player". Filament members column renamed "Social sign-in" (shows Apple).
+  `SocialAccountFactory::apple()`. `.env.example` + README "Sign in with Apple — setup" (Developer Program, App ID +
+  capability, Services ID + domains/return URL, `.p8` key for later revocation, `.env`, nonce/name rules, testing).
+- Tests: +6 Apple verifier tests (incl. an end-to-end API sign-up with a real signed token + nonce), +1 link with
+  nonce (`POST /me/social-accounts/apple`, wrong nonce → 401, right → 201), +2 API tests (name fallback,
+  link/unlink), +1 goal late-evening test. iOS bundle ID is `app.brainyclan` (coordinator): `.env.example`
+  `APPLE_CLIENT_IDS=app.brainyclan` (append the Services ID for web), README and tests use it.
+- `ApiDocsTest` "groups endpoints by module" expected the tag list without `Billing` (stale since session 8 added the
+  Billing module); expectation updated.
+- Full suite: 345 tests, 344 passed + the ApiDocsTest expectation fixed afterwards (re-run of the changed files green:
+  ApiDocsTest + SocialTokenVerifiersTest 21/21); total now 346. Pint and PHPStan clean.
+- Live: `POST /api/v1/auth/social/apple` with a junk token → 401 `social_token_invalid` (contract shape).
+- Not done: account deletion / Apple token revocation (Next up 0a); B8 push token and notification preferences.
+- For the coordinator / `docs/API.md`: the request now documents `nonce` for Apple only (Google/Facebook ignore it);
+  `/me/social-accounts/apple` also accepts `nonce`. Account deletion will need an `authorization_code` field on the
+  Apple sign-in body (to get a revocable refresh token) and `DELETE /me` — not in the contract yet.
 
 ### 2026-10-14 (session 8: B8 billing core)
 

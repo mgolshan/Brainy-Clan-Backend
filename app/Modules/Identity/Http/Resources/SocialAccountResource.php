@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * A linked Google / Facebook account.
+ * A linked Google / Facebook / Apple account.
  *
  * @property SocialAccount $resource
  */

@@ -43,6 +43,15 @@ return [
     ],
 
     /*
+     * Sign in with Apple (README "Sign in with Apple — setup"): the backend only verifies identity
+     * tokens. `client_ids` is the list of accepted `aud` values, comma-separated in
+     * `APPLE_CLIENT_IDS`: the iOS app's bundle ID and, for web sign-in, the Services ID.
+     */
+    'apple' => [
+        'client_ids' => array_values(array_filter(array_map('trim', explode(',', (string) env('APPLE_CLIENT_IDS', ''))))),
+    ],
+
+    /*
      * Facebook: verified with the Graph API (`debug_token` + `/me`) through Laravel Socialite.
      * `redirect` is unused (the app signs in natively) but Socialite expects the key.
      */
@@ -57,6 +66,11 @@ return [
      * RevenueCat (B8): the webhook's Authorization header must be `Bearer <webhook_secret>`
      * (set the same value in the RevenueCat dashboard). Empty = every webhook is rejected.
      */
+    'expo' => [
+        'push_url' => env('EXPO_PUSH_URL', 'https://exp.host/--/api/v2/push/send'),
+        'access_token' => env('EXPO_ACCESS_TOKEN'),
+    ],
+
     'revenuecat' => [
         'webhook_secret' => env('REVENUECAT_WEBHOOK_SECRET'),
         'entitlement' => env('REVENUECAT_ENTITLEMENT', 'family'),

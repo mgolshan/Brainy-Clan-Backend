@@ -13,6 +13,7 @@ use App\Modules\Play\Models\PlaySession;
 use App\Modules\Play\Models\SessionItem;
 use App\Modules\Scoring\Actions\AppendPoints;
 use App\Modules\Scoring\Models\PointEntry;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -99,6 +100,9 @@ it('builds the category tree with a constant number of queries', function () {
 });
 
 it('lists goal plans with progress with a constant number of queries', function () {
+    // Late evening in Toronto: UTC is already the next day (regression: plans had no current period).
+    $this->travelTo(CarbonImmutable::parse('2026-10-14 21:40', 'America/Toronto'));
+
     $category = Category::factory()->create();
     $small = qcFamily(2, $category);
     $large = qcFamily(6, $category);

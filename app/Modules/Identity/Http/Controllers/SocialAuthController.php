@@ -13,10 +13,12 @@ use Illuminate\Http\JsonResponse;
 class SocialAuthController
 {
     /**
-     * Sign in with Google or Facebook.
+     * Sign in with Google, Facebook or Apple.
      *
      * Adults only. The app signs in natively with the provider and sends its token: Google → the
-     * **ID token**, Facebook → the **access token**. The server verifies it with the provider, then
+     * **ID token**, Facebook → the **access token**, Apple → the **identity token** (plus the raw
+     * `nonce` when the app used one, and on the first authorization the name Apple returned as
+     * `display_name` — Apple never puts the name in the token). The server verifies it with the provider, then
      * signs in a linked account (200), links a user with the same provider-verified email (200), or
      * creates a new adult user (201). A would-be new user without `birth_year`/`birth_month` gets
      * 422 `social_signup_incomplete`: ask for them and retry with the same token. Under the adult
@@ -35,6 +37,7 @@ class SocialAuthController
             (string) $request->string('device_name'),
             (string) $request->string('platform'),
             $request->appVersion(),
+            $request->filled('nonce') ? (string) $request->string('nonce') : null,
         );
 
         return MeResource::withToken($result['user'], $result['token'])

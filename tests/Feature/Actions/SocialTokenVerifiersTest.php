@@ -1,11 +1,14 @@
 <?php
 
 use App\Modules\Core\Exceptions\ApiException;
+use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Social\AppleIdTokenVerifier;
 use App\Modules\Identity\Social\FacebookTokenVerifier;
 use App\Modules\Identity\Social\GoogleIdTokenVerifier;
 use Firebase\JWT\JWT;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Laravel\Sanctum\Sanctum;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\FacebookProvider;
 use Laravel\Socialite\Two\User as SocialiteUser;
@@ -178,4 +181,131 @@ describe('Facebook access tokens', function () {
         expectSocialTokenInvalid(fn () => app(FacebookTokenVerifier::class)->verify($jwt));
         Http::assertNothingSent();
     });
+});
+
+/**
+ * @param  array<string, mixed>  $overrides
+ */
+function appleToken(string $pem, string $kid, array $overrides = []): string
+{
+    return JWT::encode([
+        'iss' => 'https://appleid.apple.com',
+        'aud' => 'app.brainyclan',
+        'sub' => '001234.abcdef0123456789.0123',
+        'email' => 'Mom@Example.com',
+        'email_verified' => 'true',
+        'is_private_email' => 'false',
+        'nonce' => hash('sha256', 'raw-nonce-1'),
+        'iat' => time(),
+        'exp' => time() + 600,
+        ...$overrides,
+    ], $pem, 'RS256', $kid);
+}
+
+describe('Apple identity tokens', function () {
+    beforeEach(function () {
+        config()->set('services.apple.client_ids', ['app.brainyclan', 'app.brainyclan.web']);
+        [$this->pem, $jwk] = rsaKey('a1');
+        Http::fake([AppleIdTokenVerifier::JWKS_URL => Http::response(['keys' => [$jwk]], 200)]);
+    });
+
+    it('accepts a valid token for the bundle ID or the Services ID, with or without a nonce', function () {
+        $verifier = app(AppleIdTokenVerifier::class);
+        $identity = $verifier->verify(appleToken($this->pem, 'a1'), 'raw-nonce-1');
+
+        expect($identity->provider)->toBe('apple')
+            ->and($identity->providerUserId)->toBe('001234.abcdef0123456789.0123')
+            ->and($identity->email)->toBe('mom@example.com')
+            ->and($identity->name)->toBeNull();
+
+        $verifier->verify(appleToken($this->pem, 'a1', ['aud' => 'app.brainyclan.web']));
+        $verifier->verify(appleToken($this->pem, 'a1', ['email_verified' => true]));
+        Http::assertSentCount(1); // keys are cached
+    });
+
+    it('accepts a private relay email as verified and drops unverified emails', function () {
+        $verifier = app(AppleIdTokenVerifier::class);
+
+        $relay = $verifier->verify(appleToken($this->pem, 'a1', ['email' => 'x7k2@privaterelay.appleid.com', 'is_private_email' => 'true']));
+        $unverified = $verifier->verify(appleToken($this->pem, 'a1', ['email_verified' => 'false']));
+        $none = $verifier->verify(appleToken($this->pem, 'a1', ['email' => null, 'email_verified' => null]));
+
+        expect($relay->email)->toBe('x7k2@privaterelay.appleid.com')
+            ->and($unverified->email)->toBeNull()
+            ->and($none->email)->toBeNull();
+    });
+
+    it('rejects wrong audience, issuer, expiry, signature, nonce and garbage', function () {
+        $verifier = app(AppleIdTokenVerifier::class);
+        [$otherPem] = rsaKey('a1');
+
+        expectSocialTokenInvalid(fn () => $verifier->verify(appleToken($this->pem, 'a1', ['aud' => 'com.someone.else'])));
+        expectSocialTokenInvalid(fn () => $verifier->verify(appleToken($this->pem, 'a1', ['iss' => 'https://accounts.google.com'])));
+        expectSocialTokenInvalid(fn () => $verifier->verify(appleToken($this->pem, 'a1', ['exp' => time() - 600])));
+        expectSocialTokenInvalid(fn () => $verifier->verify(appleToken($otherPem, 'a1')));
+        expectSocialTokenInvalid(fn () => $verifier->verify(appleToken($this->pem, 'a1'), 'another-nonce'));
+        expectSocialTokenInvalid(fn () => $verifier->verify(appleToken($this->pem, 'a1', ['nonce' => null]), 'raw-nonce-1'));
+        expectSocialTokenInvalid(fn () => $verifier->verify('junk'));
+    });
+
+    it('refetches the keys once when the key id is unknown (rotation)', function () {
+        $verifier = app(AppleIdTokenVerifier::class);
+        $verifier->verify(appleToken($this->pem, 'a1'));
+
+        expectSocialTokenInvalid(fn () => $verifier->verify(appleToken($this->pem, 'a2')));
+        Http::assertSentCount(2);
+    });
+
+    it('refuses everything when no client ID is configured', function () {
+        config()->set('services.apple.client_ids', []);
+
+        expectSocialTokenInvalid(fn () => app(AppleIdTokenVerifier::class)->verify(appleToken($this->pem, 'a1')));
+        Http::assertNothingSent();
+    });
+
+    it('signs up through the API with the name the app sends, checking the nonce', function () {
+        $this->postJson('/api/v1/auth/social/apple', [
+            'token' => appleToken($this->pem, 'a1', ['email' => 'x7k2@privaterelay.appleid.com']),
+            'nonce' => 'raw-nonce-1',
+            'display_name' => 'Moe',
+            'birth_year' => 1985,
+            'birth_month' => 3,
+            'device_name' => 'iPhone 16',
+            'platform' => 'ios',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.user.display_name', 'Moe')
+            ->assertJsonPath('data.user.email', 'x7k2@privaterelay.appleid.com');
+
+        $this->postJson('/api/v1/auth/social/apple', [
+            'token' => appleToken($this->pem, 'a1'),
+            'nonce' => 'wrong',
+            'device_name' => 'iPhone 16',
+            'platform' => 'ios',
+        ])->assertUnauthorized()->assertJsonPath('code', 'social_token_invalid');
+
+        // Signing in again: Apple sends no name and no birth data is needed.
+        $this->postJson('/api/v1/auth/social/apple', [
+            'token' => appleToken($this->pem, 'a1', ['email' => 'x7k2@privaterelay.appleid.com']),
+            'device_name' => 'iPad',
+            'platform' => 'ios',
+        ])->assertOk()->assertJsonPath('data.user.display_name', 'Moe');
+    });
+});
+
+it('verifies the nonce when linking Apple to a signed-in adult', function () {
+    config()->set('services.apple.client_ids', ['app.brainyclan']);
+    [$pem, $jwk] = rsaKey('a1');
+    Http::fake([AppleIdTokenVerifier::JWKS_URL => Http::response(['keys' => [$jwk]], 200)]);
+    $user = User::factory()->aged(35)->create();
+    Sanctum::actingAs($user);
+
+    $this->postJson('/api/v1/me/social-accounts/apple', ['token' => appleToken($pem, 'a1'), 'nonce' => 'wrong'])
+        ->assertUnauthorized()->assertJsonPath('code', 'social_token_invalid');
+    expect($user->socialAccounts()->count())->toBe(0);
+
+    $this->postJson('/api/v1/me/social-accounts/apple', ['token' => appleToken($pem, 'a1'), 'nonce' => 'raw-nonce-1'])
+        ->assertCreated()
+        ->assertJsonPath('data.provider', 'apple')
+        ->assertJsonPath('data.email', 'mom@example.com');
 });
