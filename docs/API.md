@@ -201,8 +201,9 @@ members use their invite code (`/auth/join`). No shared passwords, no parent ema
   cleared). Points ledger rows stay (append-only) but no longer point to personal data; past goal
   results show the member as "Deleted player". → 204, 422 without `confirm`, 409 `family_owner_cannot_leave`, 403 `forbidden` for a `child_account`.
 - `DELETE /family` (owner) — Body: `confirm: "<family name>"`. Deletes the family, erases every
-  **child** account in it (children have no account outside the family), removes the other
-  adults' memberships (their accounts remain, without a family) and erases the owner's account too
+  account in it **without its own login** (no email login and no linked Google/Apple/Facebook — e.g.
+  children and code-only teens, who have no account outside the family), removes the other
+  members' memberships (their accounts remain, without a family) and erases the owner's account too
   when Body `delete_my_account: true`. → 204, 422 on a wrong `confirm`, 403 `forbidden` for a
   non-owner. The family row is kept as "Deleted family" (`deleted_at`) so the points ledger stays intact.
   `active_subscription` / `store` in the deletion check describe the caller's family (any member).
@@ -471,3 +472,4 @@ Custom data in the ad request: `session_id`.
 - 2026-10-15 — Push `data` for goal notifications includes `period_id`.
 - 2026-10-15 — Account deletion: `GET /me/deletion-check`, `DELETE /me`, `DELETE /family`, child erasure on member removal, Apple `authorization_code` for token revocation; error `family_owner_cannot_leave`.
 - 2026-10-16 — Account deletion: blocker `child_account` (children and teens; `DELETE /me` → 403); `DELETE /family` non-owner → 403; deleted families are kept as anonymised rows.
+- 2026-10-16 — `DELETE /family` erases members without their own login (no email, no social account), not only children.
