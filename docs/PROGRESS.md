@@ -22,11 +22,27 @@ Milestones are defined in `docs/PLAN.md`.
 | B6c Sign in with Apple | Done | **Account deletion + Apple token revocation done** (session 12): `GET /me/deletion-check`, `DELETE /me`, `DELETE /family`, child erasure on member removal, one `EraseUser` action, `AppleTokenClient` (code exchange + revoke, ES256 client secret, skipped without keys), 12 Pest tests. **Sign-in done** (session 9): `AppleIdTokenVerifier` (JWKS `appleid.apple.com/auth/keys`, cached + refetch on unknown kid, `iss`, `aud` ∈ `APPLE_CLIENT_IDS`, `exp`, optional `nonce` = sha256 hex), provider `apple` on `/auth/social/{provider}` and `/me/social-accounts/{provider}`, `display_name` from the app (fallback "Player", never a private relay), Filament column "Social sign-in", README "Sign in with Apple — setup", Pest + live curl. |
 | B7 Remaining launch content | In progress | Sudoku + Math Sprint generated per session, Word Puzzles seeded, item `points`, Filament preview + category generators; **AI batch generator done** (Laravel AI SDK, Horizon `ai` queue, review/approve page; needs `ANTHROPIC_API_KEY` to run for real). Left: content for all 8 categories (generate + review batches) |
 | B8 Billing, ads and notifications | Done | Billing core (s8), push token + preferences (s10), sending + goal notifications (s11); **session 13:** `has_own_login`, `family_activity` (1/member/hour), `daily_reminder` (every 15 min, family tz), `POST /family/subscription/sync` (RevenueCat REST v1), hourly reconciliation, AdMob SSV (`ad_rewards`, ECDSA) + ad second chance (409 `ad_reward_pending`), Policy `ad_request`, Filament subscription section + Webhook events, README setup guide. Needs real RevenueCat/AdMob accounts to try end to end |
-| B9 Production | Not started | |
+| B9 Production | Done (needs a real server + lawyer) | **Session 14:** legal API (consents, `GET /legal`, terms/privacy pages en+fr drafts, `accept_terms`, `parental_consent`, invite preview, `me.legal`, legal acceptance, `/me/export`), account deletion web page `/account/delete`, Filament consents, Sentry (`sentry/sentry-laravel` 4.29, PII scrubber), production image (`docker/prod/Dockerfile`), `docker-compose.prod.yml` (Caddy HTTPS), encrypted off-site backups + restore drill, `docs/DEPLOY.md`, route security test. Not done on a real server: DNS/HTTPS, Storage Box upload, Sentry DSN. Texts need lawyer review |
 
 ## Next up
 
-0. **State at last stop (session 13, 2026-10-16):** **B8 done** (see log): `has_own_login`, `family_activity`,
+0. **State at last stop (session 14, 2026-10-16):** **B9 done locally** (see log). Dev DB: `migrate` (2 migrations:
+   `consents`, `account_deletion_requests`) + `AdminUserSeeder` and `DemoFamilySeeder` re-run (demo consents). **Next:**
+   a. Moe: follow `docs/DEPLOY.md` on a Hetzner server (DNS for api.brainyclan.app, `.env.prod`, Storage Box, Sentry DSN,
+      SMTP provider for the deletion emails), run the restore drill there.
+   b. Lawyer review of `resources/views/legal/{en,fr}/*` (items marked "[DRAFT FOR LAWYER REVIEW]" / "[Lawyer review: …]",
+      company details via `LEGAL_*`), then `LEGAL_DRAFT=false`; confirm the server location in the privacy policy.
+   c. Dev machine: Norton "Web/Mail Shield" intercepts HTTPS, so containers get `cURL error 60` (and PECL/Alpine
+      downloads fail in builds). Turn off HTTPS scanning for Docker or drop the Norton root cert into
+      `docker/php/extra-ca/` (git-ignored) and `docker compose build app` (README "TLS-inspecting antivirus"). I could
+      not export the certificate myself (not permitted).
+   d. Content for the 8 categories (AI generator needs `ANTHROPIC_API_KEY`).
+   Contract notes for docs/API.md (coordinator): `POST /me/legal-acceptance` for a child → 403 `forbidden`; stale
+   version → 422 on `terms_version` / `privacy_version`; `/me/export` also has `social_accounts` and per-membership
+   `notification_preferences`, response has `Content-Disposition: attachment` and `Cache-Control: no-store`;
+   social sign-up without `accept_terms` → 422 `validation_failed` on `accept_terms` (checked after the birth/age
+   checks); webhooks are now rate-limited (600/min per IP).
+   Previous: **State at last stop (session 13, 2026-10-16):** **B8 done** (see log): `has_own_login`, `family_activity`,
    `daily_reminder`, Filament subscription + webhook events, subscription sync + reconciliation, AdMob SSV +
    `ad_rewards` + ad second chance, Policy `ad_request`, README setup guide. Dev DB: `migrate` (1 migration,
    `ad_rewards`) + `PolicySeeder` re-run (no fresh). **Next:** B9 / content (AI generator needs the key). To try
@@ -303,7 +319,64 @@ curl http://localhost:8080/api/v1/health
   current state (no `REVENUECAT_API_KEY` locally); `GET /api/v1/webhooks/admob-ssv?...&signature=AAAA&key_id=1` → 400
   `ssv_signature_invalid`. Admin: Families → (family) → *Subscription* section; Billing → Webhook events.
 
+## How to test (B9 — legal, consent, privacy, production)
+
+- Tests: `docker compose exec app php artisan test --compact tests/Feature/Api/LegalTest.php
+  tests/Feature/Api/AccountDeletionPageTest.php tests/Feature/Admin/ConsentsAdminTest.php
+  tests/Feature/Actions/SentryScrubberTest.php tests/Feature/Api/RouteSecurityTest.php`.
+- Live (dev): `curl http://localhost:8080/api/v1/legal?lang=fr`; open http://localhost:8080/legal/privacy?lang=fr
+  (Draft banner); `GET /api/v1/me` as Mom → `data.legal.needs_acceptance: false`;
+  `GET /api/v1/family/invites/preview?birth_year=2018&birth_month=1` as Mom → child, `parental_consent_required: true`;
+  `GET /api/v1/me/export` as Mom (a second call within an hour → 429). Account deletion: http://localhost:8080/account/delete,
+  submit `dad@brainyclan.test`, open the link from Mailpit (http://localhost:8026) — **confirming really erases Dad**.
+- Admin: Families → The Demos → *Consents* tab (read-only).
+- Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
+
 ## Log
+
+### 2026-10-16 (session 14: B9 — legal & consent API, account deletion page, production infra)
+
+- **Consents:** `consents` table (append-only; user, type `terms`/`privacy`/`parental`, version, subject member/invite,
+  `accepted_at`, `ip_hash` = HMAC-SHA256 of the IP with the app key), `Consent` model + factory, `RecordConsent`,
+  `AcceptLegalTerms`, `GetLegalStatus`. `config/legal.php` (versions `2026-10-16`, en/fr summaries, `LEGAL_DRAFT`,
+  `LEGAL_*` contact placeholders). `LegalDocuments` helper.
+- **Endpoints:** `GET /legal` (public, `?lang=fr`), `POST /me/legal-acceptance` (204; 422 stale version; 403 children),
+  `GET /me/export` (`throttle:export` 1/hour/user; 403 children; fixed 12 queries; no tokens, password, push token, Apple
+  refresh token or IP hash), `GET /family/invites/preview` (admin). `me.legal` in every MeResource (one query).
+  `accept_terms` on register (request rule), social sign-up (only when an account is created) and adult join with email
+  (action check); `parental_consent` on child invites (checked before the member limit), recorded with the privacy
+  version and linked to the member on join. Scramble tag **Legal**.
+- **Pages:** `/legal/terms`, `/legal/privacy` (Blade, en+fr, mobile, dark mode, Draft banner, no session cookie,
+  strict CSP/headers via `SecurityHeaders`). Drafts written for this app (PIPEDA, Quebec Law 25, COPPA; children's data
+  minimisation; no ads/tracking for children; non-personalized ads; processors Hetzner, Apple/Google/Meta, RevenueCat,
+  AdMob, Expo/APNs/FCM, Sentry; retention; access/export/deletion rights) — every item needing counsel is marked.
+- **Account deletion web page** (coordinator request, Play requirement): `/account/delete` (en/fr) explains in-app
+  deletion and takes an email; `account_deletion_requests` (email HMAC only, token SHA-256, 60-min TTL, superseded on a
+  new request), honeypot, `throttle:account-deletion` 5/hour/IP, queued `AccountDeletionConfirmation` mail; the emailed
+  link opens a confirmation page whose POST button runs `DeleteAccount` (same as `DELETE /me`); owner-with-members and
+  child accounts get an explanation; identical response whether or not the email exists.
+- **Admin:** Families → *Consents* relation manager (read-only, eager-loaded, query-count test).
+- **Seeders:** Mom, Dad, Alex and the admin accepted the current versions; Mom's parental consent for Sam and Robin's invite.
+- **Sentry:** `sentry/sentry-laravel` ^4.29 (approved), `config/sentry.php` (`send_default_pii` forced false, traces
+  0.05, SQL bindings off), `Integration::handles` in `bootstrap/app.php`, `SentryScrubber` for events and transactions
+  (keeps only the user id; removes bodies, cookies, auth headers; masks emails, tokens, names, birth data). Off with an
+  empty DSN (forced empty in phpunit.xml).
+- **Infra:** `docker/prod/Dockerfile` (stages base → vendor (`composer install --no-dev`, optimized autoloader, Filament
+  assets) → `prod` (non-root, OPcache `validate_timestamps=0`, healthcheck, entrypoint caching config and refusing
+  `APP_DEBUG=true`) and `web` (Caddy + public/)); built and booted locally (`php artisan about`: production, debug off,
+  config/routes/views cached; php-fpm healthy as `brainy`, no dev packages). `docker-compose.prod.yml` (Caddy auto-HTTPS,
+  app, horizon, scheduler, MySQL 8.4, Redis with password, backup; restart policies, healthchecks, log rotation; only
+  80/443 published; MySQL/Redis on an internal network) — `docker compose config` valid. `.env.prod.example` with every
+  secret. `bootstrap/app.php` trusts private-range proxies (correct client IP behind Caddy).
+- **Backups:** `docker/backup` (Debian slim: mariadb-dump `--single-transaction` → gzip → openssl AES-256-CBC/PBKDF2 →
+  rclone; cron; 14-day local + remote retention; `restore.sh` into a scratch DB). Round trip tested against the dev DB:
+  identical row counts; wrong passphrase restores nothing. Scratch DBs dropped afterwards.
+- **Security pass:** `RouteSecurityTest` (every `/api/v1` route has `auth:sanctum` except an explicit public allowlist,
+  every route throttled, admin family routes behind `family:admin`, prod APP_DEBUG guard). Webhooks got `throttle:webhooks`.
+- **Dev image:** `docker/php/extra-ca/` for TLS-inspecting antivirus roots (cause of `cURL error 60` here: Norton Web/Mail
+  Shield re-signs HTTPS; `ca-certificates` was already installed). Not active until a cert is added (see Next up c).
+- **Docs:** `docs/DEPLOY.md` (Hetzner → firewall → Docker → DNS → `.env.prod` checklist → first deploy → admin user →
+  checks → updates/rollbacks → monitoring → backups/restore drill → Sentry → costs), README sections and link.
 
 ### 2026-10-16 (session 13: B8 finish — activity/reminders, billing sync + reconciliation, AdMob SSV, admin)
 

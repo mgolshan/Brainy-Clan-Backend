@@ -5,7 +5,9 @@ namespace App\Modules\Family\Actions;
 use App\Modules\Core\Exceptions\ApiException;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Models\Invite;
+use App\Modules\Identity\Actions\AcceptLegalTerms;
 use App\Modules\Identity\Actions\IssueDeviceToken;
+use App\Modules\Identity\Models\Consent;
 use App\Modules\Identity\Models\User;
 use App\Modules\Policy\PolicyResolver;
 use Illuminate\Support\Facades\DB;
@@ -13,13 +15,16 @@ use Illuminate\Support\Facades\DB;
 /**
  * Join a family with an invite code on a device. Creates the user from the invite
  * (nickname, birth data), the membership and a device-bound token. Email + password are
- * only accepted when the invitee's age band allows collecting them (adults).
+ * only accepted when the invitee's age band allows collecting them (adults), and then only with
+ * `accept_terms` (recorded as terms + privacy consents). A parental consent given for the invite is
+ * linked to the new member.
  */
 class JoinFamilyWithInvite
 {
     public function __construct(
         private readonly PolicyResolver $policy,
         private readonly IssueDeviceToken $issueToken,
+        private readonly AcceptLegalTerms $acceptLegalTerms,
     ) {}
 
     /**
@@ -32,8 +37,10 @@ class JoinFamilyWithInvite
         ?string $email = null,
         ?string $password = null,
         ?string $appVersion = null,
+        bool $acceptedTerms = false,
+        ?string $ipAddress = null,
     ): array {
-        return DB::transaction(function () use ($code, $deviceName, $platform, $email, $password, $appVersion): array {
+        return DB::transaction(function () use ($code, $deviceName, $platform, $email, $password, $appVersion, $acceptedTerms, $ipAddress): array {
             $invite = Invite::query()
                 ->where('code', Invite::normalizeCode($code))
                 ->lockForUpdate()
@@ -54,6 +61,10 @@ class JoinFamilyWithInvite
                 throw ApiException::validation('email', 'The email has already been taken.');
             }
 
+            if ($email !== null && ! $acceptedTerms) {
+                throw ApiException::validation('accept_terms', 'Please accept the terms of service and the privacy policy to create your login.');
+            }
+
             $user = User::query()->create([
                 'display_name' => $invite->nickname,
                 'avatar' => $invite->avatar,
@@ -64,7 +75,7 @@ class JoinFamilyWithInvite
                 'locale' => 'en',
             ]);
 
-            FamilyMember::query()->create([
+            $member = FamilyMember::query()->create([
                 'family_id' => $invite->family_id,
                 'user_id' => $user->id,
                 'role' => FamilyMember::ROLE_MEMBER,
@@ -74,6 +85,16 @@ class JoinFamilyWithInvite
             ]);
 
             $invite->forceFill(['used_by' => $user->id, 'used_at' => now()])->save();
+
+            // The parental consent given for the invite now also points at the member.
+            Consent::query()
+                ->where('subject_invite_id', $invite->id)
+                ->where('type', Consent::PARENTAL)
+                ->update(['subject_member_id' => $member->id]);
+
+            if ($email !== null) {
+                $this->acceptLegalTerms->handle($user, $ipAddress);
+            }
 
             return ['user' => $user, 'token' => $this->issueToken->handle($user, $deviceName, $platform, $appVersion)];
         });

@@ -1,0 +1,157 @@
+# Brainy Clan backend - PRODUCTION stack (one Hetzner VPS). Step by step: docs/DEPLOY.md.
+#
+#   cp .env.prod.example .env.prod        # then fill every secret
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod build
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+#
+# Only Caddy publishes ports (80/443). MySQL and Redis are reachable on the internal network only.
+# The Laravel containers read their settings from .env.prod (env_file); nothing is baked into images.
+
+name: brainy-clan
+
+x-laravel: &laravel
+    image: brainy-clan-app:${APP_IMAGE_TAG:-latest}
+    env_file: .env.prod
+    restart: unless-stopped
+    volumes:
+        - app-storage:/var/www/html/storage
+    depends_on:
+        mysql:
+            condition: service_healthy
+        redis:
+            condition: service_healthy
+    # internal: MySQL/Redis; public: outbound HTTPS (Expo push, RevenueCat, Apple/Google keys, Sentry).
+    networks: [internal, public]
+    logging: &logging
+        driver: json-file
+        options:
+            max-size: "10m"
+            max-file: "5"
+
+services:
+    caddy:
+        image: brainy-clan-web:${APP_IMAGE_TAG:-latest}
+        build:
+            context: .
+            dockerfile: docker/prod/Dockerfile
+            target: web
+        restart: unless-stopped
+        ports:
+            - "80:80"
+            - "443:443"
+            - "443:443/udp"
+        environment:
+            API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env.prod}
+            ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env.prod}
+        volumes:
+            - caddy-data:/data
+            - caddy-config:/config
+        depends_on:
+            app:
+                condition: service_healthy
+        networks: [internal, public]
+        healthcheck:
+            test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+        logging: *logging
+
+    app:
+        <<: *laravel
+        build:
+            context: .
+            dockerfile: docker/prod/Dockerfile
+            target: prod
+        # php-fpm; healthcheck from the image (port 9000).
+
+    horizon:
+        <<: *laravel
+        command: ["php", "artisan", "horizon"]
+        stop_signal: SIGTERM
+        stop_grace_period: 60s
+        healthcheck:
+            test: ["CMD", "php", "artisan", "horizon:status"]
+            interval: 60s
+            timeout: 20s
+            retries: 3
+            start_period: 30s
+
+    scheduler:
+        <<: *laravel
+        command: ["php", "artisan", "schedule:work"]
+        # No port to probe; if schedule:work dies the container exits and is restarted.
+        healthcheck:
+            disable: true
+
+    mysql:
+        image: mysql:8.4
+        restart: unless-stopped
+        environment:
+            MYSQL_DATABASE: ${DB_DATABASE:-brainy_clan}
+            MYSQL_USER: ${DB_USERNAME:-brainy}
+            MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env.prod}
+            MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env.prod}
+        command: ["--innodb-buffer-pool-size=512M", "--max-connections=100"]
+        volumes:
+            - mysql-data:/var/lib/mysql
+        healthcheck:
+            test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+            interval: 10s
+            timeout: 5s
+            retries: 30
+            start_period: 30s
+        networks: [internal]
+        logging: *logging
+
+    redis:
+        image: redis:7-alpine
+        restart: unless-stopped
+        command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.prod}"]
+        volumes:
+            - redis-data:/data
+        healthcheck:
+            test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+            interval: 10s
+            timeout: 3s
+            retries: 20
+        environment:
+            REDIS_PASSWORD: ${REDIS_PASSWORD}
+        networks: [internal]
+        logging: *logging
+
+    # Nightly encrypted off-site database backup (docker/backup/backup.sh), 14-day retention.
+    backup:
+        build:
+            context: docker/backup
+        image: brainy-clan-backup:${APP_IMAGE_TAG:-latest}
+        restart: unless-stopped
+        env_file: .env.prod
+        environment:
+            DB_HOST: mysql
+        depends_on:
+            mysql:
+                condition: service_healthy
+        volumes:
+            - backup-local:/backups
+        networks: [internal, public]
+        healthcheck:
+            test: ["CMD-SHELL", "pgrep cron > /dev/null || exit 1"]
+            interval: 60s
+            timeout: 5s
+            retries: 3
+        logging: *logging
+
+volumes:
+    app-storage:
+    mysql-data:
+    redis-data:
+    caddy-data:
+    caddy-config:
+    backup-local:
+
+networks:
+    # No route to the internet from MySQL/Redis/PHP-only containers' network.
+    internal:
+        internal: true
+    public:

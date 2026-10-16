@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Identity\Http\Controllers\AuthController;
+use App\Modules\Identity\Http\Controllers\LegalController;
 use App\Modules\Identity\Http\Controllers\MeController;
 use App\Modules\Identity\Http\Controllers\SocialAccountController;
 use App\Modules\Identity\Http\Controllers\SocialAuthController;
@@ -24,4 +25,12 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::get('me/social-accounts', [SocialAccountController::class, 'index'])->name('api.v1.me.social-accounts.index');
     Route::post('me/social-accounts/{provider}', [SocialAccountController::class, 'store'])->whereIn('provider', SocialAccount::PROVIDERS)->name('api.v1.me.social-accounts.store');
     Route::delete('me/social-accounts/{provider}', [SocialAccountController::class, 'destroy'])->whereIn('provider', SocialAccount::PROVIDERS)->name('api.v1.me.social-accounts.destroy');
+});
+
+// Legal, consent and privacy (docs/API.md "Legal, consent and privacy (B9)").
+Route::get('legal', [LegalController::class, 'show'])->middleware('throttle:api')->name('api.v1.legal.show');
+
+Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+    Route::post('me/legal-acceptance', [LegalController::class, 'accept'])->name('api.v1.me.legal-acceptance');
+    Route::get('me/export', [LegalController::class, 'export'])->middleware('throttle:export')->name('api.v1.me.export');
 });

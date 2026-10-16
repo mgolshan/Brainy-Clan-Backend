@@ -18,6 +18,8 @@ class JoinRequest extends FormRequest
             'code' => ['required', 'string', 'max:20'],
             'email' => ['sometimes', 'nullable', 'string', 'email', 'max:255'],
             'password' => ['sometimes', 'nullable', 'string', 'min:8', 'max:255', 'required_with:email'],
+            /** With `email` (adults): must be `true`, the user accepts the current terms of service and privacy policy. 422 on `accept_terms` otherwise. */
+            'accept_terms' => ['sometimes', 'nullable', 'boolean'],
             ...$this->deviceRules(),
         ];
     }

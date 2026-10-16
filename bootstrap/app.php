@@ -8,6 +8,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Sentry\Laravel\Integration;
 
 // Module routes (/api/v1/...) are registered by each module's service provider
 // (see app/Modules/*/Http/routes.php and bootstrap/providers.php).
@@ -23,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Global so it answers 426 before auth; it only acts on api/* requests.
         $middleware->append(EnsureAppVersion::class);
 
+        // Production runs behind Caddy on the private Docker network: trust its X-Forwarded-*
+        // headers so request()->ip() and https URLs are right. Never a public range.
+        $middleware->trustProxies(at: ['127.0.0.1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']);
+
         $middleware->api(append: [
             TouchDevice::class,
         ]);
@@ -32,6 +37,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Error monitoring (B9); a no-op while SENTRY_LARAVEL_DSN is empty. Events are scrubbed
+        // by App\Modules\Core\Support\SentryScrubber (config/sentry.php).
+        Integration::handles($exceptions);
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

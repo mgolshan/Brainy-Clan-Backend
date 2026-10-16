@@ -20,6 +20,8 @@ class RegisterRequest extends FormRequest
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
             'password' => ['required', 'string', 'min:8', 'max:255'],
             'locale' => ['sometimes', 'nullable', 'string', Rule::in(User::LOCALES)],
+            /** Must be `true`: the user accepts the current terms of service and privacy policy (`GET /legal`). */
+            'accept_terms' => ['required', 'accepted'],
             ...$this->birthRules(),
             ...$this->deviceRules(),
         ];

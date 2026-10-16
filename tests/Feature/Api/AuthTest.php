@@ -14,6 +14,7 @@ function registerPayload(array $overrides = []): array
         'password' => 'secret123',
         'birth_year' => 1985,
         'birth_month' => 6,
+        'accept_terms' => true,
         'device_name' => 'Pixel 9',
         'platform' => 'android',
         ...$overrides,
@@ -123,7 +124,7 @@ it('lets an adult invitee set email and password when joining', function () {
     $owner = familyOwner();
     Invite::factory()->adult()->create(['family_id' => $owner->family_id, 'created_by' => $owner->user_id, 'code' => 'DADS2345']);
 
-    $this->postJson('/api/v1/auth/join', ['code' => 'DADS2345', 'device_name' => 'Phone', 'platform' => 'android', 'email' => 'dad@example.com', 'password' => 'secret123'])
+    $this->postJson('/api/v1/auth/join', ['code' => 'DADS2345', 'device_name' => 'Phone', 'platform' => 'android', 'email' => 'dad@example.com', 'password' => 'secret123', 'accept_terms' => true])
         ->assertCreated()
         ->assertJsonPath('data.user.email', 'dad@example.com')
         ->assertJsonPath('data.member.is_child', false);

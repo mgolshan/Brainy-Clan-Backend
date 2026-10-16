@@ -43,6 +43,11 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY php.ini /usr/local/etc/php/conf.d/zz-brainy-clan.ini
 COPY php-fpm.conf /usr/local/etc/php-fpm.d/zzz-brainy-clan.conf
 
+# Extra CA certificates (*.crt) for machines behind a TLS-inspecting antivirus or proxy; empty
+# by default. See extra-ca/README.md. (Late in the file so adding one keeps the cached layers.)
+COPY extra-ca/ /usr/local/share/ca-certificates/extra/
+RUN update-ca-certificates
+
 # Unprivileged user that runs php-fpm, artisan, composer, horizon and the scheduler.
 RUN groupadd --non-unique --gid "${GID}" brainy \
     && useradd --non-unique --uid "${UID}" --gid "${GID}" --create-home --shell /bin/bash brainy \

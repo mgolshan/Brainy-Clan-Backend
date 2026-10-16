@@ -3,6 +3,7 @@
 namespace App\Modules\Family\Models;
 
 use App\Modules\Billing\Models\Subscription;
+use App\Modules\Identity\Models\Consent;
 use App\Modules\Identity\Models\User;
 use Database\Factories\FamilyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
@@ -70,6 +72,17 @@ class Family extends Model
     public function members(): HasMany
     {
         return $this->hasMany(FamilyMember::class)->where('status', FamilyMember::STATUS_ACTIVE);
+    }
+
+    /**
+     * Legal consents given by the family's members (incl. removed ones): their terms/privacy
+     * acceptances and the parental consents admins gave for children. Read-only in the admin.
+     *
+     * @return HasManyThrough<Consent, FamilyMember, $this>
+     */
+    public function consents(): HasManyThrough
+    {
+        return $this->hasManyThrough(Consent::class, FamilyMember::class, 'family_id', 'user_id', 'id', 'user_id');
     }
 
     /**

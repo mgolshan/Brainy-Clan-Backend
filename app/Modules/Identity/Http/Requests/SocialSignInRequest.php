@@ -25,19 +25,21 @@ class SocialSignInRequest extends FormRequest
             /** Only for a first-time sign-up; defaults to the name from Google/Facebook. Apple: send the name Apple gave the app on the first authorization. */
             'display_name' => ['sometimes', 'nullable', 'string', 'max:60'],
             'locale' => ['sometimes', 'nullable', 'string', Rule::in(User::LOCALES)],
+            /** Required (`true`) only when this sign-in creates a new account: the user accepts the current terms of service and privacy policy. 422 on `accept_terms` otherwise. */
+            'accept_terms' => ['sometimes', 'nullable', 'boolean'],
             ...$this->birthRules(required: false),
             ...$this->deviceRules(),
         ];
     }
 
     /**
-     * @return array{birth_year?: int|null, birth_month?: int|null, display_name?: string|null, locale?: string|null}
+     * @return array{birth_year?: int|null, birth_month?: int|null, display_name?: string|null, locale?: string|null, accept_terms: bool}
      */
     public function profile(): array
     {
         /** @var array{birth_year?: int|null, birth_month?: int|null, display_name?: string|null, locale?: string|null} $profile */
         $profile = $this->safe()->only(['birth_year', 'birth_month', 'display_name', 'locale']);
 
-        return $profile;
+        return [...$profile, 'accept_terms' => $this->boolean('accept_terms')];
     }
 }

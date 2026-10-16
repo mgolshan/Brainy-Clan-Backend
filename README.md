@@ -9,6 +9,8 @@ REST API and admin panel for **Brainy Clan**, a family learning and quiz mobile 
 
 Project rules and architecture notes for AI assistants and developers: [CLAUDE.md](CLAUDE.md).
 
+**Production:** step-by-step deploy guide (Hetzner, Docker, HTTPS, backups, Sentry): [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Prerequisites
 
 - Windows 11 with **Docker Desktop** using the **WSL 2 backend** (Settings > General >
@@ -90,6 +92,8 @@ After changing `docker/php/Dockerfile` or `docker/php/php.ini`, rebuild:
 | Mailpit (caught e-mails) | http://localhost:8026 | - |
 | MySQL from the host | `127.0.0.1:3307`, database `brainy_clan` | `brainy` / `secret` (root: `root`) |
 | Redis from the host | `127.0.0.1:6380` | - |
+| Terms / privacy (drafts) | http://localhost:8080/legal/terms, http://localhost:8080/legal/privacy (`?lang=fr`) | public |
+| Account deletion page | http://localhost:8080/account/delete (`?lang=fr`; confirmation mail in Mailpit) | public |
 
 Inside the containers the services are reached by name: `mysql:3306`, `redis:6379`,
 `mailpit:1025`. That is what `.env` uses.
@@ -629,3 +633,37 @@ scripts/setup.ps1           one-time setup entry point (Windows)
 scripts/setup.sh            one-time setup entry point (WSL / Linux / macOS)
 phpstan.neon                Larastan configuration
 ```
+
+## Legal, consent and privacy (B9)
+
+- **Documents:** `config/legal.php` holds the current versions and "what changed" summaries; the texts are
+  Blade views in `resources/views/legal/{en,fr}/`. They are **drafts for lawyer review** (Canada: PIPEDA,
+  Quebec Law 25; US: COPPA) — the pages show a "Draft" banner until `LEGAL_DRAFT=false`. Fill the company
+  details with `LEGAL_COMPANY_NAME`, `LEGAL_CONTACT_EMAIL`, `LEGAL_POSTAL_ADDRESS`, `LEGAL_PRIVACY_OFFICER`.
+- **New version:** edit the text, bump `version` in `config/legal.php` and write the `summary`; every adult
+  and teen then gets `me.legal.needs_acceptance: true` and the app asks again (`POST /me/legal-acceptance`).
+- **Consents** (`consents` table, append-only): terms + privacy on sign-up (`accept_terms`), parental
+  consent on child invites (`parental_consent`, linked to the member when the child joins). IPs are stored
+  only as an HMAC. Visible read-only in the admin: Families → a family → *Consents*.
+- **Data export:** `GET /api/v1/me/export` (1 per hour). **Account deletion without the app:**
+  `/account/delete` (emailed one-time link; the confirmation page runs the same deletion as `DELETE /me`).
+
+```sh
+curl http://localhost:8080/api/v1/legal?lang=fr
+curl -H "Authorization: Bearer <Mom's token>" http://localhost:8080/api/v1/me              # data.legal
+curl -H "Authorization: Bearer <Mom's token>" "http://localhost:8080/api/v1/family/invites/preview?birth_year=2018&birth_month=1"
+curl -H "Authorization: Bearer <Mom's token>" http://localhost:8080/api/v1/me/export
+```
+
+## Error monitoring (Sentry)
+
+`sentry/sentry-laravel` reports exceptions when `SENTRY_LARAVEL_DSN` is set (empty = off, the default in
+development). `App\Modules\Core\Support\SentryScrubber` removes personal data from every event (no
+bodies, cookies, auth headers, names, emails, birth data or IPs; only the numeric user id). Setup:
+[docs/DEPLOY.md](docs/DEPLOY.md#10-sentry).
+
+## TLS-inspecting antivirus on the dev machine
+
+If outbound HTTPS from the containers fails with `cURL error 60` (e.g. Norton "Web/Mail Shield" scanning
+HTTPS), either turn off HTTPS scanning for Docker or put the antivirus root certificate into
+`docker/php/extra-ca/` and rebuild — see [docker/php/extra-ca/README.md](docker/php/extra-ca/README.md).

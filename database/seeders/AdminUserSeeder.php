@@ -21,5 +21,7 @@ class AdminUserSeeder extends Seeder
 
         $admin->is_staff = true;
         $admin->save();
+
+        DemoFamilySeeder::acceptCurrentLegal($admin);
     }
 }

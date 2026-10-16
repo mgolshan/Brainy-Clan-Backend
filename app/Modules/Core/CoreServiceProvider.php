@@ -23,6 +23,19 @@ class CoreServiceProvider extends ModuleServiceProvider
             return Limit::perMinute(120)->by($user instanceof User ? 'user|'.$user->id : 'ip|'.$request->ip());
         });
 
+        // GET /me/export builds a full copy of a user's data: 1 per hour per user.
+        RateLimiter::for('export', function (Request $request) {
+            $user = $request->user();
+
+            return Limit::perHour(1)->by($user instanceof User ? 'export|'.$user->id : 'export-ip|'.$request->ip());
+        });
+
+        // Provider webhooks (RevenueCat, AdMob SSV): generous, only a guard against floods.
+        RateLimiter::for('webhooks', fn (Request $request) => Limit::perMinute(600)->by('webhooks|'.$request->ip()));
+
+        // Public account deletion page: 5 form posts per hour per IP.
+        RateLimiter::for('account-deletion', fn (Request $request) => Limit::perHour(5)->by('account-deletion|'.$request->ip()));
+
         parent::boot();
     }
 }

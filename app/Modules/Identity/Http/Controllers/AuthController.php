@@ -22,14 +22,15 @@ class AuthController
      * Register an adult.
      *
      * Email + password sign-up. 422 when the computed age band may not self-register
-     * (`collect_email` false: children, teens). Creates a device-bound token.
+     * (`collect_email` false: children, teens) and on `accept_terms` unless it is `true` (the
+     * acceptance of the current terms + privacy versions is recorded). Creates a device-bound token.
      */
     public function register(RegisterRequest $request, RegisterAdult $register): JsonResponse
     {
         /** @var array{display_name: string, email: string, password: string, birth_year: int, birth_month: int, locale?: string|null, device_name: string, platform: string} $data */
         $data = $request->validated();
 
-        $result = $register->handle($data, $data['device_name'], $data['platform'], $request->appVersion());
+        $result = $register->handle($data, $data['device_name'], $data['platform'], $request->appVersion(), $request->ip());
 
         return MeResource::withToken($result['user'], $result['token'])->response()->setStatusCode(201);
     }

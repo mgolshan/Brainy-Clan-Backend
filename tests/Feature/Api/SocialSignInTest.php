@@ -44,7 +44,7 @@ function googleIdentity(string $sub = 'g-123', ?string $email = 'mom@gmail.com',
  */
 function socialPayload(array $overrides = []): array
 {
-    return ['token' => 'provider-token', 'device_name' => 'Pixel 9', 'platform' => 'android', ...$overrides];
+    return ['token' => 'provider-token', 'device_name' => 'Pixel 9', 'platform' => 'android', 'accept_terms' => true, ...$overrides];
 }
 
 it('creates a new adult user from a Google sign-in (201)', function () {

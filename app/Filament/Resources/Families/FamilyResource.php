@@ -6,6 +6,7 @@ use App\Filament\Resources\Families\Pages\EditFamily;
 use App\Filament\Resources\Families\Pages\ListFamilies;
 use App\Filament\Resources\Families\Pages\ViewFamily;
 use App\Filament\Resources\Families\RelationManagers\AllMembersRelationManager;
+use App\Filament\Resources\Families\RelationManagers\ConsentsRelationManager;
 use App\Filament\Resources\Families\RelationManagers\InvitesRelationManager;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Family\Models\Family;
@@ -121,6 +122,7 @@ class FamilyResource extends Resource
         return [
             AllMembersRelationManager::class,
             InvitesRelationManager::class,
+            ConsentsRelationManager::class,
         ];
     }
 

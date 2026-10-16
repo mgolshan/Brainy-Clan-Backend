@@ -6,7 +6,7 @@ it('creates an invite with a readable code valid for 7 days', function () {
     $owner = familyOwner();
     actingAsMember($owner);
 
-    $response = $this->postJson('/api/v1/family/invites', ['nickname' => 'Sam', 'birth_year' => now()->year - 9, 'birth_month' => 3, 'avatar' => 'fox'])
+    $response = $this->postJson('/api/v1/family/invites', ['nickname' => 'Sam', 'birth_year' => now()->year - 9, 'birth_month' => 3, 'avatar' => 'fox', 'parental_consent' => true])
         ->assertCreated()
         ->assertJsonPath('data.nickname', 'Sam')
         ->assertJsonPath('data.avatar', 'fox')
@@ -23,8 +23,8 @@ it('enforces the tier member limit (members + pending invites)', function () {
     $owner = familyOwner(); // free tier: max 2 members
     actingAsMember($owner);
 
-    $this->postJson('/api/v1/family/invites', ['nickname' => 'One', 'birth_year' => 2015, 'birth_month' => 1])->assertCreated();
-    $this->postJson('/api/v1/family/invites', ['nickname' => 'Two', 'birth_year' => 2015, 'birth_month' => 1])
+    $this->postJson('/api/v1/family/invites', ['nickname' => 'One', 'birth_year' => 2015, 'birth_month' => 1, 'parental_consent' => true])->assertCreated();
+    $this->postJson('/api/v1/family/invites', ['nickname' => 'Two', 'birth_year' => 2015, 'birth_month' => 1, 'parental_consent' => true])
         ->assertStatus(403)
         ->assertJsonPath('code', 'member_limit_reached');
 });
@@ -34,10 +34,10 @@ it('allows more members on the family plan', function () {
     actingAsMember($owner);
 
     foreach (range(1, 6) as $i) {
-        $this->postJson('/api/v1/family/invites', ['nickname' => "Kid {$i}", 'birth_year' => 2015, 'birth_month' => 1])->assertCreated();
+        $this->postJson('/api/v1/family/invites', ['nickname' => "Kid {$i}", 'birth_year' => 2015, 'birth_month' => 1, 'parental_consent' => true])->assertCreated();
     }
 
-    $this->postJson('/api/v1/family/invites', ['nickname' => 'Kid 7', 'birth_year' => 2015, 'birth_month' => 1])->assertStatus(403);
+    $this->postJson('/api/v1/family/invites', ['nickname' => 'Kid 7', 'birth_year' => 2015, 'birth_month' => 1, 'parental_consent' => true])->assertStatus(403);
 });
 
 it('lists only pending invites and deletes them', function () {
@@ -63,7 +63,7 @@ it('forbids invites for non-admins and validates input', function () {
     $kid = addMember($owner->family, 9);
     actingAsMember($kid);
 
-    $this->postJson('/api/v1/family/invites', ['nickname' => 'X', 'birth_year' => 2015, 'birth_month' => 1])->assertStatus(403);
+    $this->postJson('/api/v1/family/invites', ['nickname' => 'X', 'birth_year' => 2015, 'birth_month' => 1, 'parental_consent' => true])->assertStatus(403);
     $this->getJson('/api/v1/family/invites')->assertStatus(403);
 
     app('auth')->forgetGuards();

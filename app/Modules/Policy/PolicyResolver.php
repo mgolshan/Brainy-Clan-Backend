@@ -190,6 +190,17 @@ class PolicyResolver
     }
 
     /**
+     * Whether a user is in a child band (with their active family's country bands, if any).
+     */
+    public function isChildUser(User $user): bool
+    {
+        $member = $user->activeMembership();
+        $member?->loadMissing('family');
+
+        return $this->isChildBand($this->bandForBirth($user->birth_year, $user->birth_month, $member?->family->country_code));
+    }
+
+    /**
      * Whether we may collect email/password for someone in this band (adults only by default).
      */
     public function collectsEmail(?AgeBand $band): bool

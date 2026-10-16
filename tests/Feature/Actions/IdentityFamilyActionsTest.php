@@ -127,12 +127,12 @@ it('GenerateInviteCode uses the unambiguous alphabet', function () {
 it('CreateInvite and RevokeInvite respect the member limit', function () {
     $owner = familyOwner();
 
-    $invite = app(CreateInvite::class)->handle($owner, ['nickname' => 'Sam', 'birth_year' => 2017, 'birth_month' => 3]);
-    expect(fn () => app(CreateInvite::class)->handle($owner, ['nickname' => 'Two', 'birth_year' => 2017, 'birth_month' => 3]))
+    $invite = app(CreateInvite::class)->handle($owner, ['nickname' => 'Sam', 'birth_year' => 2017, 'birth_month' => 3, 'parental_consent' => true]);
+    expect(fn () => app(CreateInvite::class)->handle($owner, ['nickname' => 'Two', 'birth_year' => 2017, 'birth_month' => 3, 'parental_consent' => true]))
         ->toThrow(fn (ApiException $e) => expect($e->errorCode)->toBe('member_limit_reached'));
 
     app(RevokeInvite::class)->handle($invite);
-    expect(app(CreateInvite::class)->handle($owner, ['nickname' => 'Two', 'birth_year' => 2017, 'birth_month' => 3]))->toBeInstanceOf(Invite::class);
+    expect(app(CreateInvite::class)->handle($owner, ['nickname' => 'Two', 'birth_year' => 2017, 'birth_month' => 3, 'parental_consent' => true]))->toBeInstanceOf(Invite::class);
 });
 
 it('JoinFamilyWithInvite creates the member and consumes the code once', function () {

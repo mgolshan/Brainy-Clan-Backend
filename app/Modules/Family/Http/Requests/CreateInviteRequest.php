@@ -18,6 +18,8 @@ class CreateInviteRequest extends FormRequest
             'birth_year' => ['required', 'integer', 'min:1900', 'max:'.now()->year],
             'birth_month' => ['required', 'integer', 'min:1', 'max:12'],
             'avatar' => ['sometimes', 'nullable', 'string', Rule::in(User::AVATARS)],
+            /** Required (`true`) for a child (see `GET /family/invites/preview`): the admin confirms they are the parent/guardian (or have their permission) and agrees to the child's data being processed as the privacy policy describes. */
+            'parental_consent' => ['sometimes', 'nullable', 'boolean'],
         ];
     }
 }

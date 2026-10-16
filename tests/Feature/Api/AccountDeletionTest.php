@@ -279,5 +279,5 @@ function adFakeApple(SocialIdentity $identity): void
  */
 function adPayload(array $overrides = []): array
 {
-    return ['token' => 'provider-token', 'device_name' => 'iPhone', 'platform' => 'ios', ...$overrides];
+    return ['token' => 'provider-token', 'device_name' => 'iPhone', 'platform' => 'ios', 'accept_terms' => true, ...$overrides];
 }

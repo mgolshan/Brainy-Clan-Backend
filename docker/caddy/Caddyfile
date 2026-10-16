@@ -1,0 +1,30 @@
+# Brainy Clan - Caddy in front of php-fpm (docker-compose.prod.yml).
+# Automatic HTTPS (Let's Encrypt) for API_DOMAIN; the admin (/admin) and Horizon (/horizon)
+# live on the same host. ACME_EMAIL gets certificate expiry notices.
+{
+	email {$ACME_EMAIL}
+}
+
+{$API_DOMAIN} {
+	root * /var/www/html/public
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Never serve dotfiles (.env, .git) even if one ends up in public/.
+	@hidden path /.*
+	respond @hidden 404
+
+	php_fastcgi app:9000
+	file_server
+
+	log {
+		output stdout
+		format console
+	}
+}

@@ -475,25 +475,39 @@ from RevenueCat webhooks and never trusts the app for the tier.
 ### Legal, consent and privacy (B9)
 Drafts of the privacy policy and terms are served by the backend and **must be reviewed by a lawyer
 before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=false`).
-- `GET /legal` (public) → `{ "data": { "terms": { "version": "2026-10-16", "url": "https://.../legal/terms" },
-  "privacy": { "version": "2026-10-16", "url": "https://.../legal/privacy" } } }`. Pages at `/legal/terms`
+- `GET /legal` (public, `?lang=fr` optional) → `{ "data": { "terms": { "version": "2026-10-16", "url": "https://.../legal/terms",
+  "summary": "What changed in this version" | null }, "privacy": { ... same } } }`. Versions are opaque
+  strings (currently dates); `summary` is a short localized "what changed" text for re-acceptance. Pages at `/legal/terms`
   and `/legal/privacy` (HTML, `?lang=fr` for French).
 - `POST /auth/register` and adult `POST /auth/social/{provider}` sign-ups require `accept_terms: true`
   (422 on `accept_terms` otherwise); the server records a consent row (user, type `terms`+`privacy`,
   versions, time, IP hash). Joining by invite as an adult with email (`/auth/join` with email) also
   needs `accept_terms: true`.
+- `GET /family/invites/preview?birth_year=2017&birth_month=3` (admin) → `{ "data": { "age_band": "child",
+  "is_child": true, "parental_consent_required": true, "email_login_allowed": false } }` — lets the
+  invite form show the parental-consent checkbox only when needed (the app never computes bands).
 - **Parental consent:** `POST /family/invites` for a nickname/birth date in a band with `is_child`
   requires `parental_consent: true` (422 on `parental_consent` otherwise) — the admin confirms they are
   the parent/guardian (or have their permission) and agrees to the child's data being processed as
   described in the privacy policy. Recorded as a consent row (type `parental`, admin, child invite →
   member once joined, policy version, time).
-- `GET /me` gains `legal: { "needs_acceptance": false, "terms_version": "...", "privacy_version": "..." }`
-  — `needs_acceptance` is true for adults whose last accepted versions are older than the current
-  ones. `POST /me/legal-acceptance` (auth) — Body: `terms_version, privacy_version` (must equal the
+- `GET /me` gains `legal: { "needs_acceptance": false, "terms_version": "<current>", "privacy_version": "<current>",
+  "accepted_terms_version": "<user's last accepted>" | null, "accepted_privacy_version": ... | null }`
+  — `needs_acceptance` is true for non-child users whose accepted versions differ from the current
+  ones (always false for children). `POST /me/legal-acceptance` (auth) — Body: `terms_version, privacy_version` (must equal the
   current ones) → 204. Children never see this (their parent consented).
-- `GET /me/export` (auth, adults) → a JSON download of the user's own data (profile, memberships,
-  points ledger rows, sessions summary, goals participation, consents, devices without tokens) —
-  right of access (PIPEDA / Quebec Law 25 / GDPR-style). Rate-limited (1 per hour).
+- **Account deletion web page** (Google Play requirement): public HTML page `/account/delete` (en/fr)
+  explaining how to delete the account in the app (Profile → Privacy → Delete account; children:
+  ask the family admin) and a request form (email of the account) for people who no longer have
+  the app. A submitted request is stored (`account_deletion_requests`, rate-limited, honeypot) and
+  emails a one-time confirmation link to that address if it belongs to an account; confirming runs
+  the same deletion as `DELETE /me` (owner with other members → the page explains to delete the
+  family in the app or contact support). Never reveals whether an email exists.
+- `GET /me/export` (auth; any non-child user — children get 403, their parent exports via support)
+  → `{ "data": { "exported_at": "...", "user": {...}, "memberships": [...], "point_entries": [...],
+  "sessions": [...], "goals": [...], "consents": [...], "devices": [...] } }` (devices without tokens,
+  social accounts without tokens) — right of access (PIPEDA / Quebec Law 25 / GDPR-style).
+  Rate-limited: 1 per hour → 429.
 
 ## Changelog
 - 2026-10-10 — Initial contract for B1–B5 / F1–F3.
@@ -526,3 +540,6 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-16 — B9 legal: `GET /legal`, terms/privacy pages, `accept_terms` on sign-ups, `parental_consent` on child invites, `me.legal` + `POST /me/legal-acceptance`, `GET /me/export`.
 - 2026-10-16 — Policy gains `ad_request` (non_personalized, under_age_of_consent, max_ad_content_rating).
 - 2026-10-16 — SSV: `ssv_signature_invalid` (400), 200 body with `outcome`; ad second chance needs `reward_ref` (422); push `data` for `family_activity` / `daily_reminder`.
+- 2026-10-16 — Legal clarifications: `GET /legal` `summary`; `GET /family/invites/preview`; `me.legal` current + accepted versions; `/me/export` shape and who may export.
+- 2026-10-16 — Account deletion web page `/account/delete` with emailed confirmation (Play requirement).
+- 2026-10-16 — B9 details: `POST /me/legal-acceptance` → 403 for children, 422 on a stale version; `/me/export` also has `social_accounts` and per-membership `notification_preferences` and is sent as an attachment (`no-store`); social sign-up checks `accept_terms` after birth/age checks; child invites check `parental_consent` before the member limit; webhooks rate-limited (600/min/IP).

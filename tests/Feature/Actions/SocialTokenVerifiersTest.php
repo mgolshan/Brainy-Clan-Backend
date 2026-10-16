@@ -270,6 +270,7 @@ describe('Apple identity tokens', function () {
             'display_name' => 'Moe',
             'birth_year' => 1985,
             'birth_month' => 3,
+            'accept_terms' => true,
             'device_name' => 'iPhone 16',
             'platform' => 'ios',
         ])

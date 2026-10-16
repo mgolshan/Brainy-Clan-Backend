@@ -16,7 +16,8 @@ use Illuminate\Support\Str;
  * `POST /auth/social/{provider}`: verifies the provider token, then
  * 1. a linked account → sign in;
  * 2. no link, but a user with the same provider-verified email → link and sign in;
- * 3. otherwise create an adult user (birth data required, age checked like `/auth/register`);
+ * 3. otherwise create an adult user (birth data required, age checked like `/auth/register`,
+ *    `accept_terms` required and recorded as terms + privacy consents);
  *    its email is the provider-verified one, or null when the provider shares none.
  * Returns a device-bound Sanctum token like `/auth/login`. Adults only.
  */
@@ -28,17 +29,18 @@ class SignInWithSocial
         private readonly EnsureSocialSignInAllowed $ensureAllowed,
         private readonly IssueDeviceToken $issueToken,
         private readonly StoreAppleRefreshToken $storeAppleToken,
+        private readonly AcceptLegalTerms $acceptLegalTerms,
     ) {}
 
     /**
-     * @param  array{birth_year?: int|null, birth_month?: int|null, display_name?: string|null, locale?: string|null}  $profile
+     * @param  array{birth_year?: int|null, birth_month?: int|null, display_name?: string|null, locale?: string|null, accept_terms?: bool}  $profile
      * @return array{user: User, token: string, created: bool}
      */
-    public function handle(string $provider, string $token, array $profile, string $deviceName, string $platform, ?string $appVersion = null, ?string $nonce = null, ?string $authorizationCode = null): array
+    public function handle(string $provider, string $token, array $profile, string $deviceName, string $platform, ?string $appVersion = null, ?string $nonce = null, ?string $authorizationCode = null, ?string $ipAddress = null): array
     {
         $identity = $this->verifiers->for($provider)->verify($token, $nonce);
 
-        $result = DB::transaction(function () use ($identity, $profile, $deviceName, $platform, $appVersion): array {
+        $result = DB::transaction(function () use ($identity, $profile, $deviceName, $platform, $appVersion, $ipAddress): array {
             $created = false;
             $account = SocialAccount::query()
                 ->with('user')
@@ -57,7 +59,7 @@ class SignInWithSocial
                 $this->link($existing, $identity);
                 $user = $existing;
             } else {
-                $user = $this->createUser($identity, $profile);
+                $user = $this->createUser($identity, $profile, $ipAddress);
                 $created = true;
             }
 
@@ -80,9 +82,9 @@ class SignInWithSocial
     }
 
     /**
-     * @param  array{birth_year?: int|null, birth_month?: int|null, display_name?: string|null, locale?: string|null}  $profile
+     * @param  array{birth_year?: int|null, birth_month?: int|null, display_name?: string|null, locale?: string|null, accept_terms?: bool}  $profile
      */
-    private function createUser(SocialIdentity $identity, array $profile): User
+    private function createUser(SocialIdentity $identity, array $profile, ?string $ipAddress): User
     {
         $birthYear = $profile['birth_year'] ?? null;
         $birthMonth = $profile['birth_month'] ?? null;
@@ -95,6 +97,10 @@ class SignInWithSocial
 
         if (! $this->policy->collectsEmail($band)) {
             throw ApiException::validation('birth_year', 'Only adults can create an account. Ask a parent to invite you to the family.');
+        }
+
+        if (($profile['accept_terms'] ?? false) !== true) {
+            throw ApiException::validation('accept_terms', 'Please accept the terms of service and the privacy policy to create your account.');
         }
 
         $displayName = $profile['display_name'] ?? null;
@@ -113,6 +119,7 @@ class SignInWithSocial
         ]);
 
         $this->link($user, $identity);
+        $this->acceptLegalTerms->handle($user, $ipAddress);
 
         return $user;
     }

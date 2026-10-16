@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Modules\Family\Models\Family;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Models\Invite;
+use App\Modules\Identity\Legal\LegalDocuments;
+use App\Modules\Identity\Models\Consent;
 use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\User;
 use Illuminate\Database\Seeder;
@@ -55,8 +57,42 @@ class DemoFamilySeeder extends Seeder
         $this->deviceToken($sam, self::SAM_TOKEN, 'Sam\'s tablet');
         $this->deviceToken($alex, self::ALEX_TOKEN, 'Alex\'s phone');
 
-        $this->invite($family, $mom, 'CUBS2222', 'Robin', 'penguin', $year - 7);
+        $robin = $this->invite($family, $mom, 'CUBS2222', 'Robin', 'penguin', $year - 7);
         $this->invite($family, $mom, 'TEEN2828', 'Jordan', 'tiger', $year - 15);
+
+        // Legal (B9): adults and the teen accepted the current terms + privacy policy; Mom gave
+        // parental consent for Sam (joined) and for Robin's pending child invite.
+        foreach ([$mom, $dad, $alex] as $user) {
+            self::acceptCurrentLegal($user);
+        }
+
+        $samMember = $family->allMembers()->where('user_id', $sam->id)->firstOrFail();
+        $this->parentalConsent($mom, ['subject_member_id' => $samMember->id]);
+        $this->parentalConsent($mom, ['subject_invite_id' => $robin->id]);
+    }
+
+    /**
+     * Idempotent: one `terms` and one `privacy` consent with the current versions.
+     */
+    public static function acceptCurrentLegal(User $user): void
+    {
+        foreach ([Consent::TERMS => LegalDocuments::termsVersion(), Consent::PRIVACY => LegalDocuments::privacyVersion()] as $type => $version) {
+            Consent::query()->firstOrCreate(
+                ['user_id' => $user->id, 'type' => $type, 'version' => $version],
+                ['accepted_at' => now()],
+            );
+        }
+    }
+
+    /**
+     * @param  array{subject_member_id?: int, subject_invite_id?: int}  $subject
+     */
+    private function parentalConsent(User $parent, array $subject): void
+    {
+        Consent::query()->firstOrCreate(
+            ['user_id' => $parent->id, 'type' => Consent::PARENTAL, ...$subject],
+            ['version' => LegalDocuments::privacyVersion(), 'accepted_at' => now()],
+        );
     }
 
     private function adult(string $email, string $name, string $avatar, int $birthYear, int $birthMonth): User
@@ -118,9 +154,9 @@ class DemoFamilySeeder extends Seeder
         );
     }
 
-    private function invite(Family $family, User $creator, string $code, string $nickname, string $avatar, int $birthYear): void
+    private function invite(Family $family, User $creator, string $code, string $nickname, string $avatar, int $birthYear): Invite
     {
-        Invite::query()->updateOrCreate(
+        return Invite::query()->updateOrCreate(
             ['code' => $code],
             [
                 'family_id' => $family->id,

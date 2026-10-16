@@ -22,7 +22,8 @@ class SocialAuthController
      * signs in a linked account (200), links a user with the same provider-verified email (200), or
      * creates a new adult user (201). A would-be new user without `birth_year`/`birth_month` gets
      * 422 `social_signup_incomplete`: ask for them and retry with the same token. Under the adult
-     * age → 422 `validation_failed` (like register). 401 `social_token_invalid` when the token
+     * age → 422 `validation_failed` (like register). A new account also needs `accept_terms: true`
+     * (422 `validation_failed` on `accept_terms` otherwise; the acceptance is recorded). 401 `social_token_invalid` when the token
      * can't be verified. 403 `forbidden` when the matching user is not an adult.
      *
      * @unauthenticated
@@ -39,6 +40,7 @@ class SocialAuthController
             $request->appVersion(),
             $request->filled('nonce') ? (string) $request->string('nonce') : null,
             $request->filled('authorization_code') ? (string) $request->string('authorization_code') : null,
+            $request->ip(),
         );
 
         return MeResource::withToken($result['user'], $result['token'])

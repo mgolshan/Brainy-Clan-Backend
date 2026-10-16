@@ -38,6 +38,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::delete('family/members/{member}', [MemberController::class, 'destroy'])->whereNumber('member')->name('api.v1.family.members.destroy');
         Route::post('family/members/{member}/sign-in-codes', [SignInCodeController::class, 'store'])->whereNumber('member')->name('api.v1.family.members.sign-in-codes.store');
         Route::get('family/invites', [InviteController::class, 'index'])->name('api.v1.family.invites.index');
+        Route::get('family/invites/preview', [InviteController::class, 'preview'])->name('api.v1.family.invites.preview');
         Route::post('family/invites', [InviteController::class, 'store'])->name('api.v1.family.invites.store');
         Route::delete('family/invites/{invite}', [InviteController::class, 'destroy'])->whereNumber('invite')->name('api.v1.family.invites.destroy');
     });
