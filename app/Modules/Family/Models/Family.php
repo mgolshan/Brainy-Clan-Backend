@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -20,6 +21,7 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property string $timezone
  * @property string $country_code
  * @property string $tier
+ * @property Carbon|null $deleted_at Set by `DELETE /family` (row kept for the ledger)
  */
 #[Fillable(['owner_user_id', 'name', 'timezone', 'country_code', 'tier'])]
 #[UseFactory(FamilyFactory::class)]
@@ -33,6 +35,13 @@ class Family extends Model
     public const string TIER_FAMILY = 'family';
 
     public const array TIERS = [self::TIER_FREE, self::TIER_FAMILY];
+
+    protected function casts(): array
+    {
+        return [
+            'deleted_at' => 'datetime',
+        ];
+    }
 
     /**
      * @return BelongsTo<User, $this>

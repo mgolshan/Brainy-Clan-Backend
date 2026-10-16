@@ -13,9 +13,11 @@ use Illuminate\Support\Facades\DB;
  */
 class UnlinkSocialAccount
 {
+    public function __construct(private readonly RevokeAppleTokens $revokeAppleTokens) {}
+
     public function handle(User $user, string $provider): void
     {
-        DB::transaction(function () use ($user, $provider): void {
+        $removed = DB::transaction(function () use ($user, $provider): SocialAccount {
             $accounts = SocialAccount::query()->where('user_id', $user->id)->lockForUpdate()->get();
             $account = $accounts->firstWhere('provider', $provider);
 
@@ -28,6 +30,10 @@ class UnlinkSocialAccount
             }
 
             $account->delete();
+
+            return $account;
         });
+
+        $this->revokeAppleTokens->handle(collect([$removed]));
     }
 }

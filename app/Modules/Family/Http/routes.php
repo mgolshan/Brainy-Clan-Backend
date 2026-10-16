@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Family\Http\Controllers\AccountDeletionController;
 use App\Modules\Family\Http\Controllers\FamilyController;
 use App\Modules\Family\Http\Controllers\InviteController;
 use App\Modules\Family\Http\Controllers\MemberController;
@@ -16,6 +17,11 @@ Route::middleware('throttle:auth')->group(function () {
 
 Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('families', [FamilyController::class, 'store'])->name('api.v1.families.store');
+
+    // Account deletion (docs/API.md "Account deletion"); owner check for DELETE /family in the controller.
+    Route::get('me/deletion-check', [AccountDeletionController::class, 'check'])->name('api.v1.me.deletion-check');
+    Route::delete('me', [AccountDeletionController::class, 'destroyMe'])->name('api.v1.me.destroy');
+    Route::delete('family', [AccountDeletionController::class, 'destroyFamily'])->middleware('family:admin')->name('api.v1.family.destroy');
 
     Route::middleware('family')->group(function () {
         Route::get('family', [FamilyController::class, 'show'])->name('api.v1.family.show');

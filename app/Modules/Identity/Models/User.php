@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
@@ -30,6 +31,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property int|null $birth_month
  * @property string $locale
  * @property bool $is_staff
+ * @property Carbon|null $erased_at Account deleted: personal data erased (`EraseUser`)
  */
 #[Fillable(['display_name', 'avatar', 'email', 'password', 'birth_year', 'birth_month', 'locale'])]
 #[Hidden(['password', 'remember_token'])]
@@ -57,6 +59,7 @@ class User extends Authenticatable implements FilamentUser, HasName
             'birth_year' => 'integer',
             'birth_month' => 'integer',
             'is_staff' => 'boolean',
+            'erased_at' => 'datetime',
         ];
     }
 

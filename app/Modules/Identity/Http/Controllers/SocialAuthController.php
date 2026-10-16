@@ -38,6 +38,7 @@ class SocialAuthController
             (string) $request->string('platform'),
             $request->appVersion(),
             $request->filled('nonce') ? (string) $request->string('nonce') : null,
+            $request->filled('authorization_code') ? (string) $request->string('authorization_code') : null,
         );
 
         return MeResource::withToken($result['user'], $result['token'])

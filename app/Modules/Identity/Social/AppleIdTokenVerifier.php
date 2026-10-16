@@ -52,7 +52,7 @@ class AppleIdTokenVerifier extends JwksIdTokenVerifier
             }
         }
 
-        return new SocialIdentity(SocialAccount::APPLE, (string) $claims['sub'], $this->verifiedEmail($claims), null);
+        return new SocialIdentity(SocialAccount::APPLE, (string) $claims['sub'], $this->verifiedEmail($claims), null, $audience);
     }
 
     public static function isPrivateRelay(?string $email): bool

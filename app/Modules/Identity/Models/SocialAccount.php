@@ -4,6 +4,7 @@ namespace App\Modules\Identity\Models;
 
 use Database\Factories\SocialAccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,9 +19,12 @@ use Illuminate\Support\Carbon;
  * @property string $provider
  * @property string $provider_user_id
  * @property string|null $email
+ * @property string|null $refresh_token Apple only (encrypted): revoked on unlink and account deletion
+ * @property string|null $token_client_id The Apple client id the refresh token was issued for
  * @property Carbon $linked_at
  */
 #[Fillable(['user_id', 'provider', 'provider_user_id', 'email', 'linked_at'])]
+#[Hidden(['refresh_token'])]
 #[UseFactory(SocialAccountFactory::class)]
 class SocialAccount extends Model
 {
@@ -39,6 +43,7 @@ class SocialAccount extends Model
     {
         return [
             'linked_at' => 'datetime',
+            'refresh_token' => 'encrypted',
         ];
     }
 

@@ -19,14 +19,19 @@ Milestones are defined in `docs/PLAN.md`.
 | No-N+1 guard | Done | `Model::preventLazyLoading()` outside production; query-count tests for every list endpoint and the busy Filament tables |
 | B6a API documentation (Scramble) | Done | Module tags, contract error envelope + codes per endpoint (`ErrorResponsesExtension`, `#[ApiErrors]`), typed answer/leaderboard responses, summaries on every endpoint, spec coverage test |
 | B6b Social sign-in (Google, Facebook) | Done | Socialite 5.31, `social_accounts`, verifiers (Google ID token via JWKS, Facebook `debug_token` + `/me`), sign-in/link/unlink/list, Filament column, README setup guide, Pest + live smoke test. Needs real Google/Facebook IDs to try end to end |
-| B6c Sign in with Apple | In progress | **Sign-in done** (session 9): `AppleIdTokenVerifier` (JWKS `appleid.apple.com/auth/keys`, cached + refetch on unknown kid, `iss`, `aud` ∈ `APPLE_CLIENT_IDS`, `exp`, optional `nonce` = sha256 hex), provider `apple` on `/auth/social/{provider}` and `/me/social-accounts/{provider}`, `display_name` from the app (fallback "Player", never a private relay), Filament column "Social sign-in", README "Sign in with Apple — setup", Pest + live curl. **Left:** account deletion `DELETE /me` + Apple token revocation (App Store 5.1.1(v)) |
+| B6c Sign in with Apple | Done | **Account deletion + Apple token revocation done** (session 12): `GET /me/deletion-check`, `DELETE /me`, `DELETE /family`, child erasure on member removal, one `EraseUser` action, `AppleTokenClient` (code exchange + revoke, ES256 client secret, skipped without keys), 12 Pest tests. **Sign-in done** (session 9): `AppleIdTokenVerifier` (JWKS `appleid.apple.com/auth/keys`, cached + refetch on unknown kid, `iss`, `aud` ∈ `APPLE_CLIENT_IDS`, `exp`, optional `nonce` = sha256 hex), provider `apple` on `/auth/social/{provider}` and `/me/social-accounts/{provider}`, `display_name` from the app (fallback "Player", never a private relay), Filament column "Social sign-in", README "Sign in with Apple — setup", Pest + live curl. |
 | B7 Remaining launch content | In progress | Sudoku + Math Sprint generated per session, Word Puzzles seeded, item `points`, Filament preview + category generators; **AI batch generator done** (Laravel AI SDK, Horizon `ai` queue, review/approve page; needs `ANTHROPIC_API_KEY` to run for real). Left: content for all 8 categories (generate + review batches) |
 | B8 Billing, ads and notifications | In progress | **Billing core done** (session 8): `BillingServiceProvider`, `POST /api/v1/webhooks/revenuecat` (Bearer secret, idempotent via `webhook_events`, stale/out-of-order guard, `ApplyRevenueCatEvent` sets the family `tier`), `GET /family/subscription` (admin), factories, fixtures + 13 Pest tests, live smoke test. Dev DB migrated. Not touched in session 9. **Push token + notification preferences done** (session 10: `Notifications` module, 13 Pest tests). **Sending started** (session 11: Expo sender, `SendMemberNotification`, `goal_reached` / `period_closed` listeners, 7 Pest tests). **Left:** `family_activity`, `daily_reminder`, AdMob SSV / rewarded-ad second chance, Filament subscription view (see Next up) |
 | B9 Production | Not started | |
 
 ## Next up
 
-0. **State at last stop (session 11, 2026-10-15):** flaky `GeneratedPlayTest` fixed (test-only); B8 item 3 (sending)
+0. **State at last stop (session 12, 2026-10-16):** B6c **account deletion done** (see log). Migration
+   `2026_10_16_100000_add_account_deletion_fields` run on the dev DB (`migrate`, no fresh). B8 `family_activity` /
+   `daily_reminder` **not started** (time budget). **Next, in order:** B8 item 3 rest (a below), then b, c.
+   Contract additions to confirm in docs/API.md: blocker `child_account` + 403 `forbidden` on `DELETE /me` for
+   non-adults; `DELETE /family` is 403 for non-owner admins.
+   Previous: **State at last stop (session 11, 2026-10-15):** flaky `GeneratedPlayTest` fixed (test-only); B8 item 3 (sending)
    **partly done**: Expo push sender, `SendMemberNotification` (preferences, quiet hours, 12 h drop), queued listeners
    for `GoalReached` / `PeriodClosed` (see log). No migrations. **Next, in order:**
    a. B8 item 3 rest: `family_activity` (listener on the play-session-finished event; recipients = other active family
@@ -34,7 +39,7 @@ Milestones are defined in `docs/PLAN.md`.
       themself) and `daily_reminder` (scheduled every 15 min: members whose `reminder_time` falls in the window in the
       family timezone, `daily_reminder` on, not played today; one batched query). Both reuse `SendMemberNotification`.
    b. Optional: Expo **receipts** check (`/push/getReceipts`) — currently only ticket errors clear tokens.
-   c. Then B8 items 4–6 and account deletion (item a of session 9 below).
+   c. Then B8 items 4–6 (account deletion is done, session 12).
    Previous: **State at last stop (session 9, 2026-10-15):** goal time-of-day test failures fixed (test factory, see log) and
    B6c Sign in with Apple **sign-in** done; no migrations this session. Push token / notification preferences were
    not started (time budget). **Next, in order:**
@@ -253,6 +258,13 @@ curl http://localhost:8080/api/v1/health
   `{"message":"...","code":"social_token_invalid"}`.
 - Real token: README "Sign in with Apple — setup" (Step 7: device / TestFlight or the web authorize URL).
 
+## How to test (B6c — account deletion)
+
+- `docker compose exec app php artisan test --compact tests/Feature/Api/AccountDeletionTest.php`
+- `curl -H "Authorization: Bearer demo-alex-teen-token" -H "Accept: application/json" http://localhost:8080/api/v1/me/deletion-check`
+  (do not call `DELETE /me` or `DELETE /family` with demo tokens on the dev DB — erasure is permanent).
+- Apple revocation for real needs README "Sign in with Apple — setup" Step 4–5 keys; without them it is skipped (log).
+
 ## How to test (B8 — push token, notification preferences)
 
 - Tests: `docker compose exec app php artisan test --compact tests/Feature/Api/NotificationsTest.php` (13 tests).
@@ -269,6 +281,37 @@ curl http://localhost:8080/api/v1/health
   (new queued listeners/job). Optional `.env`: `EXPO_ACCESS_TOKEN` (only if "enhanced push security" is on in Expo).
 
 ## Log
+
+### 2026-10-16 (session 12: B6c account deletion + Apple token revocation)
+
+- **Migration** `2026_10_16_100000_add_account_deletion_fields`: `social_accounts.refresh_token` (encrypted cast,
+  hidden) + `token_client_id`, `users.erased_at`, `families.deleted_at` (plain column, no SoftDeletes trait: removed
+  members still load their family).
+- **`Identity/Actions/EraseUser`** (`handle` / `handleMany`, fixed query count): deletes Sanctum tokens, device rows
+  (push tokens), social accounts; user → "Deleted player", email/password/birth/avatar/staff cleared, `erased_at`;
+  memberships' nickname → "Deleted player", accessibility cleared; unused sign-in codes voided; notification
+  preferences deleted; the invite they used and unused invites they created deleted; password reset rows deleted.
+  User rows stay (ledger → members → users). One activity log entry `account`/`erased` with user ids only. Apple
+  tokens revoked via `DB::afterCommit`.
+- **Family**: `CheckAccountDeletion` (blockers `family_owner`, `child_account`; `deletes_family`;
+  `active_subscription` + `store`), `DeleteAccount` (`DELETE /me`, 409 `family_owner_cannot_leave`, 403 for
+  non-adults, owner-only family → `DeleteFamily`), `DeleteFamily` (members `removed`, codes voided, pending invites
+  deleted, children = no email + no social erased, adults detached, owner erased with `delete_my_account`; family
+  → "Deleted family" + `deleted_at` via query update so the activity log keeps no name; `FamilyDeleted` event →
+  Goals `DeleteFamilyGoalPlans` soft-deletes its plans). `RemoveMember` now erases child accounts (after
+  `MemberRemoved`). `AccountDeletionController`, `DeleteAccountRequest`, `DeleteFamilyRequest`.
+- **Apple**: `Identity/Apple/AppleTokenClient` + `HttpAppleTokenClient` (`/auth/token`, `/auth/revoke`; client
+  secret ES256 via `firebase/php-jwt`, `sub` = client id = the identity token `aud`, new `SocialIdentity::audience`);
+  missing `APPLE_TEAM_ID`/`APPLE_KEY_ID`/`APPLE_PRIVATE_KEY` → skipped + logged. `authorization_code` on
+  `POST /auth/social/apple` and `POST /me/social-accounts/apple` (`StoreAppleRefreshToken`); unlink revokes
+  (`RevokeAppleTokens`). Error code `family_owner_cannot_leave` in `ErrorCodes`. `.env.example`, README Step 4–6.
+- **Tests**: `tests/Feature/Api/AccountDeletionTest.php` (12): check endpoint, adult self-delete (ledger kept,
+  token 401, email login 401, activity log without email), owner blocker 409, child 403, owner-only family, `DELETE
+  /family` (children erased, adults detached, sign-in code invalid, subscription kept), non-owner admin 403,
+  `delete_my_account`, child removal erased, Apple exchange + revoke on deletion + re-sign-in makes a new user,
+  revoke on unlink, query count for 2 vs 8 children equal. Targeted files 130 passed; Pint + Larastan clean.
+- Live: `GET /api/v1/me/deletion-check` as `demo-alex-teen-token` → `can_delete: false`, `blockers: ["child_account"]`.
+- Not done: B8 `family_activity` / `daily_reminder` (Next up 0).
 
 ### 2026-10-15 (session 11: flaky test + B8 sending notifications, part 1)
 

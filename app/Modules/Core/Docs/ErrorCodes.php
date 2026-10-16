@@ -25,6 +25,7 @@ final class ErrorCodes
         'already_in_family' => ['status' => 409, 'meaning' => 'User already belongs to a family'],
         'social_account_taken' => ['status' => 409, 'meaning' => 'That Google/Facebook account is linked to another user'],
         'last_sign_in_method' => ['status' => 409, 'meaning' => 'Can\'t unlink the only way this user can sign in'],
+        'family_owner_cannot_leave' => ['status' => 409, 'meaning' => 'The family owner must delete the family (or be its only member) to delete their account'],
         'session_not_active' => ['status' => 409, 'meaning' => 'Play session is not in a state that allows this action'],
         'item_already_answered' => ['status' => 409, 'meaning' => 'Session item was already answered'],
         'invite_invalid' => ['status' => 422, 'meaning' => 'Invite code unknown, used or expired'],

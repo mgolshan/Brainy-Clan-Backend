@@ -16,5 +16,7 @@ final readonly class SocialIdentity
         public string $providerUserId,
         public ?string $email,
         public ?string $name,
+        /** Apple: the token `aud` (bundle ID or Services ID), needed to exchange the authorization code. */
+        public ?string $audience = null,
     ) {}
 }

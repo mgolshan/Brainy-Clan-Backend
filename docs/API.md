@@ -39,6 +39,7 @@ and add a line to the changelog at the bottom.
 | `social_signup_incomplete` | 422 | New social account: birth year/month needed (adult check) |
 | `social_account_taken` | 409 | That Google/Facebook account is linked to another user |
 | `last_sign_in_method` | 409 | Can't unlink the only way this user can sign in |
+| `family_owner_cannot_leave` | 409 | The family owner must delete the family (or be its only member) to delete their account |
 | `session_not_active` | 409 | Play session is not in a state that allows this action |
 | `item_already_answered` | 409 | Session item was already answered |
 | `second_chance_unavailable` | 403 | No second chance of that method left / allowed |
@@ -185,6 +186,31 @@ members use their invite code (`/auth/join`). No shared passwords, no parent ema
   when `has_password` is true). 422 when the user has no email. → 204
 - `GET /me/stats` (auth, needs family) →
   `{ "data": { "points_today": 4, "points_week": 23, "points_total": 120, "streak": { "current": 3, "longest": 7 } } }`
+
+**Account deletion** (App Store guideline 5.1.1(v); also on Android/web):
+- `GET /me/deletion-check` (auth) → `{ "data": { "can_delete": true, "blockers": [],
+  "deletes_family": false, "active_subscription": false, "store": null } }`. `blockers`:
+  `family_owner` (owner of a family with other members — delete the family instead), `child_account`
+  (a member below the adult band — children and teens are managed by the family admin, who removes them).
+  `deletes_family`: true when the caller is the owner and the only member (the family goes too).
+  `active_subscription`: the family has an active/grace store subscription — the app must tell the
+  user to cancel it in the App Store / Google Play (deleting the account does not cancel billing).
+- `DELETE /me` (auth) — Body: `confirm: "DELETE"`. Deletes the account now: signs out every
+  device, unlinks social accounts (Apple tokens are revoked with Apple), removes the membership,
+  and erases personal data (display name → "Deleted player", email, password, birth data, avatar
+  cleared). Points ledger rows stay (append-only) but no longer point to personal data; past goal
+  results show the member as "Deleted player". → 204, 422 without `confirm`, 409 `family_owner_cannot_leave`, 403 `forbidden` for a `child_account`.
+- `DELETE /family` (owner) — Body: `confirm: "<family name>"`. Deletes the family, erases every
+  **child** account in it (children have no account outside the family), removes the other
+  adults' memberships (their accounts remain, without a family) and erases the owner's account too
+  when Body `delete_my_account: true`. → 204, 422 on a wrong `confirm`, 403 `forbidden` for a
+  non-owner. The family row is kept as "Deleted family" (`deleted_at`) so the points ledger stays intact.
+  `active_subscription` / `store` in the deletion check describe the caller's family (any member).
+- Children can't delete themselves; an admin removing a child (`DELETE /family/members/{member}`)
+  also erases that child's account.
+- **Apple revocation:** `POST /auth/social/apple` and `POST /me/social-accounts/apple` accept an
+  optional `authorization_code` (from Apple's sign-in result). The server exchanges it for a
+  refresh token (stored encrypted) and revokes it on unlink and deletion.
 
 ### Family
 - `POST /families` (auth) — Body: `name, timezone (IANA), country_code (ISO-2)`. Creates the family
@@ -443,3 +469,5 @@ Custom data in the ad request: `session_id`.
 - 2026-10-15 — `nonce` is used for Apple only (ignored for Google/Facebook). Planned for account deletion (B6c): `DELETE /me` and an optional Apple `authorization_code` on sign-in (to revoke Apple tokens) — not implemented yet.
 - 2026-10-15 — Notification preferences: adult default quiet hours 21:30–07:00; both quiet times `null` = off; push token moves to the current device; 422 without a device.
 - 2026-10-15 — Push `data` for goal notifications includes `period_id`.
+- 2026-10-15 — Account deletion: `GET /me/deletion-check`, `DELETE /me`, `DELETE /family`, child erasure on member removal, Apple `authorization_code` for token revocation; error `family_owner_cannot_leave`.
+- 2026-10-16 — Account deletion: blocker `child_account` (children and teens; `DELETE /me` → 403); `DELETE /family` non-owner → 403; deleted families are kept as anonymised rows.

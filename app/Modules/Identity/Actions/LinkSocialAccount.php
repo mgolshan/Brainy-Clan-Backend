@@ -18,15 +18,16 @@ class LinkSocialAccount
     public function __construct(
         private readonly SocialTokenVerifiers $verifiers,
         private readonly EnsureSocialSignInAllowed $ensureAllowed,
+        private readonly StoreAppleRefreshToken $storeAppleToken,
     ) {}
 
-    public function handle(User $user, string $provider, string $token, ?string $nonce = null): SocialAccount
+    public function handle(User $user, string $provider, string $token, ?string $nonce = null, ?string $authorizationCode = null): SocialAccount
     {
         $this->ensureAllowed->handle($user);
 
         $identity = $this->verifiers->for($provider)->verify($token, $nonce);
 
-        return DB::transaction(function () use ($user, $identity): SocialAccount {
+        $account = DB::transaction(function () use ($user, $identity): SocialAccount {
             $owner = SocialAccount::query()
                 ->where('provider', $identity->provider)
                 ->where('provider_user_id', $identity->providerUserId)
@@ -41,5 +42,11 @@ class LinkSocialAccount
                 ['provider_user_id' => $identity->providerUserId, 'email' => $identity->email, 'linked_at' => now()],
             );
         });
+
+        if ($authorizationCode !== null) {
+            $this->storeAppleToken->handle($account, $authorizationCode, $identity->audience);
+        }
+
+        return $account;
     }
 }

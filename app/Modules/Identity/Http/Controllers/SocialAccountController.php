@@ -44,7 +44,7 @@ class SocialAccountController
         /** @var User $user */
         $user = $request->user();
 
-        $account = $link->handle($user, $provider, (string) $request->string('token'), $request->filled('nonce') ? (string) $request->string('nonce') : null);
+        $account = $link->handle($user, $provider, (string) $request->string('token'), $request->filled('nonce') ? (string) $request->string('nonce') : null, $request->filled('authorization_code') ? (string) $request->string('authorization_code') : null);
 
         return (new SocialAccountResource($account))->response()->setStatusCode(201);
     }

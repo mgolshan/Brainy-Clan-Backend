@@ -49,6 +49,12 @@ return [
      */
     'apple' => [
         'client_ids' => array_values(array_filter(array_map('trim', explode(',', (string) env('APPLE_CLIENT_IDS', ''))))),
+        // Token revocation (account deletion, App Store 5.1.1(v)): the Sign in with Apple key (.p8).
+        // When any of these is missing, revocation is skipped (logged).
+        'team_id' => env('APPLE_TEAM_ID'),
+        'key_id' => env('APPLE_KEY_ID'),
+        // The .p8 file contents (PEM); `\n` escapes are accepted for one-line .env values.
+        'private_key' => env('APPLE_PRIVATE_KEY'),
     ],
 
     /*

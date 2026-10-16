@@ -92,6 +92,11 @@ class ApiException extends RuntimeException
         return new self('last_sign_in_method', 'You can\'t remove your only way to sign in. Set a password or link another account first.', 409);
     }
 
+    public static function familyOwnerCannotLeave(): self
+    {
+        return new self('family_owner_cannot_leave', 'You own a family with other members. Delete the family first to delete your account.', 409);
+    }
+
     public static function categoryNotAllowed(): self
     {
         return new self('category_not_allowed', 'This category is not available for you.', 403);

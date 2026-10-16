@@ -356,10 +356,10 @@ Skip this if Apple sign-in is iOS-only. For sign-in on the web (or Android via t
 
 The **Services ID** is the `aud` of identity tokens from the web flow.
 
-### Step 4 – Key for Sign in with Apple (later: account deletion)
+### Step 4 – Key for Sign in with Apple (token revocation on account deletion)
 
-Not needed for sign-in itself. Account deletion (App Store guideline 5.1.1(v)) will need it to revoke
-Apple tokens — create it now so it is ready: **Keys** → **+** → name *Brainy Clan SIWA*, tick
+Not needed for sign-in itself. Account deletion (App Store guideline 5.1.1(v)) uses it to revoke
+Apple tokens when a user deletes their account or unlinks Apple: **Keys** → **+** → name *Brainy Clan SIWA*, tick
 **Sign in with Apple** → Configure → the App ID from Step 2 → Save → Continue → Register →
 **Download** the `.p8` (only once!) and note the **Key ID**. Store the `.p8` safely (password
 manager); it is a secret and never goes in git.
@@ -369,6 +369,11 @@ manager); it is a secret and never goes in git.
 ```dotenv
 # comma-separated: iOS bundle ID, plus the Services ID if you use web sign-in
 APPLE_CLIENT_IDS=app.brainyclan,app.brainyclan.web
+# token revocation (Step 4): Team ID (Membership page), the key's Key ID, the .p8 contents
+APPLE_TEAM_ID=ABCDE12345
+APPLE_KEY_ID=XYZ987WVU6
+# one line with \n for the line breaks (or a quoted multi-line value)
+APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIGT...\n-----END PRIVATE KEY-----"
 ```
 
 Then:
@@ -380,6 +385,8 @@ docker compose restart app horizon
 
 (Config: `config/services.php` → `apple.client_ids`.) Without `APPLE_CLIENT_IDS` every Apple token
 gets 401 `social_token_invalid` ("Sign in with Apple is not configured on this server.").
+Without the three key values sign-in still works, but Apple tokens are not exchanged or revoked
+(logged as "Apple token exchange/revocation skipped").
 
 ### Step 6 – what the app sends
 
@@ -398,6 +405,10 @@ gets 401 `social_token_invalid` ("Sign in with Apple is not configured on this s
   email that matches an existing adult links the Apple account to that user.
 - First time without birth data → 422 `social_signup_incomplete` → ask and retry with the same token
   (identity tokens are valid for 10 minutes).
+- `authorization_code` (optional, needed for revocation): the `authorizationCode` from the Apple
+  sign-in result, on `POST /auth/social/apple` and `POST /me/social-accounts/apple`. The backend
+  exchanges it once (valid 5 minutes) for a refresh token, stores it encrypted, and revokes it with
+  Apple on unlink and on account deletion (`DELETE /me`, `DELETE /family`).
 
 ### Step 7 – test
 

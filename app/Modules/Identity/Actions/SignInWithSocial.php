@@ -27,17 +27,18 @@ class SignInWithSocial
         private readonly PolicyResolver $policy,
         private readonly EnsureSocialSignInAllowed $ensureAllowed,
         private readonly IssueDeviceToken $issueToken,
+        private readonly StoreAppleRefreshToken $storeAppleToken,
     ) {}
 
     /**
      * @param  array{birth_year?: int|null, birth_month?: int|null, display_name?: string|null, locale?: string|null}  $profile
      * @return array{user: User, token: string, created: bool}
      */
-    public function handle(string $provider, string $token, array $profile, string $deviceName, string $platform, ?string $appVersion = null, ?string $nonce = null): array
+    public function handle(string $provider, string $token, array $profile, string $deviceName, string $platform, ?string $appVersion = null, ?string $nonce = null, ?string $authorizationCode = null): array
     {
         $identity = $this->verifiers->for($provider)->verify($token, $nonce);
 
-        return DB::transaction(function () use ($identity, $profile, $deviceName, $platform, $appVersion): array {
+        $result = DB::transaction(function () use ($identity, $profile, $deviceName, $platform, $appVersion): array {
             $created = false;
             $account = SocialAccount::query()
                 ->with('user')
@@ -66,6 +67,16 @@ class SignInWithSocial
                 'created' => $created,
             ];
         });
+
+        if ($authorizationCode !== null) {
+            $account = SocialAccount::query()->where('user_id', $result['user']->id)->where('provider', $identity->provider)->first();
+
+            if ($account !== null) {
+                $this->storeAppleToken->handle($account, $authorizationCode, $identity->audience);
+            }
+        }
+
+        return $result;
     }
 
     /**
