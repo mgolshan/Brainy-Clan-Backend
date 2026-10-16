@@ -26,7 +26,27 @@ Milestones are defined in `docs/PLAN.md`.
 
 ## Next up
 
-0. **State at last stop (session 14, 2026-10-16):** **B9 done locally** (see log). Dev DB: `migrate` (2 migrations:
+0. **State at last stop (session 15, 2026-10-16, hardening pass — cut short by a usage limit):** Expo connection
+   errors handled with a bounded retry; N+1 audit partly done (new query-count tests, see log). No migrations.
+   **Not done yet, in order (pick up here):**
+   a. **Index check:** `devices.push_token` has no index but is looked up by value (`DeliverPushNotification` clears
+      invalid tokens, `SetPushToken` clears the same token from other devices) → add an index via migration after an
+      `EXPLAIN` on a seeded dataset. `play_sessions` "started since local midnight" (daily reminders) uses
+      `member_id,status`; consider `(member_id, started_at)`. Other hot paths already indexed: `point_entries`
+      `(family_id, created_at)` / `(member_id, created_at)`, `goal_periods (status, ends_at)` + `(goal_plan_id, starts_at)`,
+      `ad_rewards` `transaction_id` unique + `reward_ref`, `consents (user_id, type, id)`, `notification_preferences`
+      `family_member_id` unique, `session_items (play_session_id, position)`. EXPLAIN not run yet.
+   b. **Security review** (not started): cross-family 404/403 tests for every route id (`member`, `device`, `invite`,
+      `plan`, `session`), `$fillable`/guarded review, validation limits (string lengths, array sizes, numeric ranges),
+      rate limits on auth/code/export/deletion page (exist; verify tests), secrets at rest (sign-in codes are
+      `code_hash`, deletion tokens SHA-256, Apple refresh token encrypted cast — verified from schema/log only; invite
+      codes are plaintext by design because admins re-display them), no PII in logs/activity log, `canAccessPanel`.
+   c. **README refresh** (not started): setup, run, seeded logins/tokens, index of all setup guides, `docs/DEPLOY.md`
+      link, tests/checks; "admin tour" still thin.
+   d. Admin config tables (age bands, settings, challenge types) have no relation columns; they are only in the
+      render test, not the constant-query test (their row count does not grow with families).
+   Then the items of session 14 below (Moe: server, lawyer, Norton cert, content).
+   Previous: **State at last stop (session 14, 2026-10-16):** **B9 done locally** (see log). Dev DB: `migrate` (2 migrations:
    `consents`, `account_deletion_requests`) + `AdminUserSeeder` and `DemoFamilySeeder` re-run (demo consents). **Next:**
    a. Moe: follow `docs/DEPLOY.md` on a Hetzner server (DNS for api.brainyclan.app, `.env.prod`, Storage Box, Sentry DSN,
       SMTP provider for the deletion emails), run the restore drill there.
@@ -51,7 +71,7 @@ Milestones are defined in `docs/PLAN.md`.
    error `ssv_signature_invalid` (400) on the SSV webhook; SSV 200 body `{ data: { transaction_id, outcome:
    stored|duplicate|ignored } }`; `reward_ref` missing on `method: "ad"` → 422 `validation_failed`;
    `family_activity` push `data` `{ type, member_id, session_id }`; `daily_reminder` `data` `{ type }`.
-   Optional later: Expo receipts check (`/push/getReceipts`).
+   Optional later: Expo receipts check (`/push/getReceipts`). (Expo connection errors: fixed in session 15.)
    Previous: **State at last stop (session 12, 2026-10-16):** B6c **account deletion done** (see log). Migration
    `2026_10_16_100000_add_account_deletion_fields` run on the dev DB (`migrate`, no fresh). B8 `family_activity` /
    `daily_reminder` **not started** (time budget). **Next, in order:** B8 item 3 rest (a below), then b, c.
@@ -333,6 +353,23 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-10-16 (session 15: hardening — Expo retries, N+1 audit part 1)
+
+- **Expo push failures** (was: a connection error threw inside the queued job, and Horizon `tries` is 1, so the push
+  was lost with a failed job): `ExpoPushSender::send()` now returns `Notifications\Support\PushSendResult`
+  (`invalidTokens`, `retryTokens`) and never throws for transport problems. `HttpExpoPushSender`: connection errors and
+  HTTP 429/5xx (after the in-request retries) → the batch's tokens are retryable; ticket `MessageRateExceeded` →
+  retryable; other HTTP errors (400, bad credentials) are dropped; logs carry status, Expo error code and message
+  count only (no tokens, no response body — it can echo tokens). `DeliverPushNotification` queues a follow-up job for
+  only the undelivered tokens after 60 s, then 300 s (3 attempts total; still dropped after 12 h), so delivered devices
+  never get duplicates; a retry only reaches devices of the same members that still hold the token. 7 new tests in
+  `PushNotificationsTest`.
+- **N+1 audit (part 1):** new query-count tests — API: `GET /me` (2 vs 6 members), `GET /me/stats` (2 vs 30 ledger
+  rows), `GET /goals/{plan}` (2 vs 6 plan members); admin: invites + goal periods relation managers, family / goal
+  plan / content batch view pages and the categories list (2 vs 6 rows). All were already constant; no code change
+  needed. Index review from the dev schema (read-only) — see Next up 0a.
+- No contract changes, no migrations.
 
 ### 2026-10-16 (session 14: B9 — legal & consent API, account deletion page, production infra)
 

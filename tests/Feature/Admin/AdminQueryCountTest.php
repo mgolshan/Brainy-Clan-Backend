@@ -244,3 +244,44 @@ it('lists webhook events with provider and outcome filters and shows the payload
         ->and(WebhookEventResource::canEdit($event))->toBeFalse()
         ->and(WebhookEventResource::canDelete($event))->toBeFalse();
 });
+
+it('keeps the invites and periods relation managers at a constant number of queries', function () {
+    $count = function (FamilyMember $owner): array {
+        $family = Family::query()->findOrFail($owner->family_id);
+        $plan = GoalPlan::query()->where('family_id', $owner->family_id)->firstOrFail();
+        $queries = [];
+
+        foreach ([
+            [InvitesRelationManager::class, $family, ViewFamily::class],
+            [PeriodsRelationManager::class, $plan, ViewGoalPlan::class],
+        ] as [$manager, $record, $page]) {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            Livewire::test($manager, ['ownerRecord' => $record, 'pageClass' => $page])->assertOk();
+            $queries[] = count(DB::getQueryLog());
+            DB::disableQueryLog();
+        }
+
+        return $queries;
+    };
+
+    $count(adminFamily(1));
+
+    expect($count(adminFamily(6)))->toBe($count(adminFamily(2)));
+});
+
+it('keeps the family, goal plan and content batch view pages at a constant number of queries', function () {
+    $urls = function (FamilyMember $owner): array {
+        return [
+            "/admin/families/{$owner->family_id}",
+            '/admin/goal-plans/'.GoalPlan::query()->where('family_id', $owner->family_id)->value('id'),
+            '/admin/content-batches/'.ContentBatch::query()->latest('id')->value('id'),
+            '/admin/categories',
+        ];
+    };
+
+    $small = array_map(adminQueries(...), $urls(adminFamily(2)));
+    $large = array_map(adminQueries(...), $urls(adminFamily(6)));
+
+    expect($large)->toBe($small);
+});

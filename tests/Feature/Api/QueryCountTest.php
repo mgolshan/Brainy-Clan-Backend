@@ -238,3 +238,36 @@ it('lists my social accounts with a constant number of queries', function () {
 
     expect(qcQueries($small, '/api/v1/me/social-accounts'))->toBe(qcQueries($large, '/api/v1/me/social-accounts'));
 });
+
+it('returns me with a constant number of queries for small and large families', function () {
+    expect(qcQueries(qcFamily(2), '/api/v1/me'))->toBe(qcQueries(qcFamily(6), '/api/v1/me'));
+});
+
+it('returns my stats with a constant number of queries however long the ledger is', function () {
+    $category = Category::factory()->create();
+    $small = familyOwner(['tier' => 'family']);
+    $large = familyOwner(['tier' => 'family']);
+
+    foreach ([[$small, 2], [$large, 30]] as [$owner, $rows]) {
+        for ($i = 0; $i < $rows; $i++) {
+            app(AppendPoints::class)->handle($owner->family_id, $owner->id, $category->id, 1, PointEntry::REASON_CORRECT_ANSWER);
+        }
+    }
+
+    expect(qcQueries($small, '/api/v1/me/stats'))->toBe(qcQueries($large, '/api/v1/me/stats'));
+});
+
+it('shows one goal plan with a constant number of queries however many members it has', function () {
+    $category = Category::factory()->create();
+    $urls = [];
+
+    foreach ([2, 6] as $rows) {
+        $owner = qcFamily($rows, $category);
+        $plan = GoalPlan::factory()->create(['family_id' => $owner->family_id]);
+        $plan->categories()->attach($category->id);
+        $plan->planMembers()->createMany($owner->family->members()->pluck('id')->map(fn ($id) => ['member_id' => $id])->all());
+        $urls[$rows] = [$owner, "/api/v1/goals/{$plan->id}"];
+    }
+
+    expect(qcQueries(...$urls[2]))->toBe(qcQueries(...$urls[6]));
+});

@@ -13,16 +13,19 @@ use App\Modules\Notifications\Listeners\NotifyFamilyActivity;
 use App\Modules\Notifications\Listeners\NotifyGoalReached;
 use App\Modules\Notifications\Models\NotificationPreference;
 use App\Modules\Notifications\Support\HttpExpoPushSender;
+use App\Modules\Notifications\Support\PushSendResult;
 use App\Modules\Play\Events\SessionCompleted;
 use App\Modules\Play\Models\PlaySession;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
 /**
@@ -36,11 +39,18 @@ class FakeExpoPushSender implements ExpoPushSender
     /** @var list<string> */
     public array $invalid = [];
 
-    public function send(array $messages): array
+    /** @var list<string> */
+    public array $retry = [];
+
+    public function send(array $messages): PushSendResult
     {
         array_push($this->sent, ...$messages);
+        $tokens = array_column($messages, 'to');
 
-        return array_values(array_intersect($this->invalid, array_column($messages, 'to')));
+        return new PushSendResult(
+            array_values(array_intersect($this->invalid, $tokens)),
+            array_values(array_intersect($this->retry, $tokens)),
+        );
     }
 }
 
@@ -162,11 +172,101 @@ it('posts to Expo in batches of 100 and reports DeviceNotRegistered tokens', fun
     $messages = array_map(fn (int $i) => ['to' => "ExponentPushToken[t{$i}]", 'title' => 'T', 'body' => 'B', 'data' => ['type' => 'goal_reached']], range(1, 149));
     $messages[] = ['to' => 'ExponentPushToken[dead]', 'title' => 'T', 'body' => 'B', 'data' => ['type' => 'goal_reached']];
 
-    $invalid = app(HttpExpoPushSender::class)->send($messages);
+    $result = app(HttpExpoPushSender::class)->send($messages);
 
-    expect($invalid)->toBe(['ExponentPushToken[dead]']);
+    expect($result->invalidTokens)->toBe(['ExponentPushToken[dead]'])
+        ->and($result->retryTokens)->toBe([]);
     Http::assertSentCount(2);
     Http::assertSent(fn (Request $request) => $request->url() === 'https://exp.host/--/api/v2/push/send' && count($request->data()) === 100);
+});
+
+it('returns tokens for a retry instead of throwing when Expo is unreachable, without logging tokens', function () {
+    Log::spy();
+    Http::fake(['exp.host/*' => fn () => throw new ConnectionException('cURL error 7: Failed to connect')]);
+    $messages = [['to' => 'ExponentPushToken[a]', 'title' => 'T', 'body' => 'B', 'data' => ['type' => 'goal_reached']]];
+
+    $result = app(HttpExpoPushSender::class)->send($messages);
+
+    expect($result->retryTokens)->toBe(['ExponentPushToken[a]'])->and($result->invalidTokens)->toBe([]);
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context) => $message === 'Expo push service unreachable'
+        && ! str_contains((string) json_encode($context), 'ExponentPushToken'))->once();
+});
+
+it('retries Expo 429/5xx responses and MessageRateExceeded tickets but drops other errors', function () {
+    $message = fn (string $token) => ['to' => $token, 'title' => 'T', 'body' => 'B', 'data' => ['type' => 'goal_reached']];
+
+    Http::fake(['exp.host/*' => Http::response(['errors' => [['code' => 'INTERNAL_SERVER_ERROR']]], 503)]);
+    expect(app(HttpExpoPushSender::class)->send([$message('ExponentPushToken[a]')])->retryTokens)->toBe(['ExponentPushToken[a]']);
+});
+
+it('retries an Expo 429 response', function () {
+    Http::fake(['exp.host/*' => Http::response(['errors' => [['code' => 'TOO_MANY_REQUESTS']]], 429)]);
+
+    $result = app(HttpExpoPushSender::class)->send([['to' => 'ExponentPushToken[a]', 'title' => 'T', 'body' => 'B', 'data' => []]]);
+
+    expect($result->retryTokens)->toBe(['ExponentPushToken[a]']);
+});
+
+it('drops an Expo 400 response without logging the body', function () {
+    Log::spy();
+    Http::fake(['exp.host/*' => Http::response(['errors' => [['code' => 'VALIDATION_ERROR', 'message' => 'ExponentPushToken[a] is bad']]], 400)]);
+
+    $result = app(HttpExpoPushSender::class)->send([['to' => 'ExponentPushToken[a]', 'title' => 'T', 'body' => 'B', 'data' => []]]);
+
+    expect($result->retryTokens)->toBe([])->and($result->invalidTokens)->toBe([]);
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context) => $context['code'] === 'VALIDATION_ERROR'
+        && $context['will_retry'] === false && ! str_contains((string) json_encode($context), 'ExponentPushToken'))->once();
+});
+
+it('retries MessageRateExceeded tickets and ignores other ticket errors', function () {
+    Http::fake(['exp.host/*' => Http::response(['data' => [
+        ['status' => 'error', 'details' => ['error' => 'MessageRateExceeded']],
+        ['status' => 'error', 'details' => ['error' => 'MessageTooBig']],
+        ['status' => 'ok', 'id' => 'x'],
+    ]])]);
+    $messages = array_map(fn (string $token) => ['to' => $token, 'title' => 'T', 'body' => 'B', 'data' => []],
+        ['ExponentPushToken[a]', 'ExponentPushToken[b]', 'ExponentPushToken[c]']);
+
+    $result = app(HttpExpoPushSender::class)->send($messages);
+
+    expect($result->retryTokens)->toBe(['ExponentPushToken[a]'])->and($result->invalidTokens)->toBe([]);
+});
+
+it('queues a delayed retry for only the undelivered tokens, at most three attempts in total', function () {
+    [, [$owner, $child]] = pushPlan();
+    $childToken = "ExponentPushToken[m{$child->id}]";
+    $this->sender->retry = [$childToken];
+    Queue::fake([DeliverPushNotification::class]);
+    $createdAt = CarbonImmutable::now();
+
+    (new DeliverPushNotification([$owner->id, $child->id], 'Hi', 'There', ['type' => 'goal_reached'], $createdAt))->handle($this->sender);
+
+    expect($this->sender->sent)->toHaveCount(2);
+    Queue::assertPushed(DeliverPushNotification::class, 1);
+    Queue::assertPushed(DeliverPushNotification::class, fn (DeliverPushNotification $job) => $job->tokens === [$childToken]
+        && $job->attempt === 2 && $job->memberIds === [$owner->id, $child->id] && $job->createdAt->eq($createdAt)
+        && CarbonImmutable::instance($job->delay)->eq(CarbonImmutable::now()->addSeconds(60)));
+
+    // Attempt 2 sends only the child's token; attempt 3 is the last one.
+    $this->sender->sent = [];
+    (new DeliverPushNotification([$owner->id, $child->id], 'Hi', 'There', ['type' => 'goal_reached'], $createdAt, [$childToken], 2))->handle($this->sender);
+    expect(array_column($this->sender->sent, 'to'))->toBe([$childToken]);
+    Queue::assertPushed(DeliverPushNotification::class, fn (DeliverPushNotification $job) => $job->attempt === 3
+        && CarbonImmutable::instance($job->delay)->eq(CarbonImmutable::now()->addSeconds(300)));
+
+    (new DeliverPushNotification([$owner->id, $child->id], 'Hi', 'There', ['type' => 'goal_reached'], $createdAt, [$childToken], 3))->handle($this->sender);
+    Queue::assertPushed(DeliverPushNotification::class, 2);
+});
+
+it('skips retry tokens that were signed out or belong to someone else in the meantime', function () {
+    [, [$owner, $child]] = pushPlan();
+    $stranger = Device::factory()->create(['push_token' => 'ExponentPushToken[stranger]']);
+    Device::query()->where('user_id', $child->user_id)->update(['push_token' => null]);
+
+    (new DeliverPushNotification([$owner->id, $child->id], 'Hi', 'There', ['type' => 'goal_reached'], CarbonImmutable::now(),
+        ["ExponentPushToken[m{$child->id}]", $stranger->push_token, "ExponentPushToken[m{$owner->id}]"], 2))->handle($this->sender);
+
+    expect(array_column($this->sender->sent, 'to'))->toBe(["ExponentPushToken[m{$owner->id}]"]);
 });
 
 // ---------------------------------------------------------------------------------------------
