@@ -63,6 +63,6 @@ class MemberController
 
     private function findInFamily(Request $request, int $memberId): FamilyMember
     {
-        return $this->currentMember($request)->family->members()->with(['user', 'family'])->findOrFail($memberId);
+        return $this->currentMember($request)->family->members()->with(['user' => fn ($query) => $query->withExists('socialAccounts'), 'family'])->findOrFail($memberId);
     }
 }

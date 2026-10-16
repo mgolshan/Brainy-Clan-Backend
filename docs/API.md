@@ -44,6 +44,8 @@ and add a line to the changelog at the bottom.
 | `item_already_answered` | 409 | Session item was already answered |
 | `second_chance_unavailable` | 403 | No second chance of that method left / allowed |
 | `goal_limit_reached` | 403 | Tier limit on active goal plans reached |
+| `ad_reward_pending` | 409 | Rewarded-ad callback not received yet — retry shortly |
+| `ssv_signature_invalid` | 400 | AdMob SSV callback signature could not be verified |
 | `app_update_required` | 426 | App older than `min_app_version` |
 | `not_found` | 404 | |
 
@@ -72,7 +74,7 @@ and add a line to the changelog at the bottom.
   "difficulty_override": null,
   "accessibility": { "text_scale": 1.0, "reduced_motion": false, "calm_timers": false, "theme": null },
   "default_ui_theme": "playful", "status": "active", "joined_at": "2026-10-10T14:00:00Z",
-  "email": null, "has_password": false, "email_login_allowed": false }
+  "email": null, "has_password": false, "email_login_allowed": false, "has_own_login": false }
 ```
 - `role`: `admin` | `member`. The family owner is always `admin`.
 - `age_band`: `child` | `teen` | `adult` | `senior` (codes come from the `age_bands` table).
@@ -80,7 +82,9 @@ and add a line to the changelog at the bottom.
 - `accessibility.theme`: `null` (use the policy default) or a theme key (see Policy). Lets a member
   pick another look; it never changes rules.
 - `birth_year` / `birth_month` only for the member themself and for admins.
-- `email` / `has_password` / `email_login_allowed` (from the member's band policy) only for the member themself and for admins (otherwise omitted).
+- `has_own_login`: the member can sign in without the family (email login or a linked
+  Google/Apple/Facebook account) — members without one are erased with the family.
+- `email` / `has_password` / `email_login_allowed` / `has_own_login` (`email_login_allowed` from the member's band policy) only for the member themself and for admins (otherwise omitted).
   `email` is the member's email login, `null` when they sign in with codes only.
 
 ### Policy (resolved for the signed-in member)
@@ -97,6 +101,7 @@ and add a line to the changelog at the bottom.
   "email_login_allowed": false,
   "difficulty": { "min": 1, "max": 4, "default": 2 },
   "second_chance": { "free_per_day": 0, "free_used_today": 0, "ad_allowed": false, "redemption_allowed": true },
+  "ad_request": { "non_personalized": true, "under_age_of_consent": false, "max_ad_content_rating": "G" },
   "limits": { "max_members": 2, "max_categories": 3, "max_active_goals": 1 },
   "accessibility_defaults": { "text_scale": 1.0, "reduced_motion": false, "calm_timers": false },
   "feature_flags": {}
@@ -107,6 +112,9 @@ and add a line to the changelog at the bottom.
 - `ui_theme` default per band (editable in the admin): `child → playful`, `teen → sleek`,
   `adult → modern`, `senior → classic`. Seniors also default to `calm_timers: true`. `accessibility_defaults.text_scale` stays `1.0` for every band: the `classic` theme already has a larger type scale, so a policy scale on top would compound (×1.44).
 - Seed age bands: child 0–12, teen 13–17, adult 18–64, senior 65+.
+- `ad_request`: how the app must request rewarded ads (AdMob `requestNonPersonalizedAdsOnly`,
+  `tagForUnderAgeOfConsent`, `maxAdContentRating`), from the band policy (seeded: teen
+  `under_age_of_consent: true`; everyone non-personalized, rating G). The app never decides these.
 - Before a family exists the user still gets a policy (tier `free`).
 - `collect_email`: the band may **self-register** with email + password (adults, seniors).
   `email_login_allowed`: an admin may give a member of this band an email login (seeded: child
@@ -422,15 +430,31 @@ from RevenueCat webhooks and never trusts the app for the tier.
 - `GET /family/subscription` (admin) → `{ "data": { "tier": "family", "status": "active" | "grace" |
   "expired" | "none", "store": "app_store" | "play_store" | "stripe" | null, "product_id": "...",
   "expires_at": "...", "will_renew": true, "revenuecat_app_user_id": "family-1" } }`.
-  The app passes `revenuecat_app_user_id` to `Purchases.logIn()`.
+  The app passes `revenuecat_app_user_id` to `Purchases.logIn()`. Only adult admins see the paywall
+  (`policy.purchases_allowed` and role `admin`). After a purchase the app polls
+  `GET /family/subscription` (and refetches `/me`) for up to ~30 s until the webhook has switched the
+  tier — the app never sets the tier itself.
+- `POST /family/subscription/sync` (admin) — asks the server to fetch the subscriber from the
+  RevenueCat REST API now (when `REVENUECAT_API_KEY` is configured) and apply it, for a faster tier
+  switch after purchase/restore. → `{ data: Subscription }` (same shape as GET); without a key it
+  just returns the current state.
 - Family members over the free limits keep their data when a subscription ends; limits apply to
   new members/goals/categories only.
 
-**Rewarded ads:** `POST /play/sessions/{session}/second-chance` with `method: "ad"` requires
-`reward_ref` = the AdMob server-side-verification `transaction_id`. `GET /webhooks/admob-ssv` (public)
-receives AdMob's signed SSV callback (verified against Google's published keys) and stores the reward;
-a second chance with an unknown or already used `reward_ref` → 403 `second_chance_unavailable`.
-Custom data in the ad request: `session_id`.
+**Rewarded ads:** (free tier, only when `policy.second_chance.ad_allowed`; never for children)
+- The app generates a random `reward_ref` (UUID v4) before showing the rewarded ad and passes it to
+  AdMob as server-side-verification custom data: `custom_data = "<reward_ref>:<session_id>"`, `user_id`
+  = the member id. AdMob calls `GET /api/v1/webhooks/admob-ssv` (public) with the signed callback;
+  the server verifies the ECDSA signature against Google's published keys
+  (`https://www.gstatic.com/admob/reward/verifier-keys.json`, cached), stores the reward
+  (`transaction_id` unique; `reward_ref`, session, member from the custom data) → 200
+  `{ data: { transaction_id, outcome: "stored" | "duplicate" | "ignored" } }` (`ignored`: no usable
+  custom data, e.g. AdMob's "Verify URL" test); 400 `ssv_signature_invalid`.
+- After the ad is closed with the reward earned, the app calls
+  `POST /play/sessions/{session}/second-chance` with `method: "ad", reward_ref` (422 without `reward_ref`). The reward must exist,
+  belong to that member and session, and be unused (single use). If AdMob's callback hasn't arrived
+  yet → **409 `ad_reward_pending`** (the app retries every 2 s for up to ~20 s, then shows an error);
+  an unknown-after-timeout, used or foreign `reward_ref` → 403 `second_chance_unavailable`.
 
 **Push notifications** (Expo push service):
 - `PUT /me/push-token` (auth) — Body: `token` (Expo push token `ExponentPushToken[...]`), `platform`.
@@ -445,7 +469,31 @@ Custom data in the ad request: `session_id`.
   when older than 12 h): `goal_reached` (cooperation target reached / race winner), `period_closed` (results),
   `family_activity` (a member finished a session, max 1 per member per hour, not to themself),
   `daily_reminder` (at `reminder_time` if the member hasn't played today). Push `data`:
-  `{ "type": "goal_reached", "goal_id": 2, "period_id": 31 }` (goal types carry `goal_id` + `period_id`) so the app can deep-link.
+  `{ "type": "goal_reached", "goal_id": 2, "period_id": 31 }` (goal types carry `goal_id` + `period_id`;
+  `family_activity`: `{ type, member_id, session_id }`; `daily_reminder`: `{ type }`) so the app can deep-link.
+
+### Legal, consent and privacy (B9)
+Drafts of the privacy policy and terms are served by the backend and **must be reviewed by a lawyer
+before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=false`).
+- `GET /legal` (public) → `{ "data": { "terms": { "version": "2026-10-16", "url": "https://.../legal/terms" },
+  "privacy": { "version": "2026-10-16", "url": "https://.../legal/privacy" } } }`. Pages at `/legal/terms`
+  and `/legal/privacy` (HTML, `?lang=fr` for French).
+- `POST /auth/register` and adult `POST /auth/social/{provider}` sign-ups require `accept_terms: true`
+  (422 on `accept_terms` otherwise); the server records a consent row (user, type `terms`+`privacy`,
+  versions, time, IP hash). Joining by invite as an adult with email (`/auth/join` with email) also
+  needs `accept_terms: true`.
+- **Parental consent:** `POST /family/invites` for a nickname/birth date in a band with `is_child`
+  requires `parental_consent: true` (422 on `parental_consent` otherwise) — the admin confirms they are
+  the parent/guardian (or have their permission) and agrees to the child's data being processed as
+  described in the privacy policy. Recorded as a consent row (type `parental`, admin, child invite →
+  member once joined, policy version, time).
+- `GET /me` gains `legal: { "needs_acceptance": false, "terms_version": "...", "privacy_version": "..." }`
+  — `needs_acceptance` is true for adults whose last accepted versions are older than the current
+  ones. `POST /me/legal-acceptance` (auth) — Body: `terms_version, privacy_version` (must equal the
+  current ones) → 204. Children never see this (their parent consented).
+- `GET /me/export` (auth, adults) → a JSON download of the user's own data (profile, memberships,
+  points ledger rows, sessions summary, goals participation, consents, devices without tokens) —
+  right of access (PIPEDA / Quebec Law 25 / GDPR-style). Rate-limited (1 per hour).
 
 ## Changelog
 - 2026-10-10 — Initial contract for B1–B5 / F1–F3.
@@ -473,3 +521,8 @@ Custom data in the ad request: `session_id`.
 - 2026-10-15 — Account deletion: `GET /me/deletion-check`, `DELETE /me`, `DELETE /family`, child erasure on member removal, Apple `authorization_code` for token revocation; error `family_owner_cannot_leave`.
 - 2026-10-16 — Account deletion: blocker `child_account` (children and teens; `DELETE /me` → 403); `DELETE /family` non-owner → 403; deleted families are kept as anonymised rows.
 - 2026-10-16 — `DELETE /family` erases members without their own login (no email, no social account), not only children.
+- 2026-10-16 — Member gains `has_own_login`; purchase flow notes; `POST /family/subscription/sync`.
+- 2026-10-16 — Rewarded ads: app-generated `reward_ref` in AdMob SSV custom data (`<reward_ref>:<session_id>`), SSV webhook under `/api/v1/webhooks/admob-ssv`, 409 `ad_reward_pending`.
+- 2026-10-16 — B9 legal: `GET /legal`, terms/privacy pages, `accept_terms` on sign-ups, `parental_consent` on child invites, `me.legal` + `POST /me/legal-acceptance`, `GET /me/export`.
+- 2026-10-16 — Policy gains `ad_request` (non_personalized, under_age_of_consent, max_ad_content_rating).
+- 2026-10-16 — SSV: `ssv_signature_invalid` (400), 200 body with `outcome`; ad second chance needs `reward_ref` (422); push `data` for `family_activity` / `daily_reminder`.

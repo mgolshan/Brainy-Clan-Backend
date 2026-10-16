@@ -2,6 +2,7 @@
 
 namespace App\Modules\Play\Actions;
 
+use App\Modules\Billing\Models\AdReward;
 use App\Modules\Core\Exceptions\ApiException;
 use App\Modules\Play\Models\PlaySession;
 use App\Modules\Play\Models\SecondChance;
@@ -12,7 +13,9 @@ use Illuminate\Support\Facades\DB;
  * Second chance after hitting the blunder cap: `free` (Family plan, limited per day) or `ad`
  * (rewarded ad, free tier, never for children). Resets mistakes and tops up items.
  *
- * Ad rewards: `reward_ref` is recorded but not verified yet (server-side verification in B8).
+ * Ad rewards (docs/API.md "Rewarded ads"): `reward_ref` must match an unused {@see AdReward} that
+ * AdMob's server-side verification stored for this member and session; it is consumed (`used_at`).
+ * No reward with that ref yet → 409 `ad_reward_pending` (callback in flight); used or foreign → 403.
  */
 class GrantSecondChance
 {
@@ -47,6 +50,10 @@ class GrantSecondChance
                 });
             }
 
+            if ($method === SecondChance::METHOD_AD) {
+                $this->consumeAdReward($session, $rewardRef);
+            }
+
             SecondChance::query()->create([
                 'play_session_id' => $session->id,
                 'member_id' => $session->member_id,
@@ -65,5 +72,28 @@ class GrantSecondChance
 
             return $session;
         });
+    }
+
+    private function consumeAdReward(PlaySession $session, ?string $rewardRef): void
+    {
+        if ($rewardRef === null || $rewardRef === '') {
+            throw ApiException::validation('reward_ref', 'The reward ref is required for an ad second chance.');
+        }
+
+        $rewards = AdReward::query()->where('reward_ref', $rewardRef)->lockForUpdate()->get();
+
+        if ($rewards->isEmpty()) {
+            throw ApiException::adRewardPending();
+        }
+
+        $reward = $rewards->first(fn (AdReward $reward): bool => $reward->used_at === null
+            && $reward->member_id === $session->member_id
+            && $reward->play_session_id === $session->id);
+
+        if ($reward === null) {
+            throw ApiException::secondChanceUnavailable('This ad reward was already used or belongs to another member or session.');
+        }
+
+        $reward->forceFill(['used_at' => now()])->save();
     }
 }

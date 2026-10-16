@@ -7,19 +7,24 @@ use App\Filament\Resources\Families\Pages\ListFamilies;
 use App\Filament\Resources\Families\Pages\ViewFamily;
 use App\Filament\Resources\Families\RelationManagers\AllMembersRelationManager;
 use App\Filament\Resources\Families\RelationManagers\InvitesRelationManager;
+use App\Modules\Billing\Models\Subscription;
 use App\Modules\Family\Models\Family;
 use BackedEnum;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 /**
@@ -56,7 +61,39 @@ class FamilyResource extends Resource
             TextEntry::make('timezone'),
             TextEntry::make('country_code'),
             TextEntry::make('created_at')->dateTime(),
+            Section::make('Subscription')
+                ->description('Read-only: set by RevenueCat webhooks, the app sync and the hourly reconciliation. Webhooks are under Billing → Webhook events.')
+                ->columnSpanFull()->columns(4)
+                ->schema([
+                    TextEntry::make('subscription.status')->label('Status')->badge()->default(Subscription::STATUS_NONE)
+                        ->color(fn (string $state): string => match ($state) {
+                            Subscription::STATUS_ACTIVE => 'success',
+                            Subscription::STATUS_GRACE => 'warning',
+                            Subscription::STATUS_EXPIRED => 'danger',
+                            default => 'gray',
+                        }),
+                    TextEntry::make('subscription.store')->label('Store')->placeholder('—'),
+                    TextEntry::make('subscription.product_id')->label('Product')->placeholder('—'),
+                    TextEntry::make('subscription.environment')->label('Environment')->placeholder('—'),
+                    TextEntry::make('subscription.expires_at')->label('Expires')->dateTime()->placeholder('—'),
+                    TextEntry::make('subscription.grace_expires_at')->label('Grace period ends')->dateTime()->placeholder('—'),
+                    IconEntry::make('subscription.will_renew')->label('Will renew')->boolean(),
+                    TextEntry::make('subscription.last_event_type')->label('Last event')->placeholder('—'),
+                    TextEntry::make('revenuecat_app_user_id')->label('RevenueCat app user id')
+                        ->state(fn (Family $record): string => 'family-'.$record->id)->copyable(),
+                    TextEntry::make('subscription.updated_at')->label('Updated')->dateTime()->placeholder('—'),
+                ]),
         ]);
+    }
+
+    /**
+     * View/edit pages load the owner and the subscription with the record.
+     *
+     * @return Builder<Model>
+     */
+    public static function getRecordRouteBindingEloquentQuery(): Builder
+    {
+        return parent::getRecordRouteBindingEloquentQuery()->with(['owner', 'subscription']);
     }
 
     public static function table(Table $table): Table

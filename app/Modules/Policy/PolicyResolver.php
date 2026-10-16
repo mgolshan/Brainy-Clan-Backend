@@ -106,6 +106,7 @@ class PolicyResolver
                 'ad_allowed' => $adsAllowed,
                 'redemption_allowed' => $this->redemptionAllowed($band, $tier),
             ],
+            'ad_request' => $this->adRequest($band),
             'limits' => [
                 'max_members' => (int) $this->setting('limits.max_members', $tier, $band?->code),
                 'max_categories' => (int) $this->setting('limits.max_categories', $tier, $band?->code),
@@ -331,6 +332,24 @@ class PolicyResolver
     {
         return (bool) ($band?->rule('ads_allowed') ?? false)
             && (bool) $this->setting('ads.enabled', $tier, $band->code);
+    }
+
+    /**
+     * How the app must request rewarded ads (AdMob request configuration), from the band policy
+     * `ad_request`. Missing values fall back to non-personalized ads rated G; `under_age_of_consent`
+     * is set per band (seeded: teen true).
+     *
+     * @return array{non_personalized: bool, under_age_of_consent: bool, max_ad_content_rating: string}
+     */
+    public function adRequest(?AgeBand $band): array
+    {
+        $rating = $band?->rule('ad_request.max_ad_content_rating');
+
+        return [
+            'non_personalized' => (bool) ($band?->rule('ad_request.non_personalized') ?? true),
+            'under_age_of_consent' => (bool) ($band?->rule('ad_request.under_age_of_consent') ?? false),
+            'max_ad_content_rating' => is_string($rating) && in_array($rating, AgeBand::AD_CONTENT_RATINGS, true) ? $rating : 'G',
+        ];
     }
 
     private function redemptionAllowed(?AgeBand $band, string $tier): bool

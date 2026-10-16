@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Billing\Models\AdReward;
 use App\Modules\Content\Models\Category;
 use App\Modules\Content\Models\ContentItem;
 use App\Modules\Family\Models\FamilyMember;
@@ -242,11 +243,14 @@ it('grants an ad second chance to a free-tier adult and records the reward ref',
     [$member, $category] = playSetup('free');
     $id = startSession($category)['session']['id'];
     failSession($id);
+    // Stored by AdMob's server-side verification callback (see AdRewardsTest).
+    $reward = AdReward::factory()->create(['reward_ref' => 'admob-123', 'member_id' => $member->id, 'play_session_id' => $id]);
 
     $this->postJson("/api/v1/play/sessions/{$id}/second-chance", ['method' => 'ad', 'reward_ref' => 'admob-123'])
         ->assertOk()->assertJsonPath('data.session.status', 'active');
 
-    expect(SecondChance::query()->where('member_id', $member->id)->value('reward_ref'))->toBe('admob-123');
+    expect(SecondChance::query()->where('member_id', $member->id)->value('reward_ref'))->toBe('admob-123')
+        ->and($reward->fresh()?->used_at)->not->toBeNull();
 });
 
 it('never offers ads to children', function () {

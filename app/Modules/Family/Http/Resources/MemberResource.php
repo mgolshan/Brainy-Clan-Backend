@@ -59,6 +59,8 @@ class MemberResource extends JsonResource
             'has_password' => $this->when($showPrivate, $member->user->password !== null),
             // From the band already resolved above (cached policy snapshot): no extra query per member.
             'email_login_allowed' => $this->when($showPrivate, $policy->emailLoginAllowed($band)),
+            // Lists load `user` with `withExists('socialAccounts')`: no query per member.
+            'has_own_login' => $this->when($showPrivate, fn (): bool => $member->user->hasOwnLogin()),
         ];
     }
 

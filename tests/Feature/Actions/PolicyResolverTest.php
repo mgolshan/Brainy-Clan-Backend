@@ -96,3 +96,28 @@ it('derives play rules from settings', function () {
 
     expect(resolver()->playRules($owner))->toBe(['target_points' => 10, 'blunder_cap' => 3, 'redemption_items' => 3]);
 });
+
+it('tells the app how to request ads per band (ad_request)', function () {
+    $owner = familyOwner();
+    $teen = addMember($owner->family, 15);
+    $kid = addMember($owner->family, 9);
+    $senior = addMember($owner->family, 70);
+
+    expect(resolver()->forMember($teen)['ad_request'])->toBe(['non_personalized' => true, 'under_age_of_consent' => true, 'max_ad_content_rating' => 'G'])
+        ->and(resolver()->forMember($owner)['ad_request'])->toBe(['non_personalized' => true, 'under_age_of_consent' => false, 'max_ad_content_rating' => 'G'])
+        ->and(resolver()->forMember($kid)['ad_request']['under_age_of_consent'])->toBeFalse()
+        ->and(resolver()->forMember($senior)['ad_request']['under_age_of_consent'])->toBeFalse();
+});
+
+it('reads ad_request from the band policy with strict fallbacks', function () {
+    $band = AgeBand::factory()->create(['code' => 'adult', 'country_code' => 'FR', 'min_age' => 18, 'max_age' => null, 'policy' => [
+        'ad_request' => ['non_personalized' => false, 'under_age_of_consent' => true, 'max_ad_content_rating' => 'T'],
+    ]]);
+    $noRules = AgeBand::factory()->create(['code' => 'adult', 'country_code' => 'IT', 'min_age' => 18, 'max_age' => null, 'policy' => [
+        'ad_request' => ['max_ad_content_rating' => 'X'],
+    ]]);
+
+    expect(resolver()->adRequest($band))->toBe(['non_personalized' => false, 'under_age_of_consent' => true, 'max_ad_content_rating' => 'T'])
+        ->and(resolver()->adRequest($noRules))->toBe(['non_personalized' => true, 'under_age_of_consent' => false, 'max_ad_content_rating' => 'G'])
+        ->and(resolver()->adRequest(null))->toBe(['non_personalized' => true, 'under_age_of_consent' => false, 'max_ad_content_rating' => 'G']);
+});

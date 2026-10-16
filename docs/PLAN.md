@@ -55,6 +55,13 @@ as written there; if something must change, update `docs/API.md` first and note 
   `points` (Sudoku 3/5/8 by size, word search 3, others 1); batches are sized so the target stays
   reachable within the blunder cap. Free-tier category order: Geography, Science, Wisdom (free),
   then Math Sprint, Sudoku, Word Puzzles, History, Vocabulary.
+- **Rewarded-ad verification (2026-10-16):** AdMob's `transaction_id` is only visible server-side,
+  so the app generates its own `reward_ref` and passes it as SSV custom data; the SSV webhook stores
+  the reward and the second chance must present a matching, unused `reward_ref` (409
+  `ad_reward_pending` while the callback is in flight). See `docs/API.md` → Rewarded ads.
+- **Tier switches only via the server (2026-10-16):** after a purchase the app polls; an admin-only
+  `POST /family/subscription/sync` pulls the subscriber from the RevenueCat REST API when a key is
+  configured, plus a scheduled reconciliation for subscriptions whose expiry passed without a webhook.
 - **Full API documentation with Scramble (2026-10-11, requested by Moe):** every endpoint is
   documented with [Scramble](https://scramble.dedoc.co) (`dedoc/scramble`, free, MIT). It
   generates an OpenAPI 3.1 spec from the code itself (routes, Form Requests, API Resources), so
@@ -181,8 +188,16 @@ as written there; if something must change, update `docs/API.md` first and note 
 - Push tokens, reminders, family activity alerts, quiet hours.
 
 ### B9 — Production
-- Production Docker image, Hetzner VPS, HTTPS, backups, Sentry, Horizon supervision.
-- Privacy policy and parental consent support in the API.
+- Production Docker image (multi-stage, OPcache on, no dev deps), `docker-compose.prod.yml` with
+  Caddy (automatic HTTPS), MySQL, Redis, Horizon, scheduler; health checks and restart policies.
+- Backups: nightly `mysqldump` (compressed, encrypted) to an off-site target (Hetzner Storage Box or
+  S3-compatible), retention 14 days, restore drill documented.
+- Sentry (`sentry/sentry-laravel`, approved in the design doc) with PII scrubbing (no child data).
+- Step-by-step deploy guide for Moe: Hetzner VPS sizing (CX22 ≈ €5/month fits the budget), SSH keys,
+  firewall, Docker install, DNS for brainyclan.app, `.env` for production, first deploy, updates,
+  rollbacks, monitoring.
+- Privacy policy, terms and parental consent support in the API per `docs/API.md` "Legal, consent
+  and privacy (B9)" — drafts must be reviewed by a lawyer before store submission.
 
 ## Open questions
 - Whether teens on the free tier see rewarded ads.

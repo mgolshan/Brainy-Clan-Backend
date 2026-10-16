@@ -41,7 +41,8 @@ function qcQueries(FamilyMember $member, string $url): int
 }
 
 /**
- * A family-tier family with `$rows` extra members, each with ledger points and a device.
+ * A family-tier family with `$rows` extra members, each with ledger points and a device; every
+ * other adult signs in with a social account only (`has_own_login` without an email).
  */
 function qcFamily(int $rows, ?Category $category = null): FamilyMember
 {
@@ -51,6 +52,12 @@ function qcFamily(int $rows, ?Category $category = null): FamilyMember
     for ($i = 0; $i < $rows; $i++) {
         $member = addMember($owner->family, $i % 2 === 0 ? 9 : 30);
         Device::factory()->create(['user_id' => $member->user_id]);
+
+        if ($i % 4 === 1) {
+            $member->user->forceFill(['email' => null, 'password' => null])->save();
+            SocialAccount::factory()->create(['user_id' => $member->user_id]);
+        }
+
         app(AppendPoints::class)->handle($owner->family_id, $member->id, $category->id, $i + 1, PointEntry::REASON_CORRECT_ANSWER);
     }
 

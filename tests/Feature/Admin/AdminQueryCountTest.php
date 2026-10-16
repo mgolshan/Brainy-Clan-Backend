@@ -5,6 +5,10 @@ use App\Filament\Resources\Families\RelationManagers\AllMembersRelationManager;
 use App\Filament\Resources\Families\RelationManagers\InvitesRelationManager;
 use App\Filament\Resources\GoalPlans\Pages\ViewGoalPlan;
 use App\Filament\Resources\GoalPlans\RelationManagers\PeriodsRelationManager;
+use App\Filament\Resources\WebhookEvents\Pages\ListWebhookEvents;
+use App\Filament\Resources\WebhookEvents\WebhookEventResource;
+use App\Modules\Billing\Models\Subscription;
+use App\Modules\Billing\Models\WebhookEvent;
 use App\Modules\Content\Models\Category;
 use App\Modules\Content\Models\ContentBatch;
 use App\Modules\Content\Models\ContentItem;
@@ -51,6 +55,10 @@ function adminFamily(int $members): FamilyMember
         SignInCode::factory()->create(['member_id' => $member->id]);
         ContentItem::factory()->create(['category_id' => $category->id, 'content_batch_id' => $batch->id])->tags()->attach($tag);
     }
+
+    Subscription::factory()->create(['family_id' => $owner->family_id]);
+    WebhookEvent::factory()->count($members)->create(['family_id' => $owner->family_id, 'type' => 'RENEWAL', 'outcome' => WebhookEvent::OUTCOME_APPLIED]);
+    WebhookEvent::factory()->create(['family_id' => null, 'outcome' => WebhookEvent::OUTCOME_IGNORED]);
 
     $plan = GoalPlan::factory()->create(['family_id' => $owner->family_id, 'name' => 'Plan '.$owner->family_id]);
     $plan->categories()->attach($category->id);
@@ -108,6 +116,7 @@ it('renders every admin list page with several rows', function (string $url) {
     '/admin/settings',
     '/admin/challenge-types',
     '/admin/activities',
+    '/admin/webhook-events',
 ]);
 
 it('keeps the busiest admin tables at a constant number of queries', function (string $url) {
@@ -125,6 +134,7 @@ it('keeps the busiest admin tables at a constant number of queries', function (s
     '/admin/content-batches',
     '/admin/tags',
     '/admin/activities',
+    '/admin/webhook-events',
 ]);
 
 it('shows members with email login and devices, and invites, on the family page', function () {
@@ -194,4 +204,43 @@ it('lets support find and open plans a family deleted', function () {
 
     $this->get('/admin/goal-plans')->assertOk()->assertDontSee($plan->name);
     $this->get("/admin/goal-plans/{$plan->id}")->assertOk()->assertSee($plan->name);
+});
+
+it('shows the subscription read-only on the family page', function () {
+    $owner = adminFamily(1);
+    Subscription::query()->where('family_id', $owner->family_id)->update(['product_id' => 'brainy_family_yearly', 'status' => Subscription::STATUS_GRACE]);
+
+    $this->get("/admin/families/{$owner->family_id}")->assertOk()
+        ->assertSee('Subscription')
+        ->assertSee('grace')
+        ->assertSee('brainy_family_yearly')
+        ->assertSee('family-'.$owner->family_id);
+
+    $neverSubscribed = familyOwner();
+    $this->get("/admin/families/{$neverSubscribed->family_id}")->assertOk()->assertSee('none');
+});
+
+it('lists webhook events with provider and outcome filters and shows the payload', function () {
+    $owner = adminFamily(2);
+    $applied = WebhookEvent::query()->where('outcome', WebhookEvent::OUTCOME_APPLIED)->get();
+    $ignored = WebhookEvent::query()->where('outcome', WebhookEvent::OUTCOME_IGNORED)->get();
+
+    Livewire::test(ListWebhookEvents::class)
+        ->assertCanSeeTableRecords($applied->merge($ignored))
+        ->filterTable('outcome', WebhookEvent::OUTCOME_IGNORED)
+        ->assertCanSeeTableRecords($ignored)
+        ->assertCanNotSeeTableRecords($applied)
+        ->resetTableFilters()
+        ->filterTable('provider', WebhookEvent::PROVIDER_REVENUECAT)
+        ->assertCanSeeTableRecords($applied);
+
+    $event = $applied->first();
+    $this->get("/admin/webhook-events/{$event->id}")->assertOk()
+        ->assertSee($event->event_id)
+        ->assertSee($owner->family->name)
+        ->assertSee('&quot;api_version&quot;: &quot;1.0&quot;', false);
+
+    expect(WebhookEventResource::canCreate())->toBeFalse()
+        ->and(WebhookEventResource::canEdit($event))->toBeFalse()
+        ->and(WebhookEventResource::canDelete($event))->toBeFalse();
 });

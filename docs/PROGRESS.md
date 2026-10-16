@@ -21,12 +21,22 @@ Milestones are defined in `docs/PLAN.md`.
 | B6b Social sign-in (Google, Facebook) | Done | Socialite 5.31, `social_accounts`, verifiers (Google ID token via JWKS, Facebook `debug_token` + `/me`), sign-in/link/unlink/list, Filament column, README setup guide, Pest + live smoke test. Needs real Google/Facebook IDs to try end to end |
 | B6c Sign in with Apple | Done | **Account deletion + Apple token revocation done** (session 12): `GET /me/deletion-check`, `DELETE /me`, `DELETE /family`, child erasure on member removal, one `EraseUser` action, `AppleTokenClient` (code exchange + revoke, ES256 client secret, skipped without keys), 12 Pest tests. **Sign-in done** (session 9): `AppleIdTokenVerifier` (JWKS `appleid.apple.com/auth/keys`, cached + refetch on unknown kid, `iss`, `aud` ∈ `APPLE_CLIENT_IDS`, `exp`, optional `nonce` = sha256 hex), provider `apple` on `/auth/social/{provider}` and `/me/social-accounts/{provider}`, `display_name` from the app (fallback "Player", never a private relay), Filament column "Social sign-in", README "Sign in with Apple — setup", Pest + live curl. |
 | B7 Remaining launch content | In progress | Sudoku + Math Sprint generated per session, Word Puzzles seeded, item `points`, Filament preview + category generators; **AI batch generator done** (Laravel AI SDK, Horizon `ai` queue, review/approve page; needs `ANTHROPIC_API_KEY` to run for real). Left: content for all 8 categories (generate + review batches) |
-| B8 Billing, ads and notifications | In progress | **Billing core done** (session 8): `BillingServiceProvider`, `POST /api/v1/webhooks/revenuecat` (Bearer secret, idempotent via `webhook_events`, stale/out-of-order guard, `ApplyRevenueCatEvent` sets the family `tier`), `GET /family/subscription` (admin), factories, fixtures + 13 Pest tests, live smoke test. Dev DB migrated. Not touched in session 9. **Push token + notification preferences done** (session 10: `Notifications` module, 13 Pest tests). **Sending started** (session 11: Expo sender, `SendMemberNotification`, `goal_reached` / `period_closed` listeners, 7 Pest tests). **Left:** `family_activity`, `daily_reminder`, AdMob SSV / rewarded-ad second chance, Filament subscription view (see Next up) |
+| B8 Billing, ads and notifications | Done | Billing core (s8), push token + preferences (s10), sending + goal notifications (s11); **session 13:** `has_own_login`, `family_activity` (1/member/hour), `daily_reminder` (every 15 min, family tz), `POST /family/subscription/sync` (RevenueCat REST v1), hourly reconciliation, AdMob SSV (`ad_rewards`, ECDSA) + ad second chance (409 `ad_reward_pending`), Policy `ad_request`, Filament subscription section + Webhook events, README setup guide. Needs real RevenueCat/AdMob accounts to try end to end |
 | B9 Production | Not started | |
 
 ## Next up
 
-0. **State at last stop (session 12, 2026-10-16):** B6c **account deletion done** (see log). Migration
+0. **State at last stop (session 13, 2026-10-16):** **B8 done** (see log): `has_own_login`, `family_activity`,
+   `daily_reminder`, Filament subscription + webhook events, subscription sync + reconciliation, AdMob SSV +
+   `ad_rewards` + ad second chance, Policy `ad_request`, README setup guide. Dev DB: `migrate` (1 migration,
+   `ad_rewards`) + `PolicySeeder` re-run (no fresh). **Next:** B9 / content (AI generator needs the key). To try
+   billing/ads for real Moe follows README "Subscriptions, rewarded ads and push — setup" (needs RevenueCat, App
+   Store / Play products, AdMob units on a public host). Contract additions for docs/API.md (coordinator):
+   error `ssv_signature_invalid` (400) on the SSV webhook; SSV 200 body `{ data: { transaction_id, outcome:
+   stored|duplicate|ignored } }`; `reward_ref` missing on `method: "ad"` → 422 `validation_failed`;
+   `family_activity` push `data` `{ type, member_id, session_id }`; `daily_reminder` `data` `{ type }`.
+   Optional later: Expo receipts check (`/push/getReceipts`).
+   Previous: **State at last stop (session 12, 2026-10-16):** B6c **account deletion done** (see log). Migration
    `2026_10_16_100000_add_account_deletion_fields` run on the dev DB (`migrate`, no fresh). B8 `family_activity` /
    `daily_reminder` **not started** (time budget). **Next, in order:** B8 item 3 rest (a below), then b, c.
    Contract additions to confirm in docs/API.md: blocker `child_account` + 403 `forbidden` on `DELETE /me` for
@@ -280,7 +290,75 @@ curl http://localhost:8080/api/v1/health
 - Deploy: `composer dump-autoload -o`, clear `/tmp/opcache/*`, `php artisan config:cache`, restart app + horizon
   (new queued listeners/job). Optional `.env`: `EXPO_ACCESS_TOKEN` (only if "enhanced push security" is on in Expo).
 
+## How to test (B8 — finish: activity/reminders, sync, reconciliation, AdMob SSV, admin)
+
+- Tests: `docker compose exec app php artisan test --compact tests/Feature/Api/PushNotificationsTest.php
+  tests/Feature/Api/SubscriptionSyncTest.php tests/Feature/Api/AdRewardsTest.php tests/Feature/Admin/AdminQueryCountTest.php`
+  (RevenueCat client, AdMob keys and Expo sender are faked; the SSV signature is made with a generated P-256 key).
+- Deploy: `composer dump-autoload -o`, `php artisan migrate` (`ad_rewards`), `php artisan db:seed --class=PolicySeeder`
+  (`ad_request`), clear `/tmp/opcache/*`, `php artisan config:cache`, `docker compose restart app horizon scheduler`.
+- Scheduler: `php artisan schedule:list` shows `notifications:daily-reminders` (every 15 min) and
+  `billing:reconcile-subscriptions` (hourly); both can be run by hand.
+- Live: `GET /api/v1/me` as Mom → `data.member.has_own_login: true`; `POST /api/v1/family/subscription/sync` as Mom →
+  current state (no `REVENUECAT_API_KEY` locally); `GET /api/v1/webhooks/admob-ssv?...&signature=AAAA&key_id=1` → 400
+  `ssv_signature_invalid`. Admin: Families → (family) → *Subscription* section; Billing → Webhook events.
+
 ## Log
+
+### 2026-10-16 (session 13: B8 finish — activity/reminders, billing sync + reconciliation, AdMob SSV, admin)
+
+- **Member `has_own_login`** (self/admin only): `User::hasOwnLogin()` (email or a linked social account; reads an
+  eager-loaded `withExists('socialAccounts')`), used by `isChildAccount()` too. `GET /family` and member updates load
+  `user` with `withExists('socialAccounts')`; `QueryCountTest` now has social-only adults (no email) in the family list.
+- **`family_activity`**: queued `Notifications\Listeners\NotifyFamilyActivity` on `Play\Events\SessionCompleted` →
+  other active members (not the finisher) through `SendMemberNotification` (prefs + quiet hours). Throttle: atomic
+  `Cache::add("notifications:family_activity:{member}", …, 3600)` = max 1 per finishing member per hour (only taken when
+  there is someone to notify). Push data `{ type, member_id, session_id }`. Two queries regardless of family size.
+- **`daily_reminder`**: `Notifications\Actions\SendDailyReminders` + `notifications:daily-reminders`, scheduled
+  `everyFifteenMinutes()->withoutOverlapping()->onOneServer()`. Members with saved preferences (the type is off by
+  default), chunked 500; per chunk: effective prefs (1 query), reminder time in the current local 15-minute window
+  (`[17:00, 17:15)`, works for +5:30/+5:45 zones and DST), not started a session since the family's local midnight
+  (1 grouped query), `Cache::add` guard per member per local day (no double reminders on re-runs). Tests cover
+  Toronto after-midnight-UTC, Kathmandu/Kolkata, the Berlin DST switch and constant query counts.
+- **Billing**: one tier switch for all paths, `Billing\Actions\ApplyFamilyTier` (saves the subscription, sets
+  `family`/`free`, dispatches `Billing\Events\SubscriptionChanged` with `source` webhook|sync|reconcile);
+  `ApplyRevenueCatEvent` uses it. `Billing\Contracts\RevenueCatClient` + `HttpRevenueCatClient` (REST v1
+  `GET /subscribers/{app_user_id}`, Bearer `REVENUECAT_API_KEY`). `SyncSubscription` maps the `family` entitlement
+  (active / grace on billing issue / expired; store, product, sandbox, will_renew) and counts as the newest event
+  (`last_event_type` `SYNC`; older webhooks delivered later are `stale`); without a key or on an API error nothing
+  changes. `POST /family/subscription/sync` (admin) returns the same shape as GET. `ReconcileSubscriptions` +
+  `billing:reconcile-subscriptions` (hourly): `active` past `expires_at` / `grace` past `grace_expires_at` by more than
+  `REVENUECAT_RECONCILE_AFTER_MINUTES` (60) → with a key re-synced from RevenueCat (missed RENEWAL stays paid; API down
+  → next run), without a key marked `expired` + tier `free`.
+- **AdMob SSV**: `GET /api/v1/webhooks/admob-ssv` (`AdMobSsvController` → `RecordAdReward`). `AdMobSignatureVerifier`:
+  signed content = raw `QUERY_STRING` up to `&signature=`, web-safe base64 DER signature, `openssl_verify` SHA-256 with
+  the key's PEM; keys from `Billing\Contracts\AdMobVerifierKeys` (`HttpAdMobVerifierKeys`: gstatic JSON, cached 24 h,
+  refetched once for an unknown `key_id`). 400 `ssv_signature_invalid`; 200 `stored` / `duplicate` (unique
+  `transaction_id`) / `ignored` (no usable custom data, unknown member/session — e.g. AdMob's "Verify URL").
+  New table `ad_rewards` (transaction_id unique, reward_ref, member, session, ad_unit, reward item/amount, payload,
+  used_at) + model/factory. `GrantSecondChance` `ad`: policy `ad_allowed` first (403), then `reward_ref` required (422),
+  no reward row → 409 `ad_reward_pending`, used/foreign member/other session → 403, else consumed (`used_at`) under a row
+  lock.
+- **Policy `ad_request`** (coordinator request): `PolicyResolver::adRequest()` from the band policy (fallback
+  non-personalized, rating G, not under age of consent); seeded teen `under_age_of_consent: true`; AgeBand admin form
+  section "Ad requests (AdMob)". `AgeBand::AD_CONTENT_RATINGS` = G, PG, T, MA.
+- **Filament**: family view page has a read-only *Subscription* section (status badge, store, product, environment,
+  expiry, grace, will renew, last event, RevenueCat app user id); record loaded with `owner` + `subscription`.
+  New **Billing → Webhook events** resource (list with provider/outcome filters, family eager-loaded; view page with
+  the pretty-printed payload; no create/edit/delete). Added to the admin render + constant-query tests.
+- README "Subscriptions, rewarded ads and push — setup" (RevenueCat project/products/entitlement/webhook/API key,
+  AdMob SSV URL + test units, Expo) and `.env.example` keys (`REVENUECAT_API_KEY`, `REVENUECAT_API_URL`,
+  `REVENUECAT_RECONCILE_AFTER_MINUTES`, `ADMOB_SSV_KEYS_URL`, `EXPO_ACCESS_TOKEN`; placeholders only). Fixed the stale
+  "account deletion not built" note in the Apple section.
+- Scramble: new endpoints documented under the Billing tag (SSV query parameters, `ssv_signature_invalid`,
+  `ad_reward_pending` on second chance); `ErrorCodes` gained both codes.
+- HTTP clients (AdMob keys, RevenueCat) catch `ConnectionException` (found in the live smoke test: the dev container
+  has no CA bundle for outbound HTTPS → cURL error 60 → was a 500; now SSV 400 / sync returns the current state). Note:
+  the existing Expo sender has the same gap (a failed connection fails the queued job, which Horizon retries).
+- Verified: full suite 432 passed (then +2 connection-failure tests, targeted files green), Pint, PHPStan clean.
+  Live: SSV bad signature → 400 `ssv_signature_invalid`; `POST /family/subscription/sync` as Mom → current state
+  (demo family: tier family, status none); `GET /me` → `has_own_login: true`, `policy.ad_request`; `/docs/api.json` 200;
+  `schedule:list` shows both new commands.
 
 ### 2026-10-16 (session 12: B6c account deletion + Apple token revocation)
 

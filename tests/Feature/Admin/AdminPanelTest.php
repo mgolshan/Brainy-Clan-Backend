@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Resources\AgeBands\Pages\EditAgeBand;
 use App\Modules\ChallengeTypes\Generators\WordSearchBuilder;
 use App\Modules\Content\Models\Category;
 use App\Modules\Content\Models\ContentItem;
@@ -8,6 +9,7 @@ use App\Modules\Goals\Models\GoalPlan;
 use App\Modules\Identity\Models\User;
 use App\Modules\Policy\Models\AgeBand;
 use App\Modules\Policy\Models\Setting;
+use Livewire\Livewire;
 
 it('keeps non-staff users out of the admin', function () {
     $this->actingAs(User::factory()->create())->get('/admin')->assertForbidden();
@@ -75,4 +77,17 @@ it('previews B7 types: word puzzles, generated samples and category generators',
     $this->actingAs($staff)->get('/admin/content-preview?sample=math-fractions&difficulty=6')->assertOk()->assertSee('fraction');
     $this->actingAs($staff)->get("/admin/categories/{$category->id}/edit")->assertOk();
     $this->actingAs($staff)->get('/admin/categories')->assertOk()->assertSee('sudoku 6');
+});
+
+it('edits a band\'s ad request configuration', function () {
+    $this->actingAs(User::factory()->staff()->create());
+    $teen = AgeBand::query()->where('code', 'teen')->firstOrFail();
+
+    Livewire::test(EditAgeBand::class, ['record' => $teen->getRouteKey()])
+        ->assertFormSet(['policy.ad_request.under_age_of_consent' => true, 'policy.ad_request.max_ad_content_rating' => 'G'])
+        ->fillForm(['policy.ad_request.max_ad_content_rating' => 'PG', 'policy.ad_request.non_personalized' => false])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($teen->fresh()->rule('ad_request'))->toBe(['non_personalized' => false, 'under_age_of_consent' => true, 'max_ad_content_rating' => 'PG']);
 });

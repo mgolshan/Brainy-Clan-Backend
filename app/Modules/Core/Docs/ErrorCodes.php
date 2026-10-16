@@ -11,6 +11,7 @@ final class ErrorCodes
      * @var array<string, array{status: int, meaning: string}>
      */
     public const array ALL = [
+        'ssv_signature_invalid' => ['status' => 400, 'meaning' => 'AdMob server-side verification callback with a missing or bad signature'],
         'validation_failed' => ['status' => 422, 'meaning' => 'Field errors in `errors`'],
         'unauthenticated' => ['status' => 401, 'meaning' => 'Missing/invalid token'],
         'invalid_credentials' => ['status' => 401, 'meaning' => 'Wrong email/password'],
@@ -28,6 +29,7 @@ final class ErrorCodes
         'family_owner_cannot_leave' => ['status' => 409, 'meaning' => 'The family owner must delete the family (or be its only member) to delete their account'],
         'session_not_active' => ['status' => 409, 'meaning' => 'Play session is not in a state that allows this action'],
         'item_already_answered' => ['status' => 409, 'meaning' => 'Session item was already answered'],
+        'ad_reward_pending' => ['status' => 409, 'meaning' => 'Rewarded-ad callback not received yet — retry shortly'],
         'invite_invalid' => ['status' => 422, 'meaning' => 'Invite code unknown, used or expired'],
         'sign_in_code_invalid' => ['status' => 422, 'meaning' => 'Sign-in code unknown, used or expired'],
         'social_signup_incomplete' => ['status' => 422, 'meaning' => 'New social account: birth year/month needed (adult check)'],

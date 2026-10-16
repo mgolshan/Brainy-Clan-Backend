@@ -437,8 +437,100 @@ Link / unlink for a signed-in adult: `POST` / `DELETE /api/v1/me/social-accounts
 `token`, optional `nonce`). The admin shows linked Apple accounts under Families → Members → *Social sign-in*.
 Code: `app/Modules/Identity/Social/AppleIdTokenVerifier.php` (shares `JwksIdTokenVerifier` with Google).
 
-**Not built yet:** account deletion (`DELETE /me`) with Apple token revocation — required before App
-Store submission (see `docs/PROGRESS.md` Next up).
+**Account deletion** (`DELETE /me`, `DELETE /family`) revokes Apple tokens when `APPLE_TEAM_ID`,
+`APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` are set (built in session 12).
+
+## Subscriptions, rewarded ads and push — setup
+
+The server decides the tier, ad rewards and notifications; the app only reports. Three outside
+services are involved. Everything below works locally without them (tests fake all three); you
+need real accounts only to try it on a device.
+
+### RevenueCat (Family plan subscription)
+
+1. **Create the project** at [app.revenuecat.com](https://app.revenuecat.com) → *Projects* → *New
+   project* "Brainy Clan". Add the apps: *App Store* (bundle ID `app.brainyclan`, plus the App Store
+   Connect in-app purchase key) and *Play Store* (package name, plus the Google Play service account
+   JSON). Follow RevenueCat's own wizard for the store credentials.
+2. **Products:** create the subscriptions in App Store Connect and Google Play Console first (e.g.
+   `brainy_family_monthly`, `brainy_family_yearly`), then *Product catalog → Products → Import*.
+3. **Entitlement:** *Product catalog → Entitlements → New* with identifier **`family`** (must match
+   `REVENUECAT_ENTITLEMENT`) and attach every Family product. Create an *Offering* (`default`) with
+   the packages the paywall shows.
+4. **App user id:** the app calls `Purchases.logIn("family-{family_id}")` with
+   `revenuecat_app_user_id` from `GET /api/v1/family/subscription`, so one purchase upgrades the whole
+   family. Nothing to configure, just don't use anonymous ids for purchases.
+5. **Webhook:** *Project settings → Integrations → Webhooks → Add*:
+   - URL: `https://<your-host>/api/v1/webhooks/revenuecat`
+   - Authorization header value: `Bearer <secret>` — generate a long random secret (e.g.
+     `openssl rand -hex 32`) and put the same `<secret>` into `.env` as `REVENUECAT_WEBHOOK_SECRET`.
+   - Environment: both (sandbox and production). Use *Send test event*: it answers 200 with
+     `outcome: ignored`, and appears in the admin under **Billing → Webhook events**.
+6. **REST API key (optional, recommended):** *Project settings → API keys → + New secret API key*
+   (v1, read access is enough). Put it into `.env` as `REVENUECAT_API_KEY` (server only, never in the
+   app). It enables `POST /api/v1/family/subscription/sync` (the app calls it while polling after a
+   purchase/restore, so the tier switches without waiting for the webhook) and lets the hourly
+   `billing:reconcile-subscriptions` re-check RevenueCat before downgrading a family whose expiry
+   passed without an EXPIRATION webhook. Without the key, sync just returns the current state and
+   the reconciliation marks such subscriptions expired after `REVENUECAT_RECONCILE_AFTER_MINUTES` (60).
+7. `docker compose exec app php artisan config:cache` and `docker compose restart app horizon`.
+
+Admin: **Families → (family) → Subscription** shows status, store, product, expiry and the
+RevenueCat app user id; **Billing → Webhook events** lists every webhook with filters (provider,
+outcome) and the raw payload. Both read-only — to fix a tier by hand use the family's *Edit* page.
+
+Local check (dev secret from your `.env`):
+
+```powershell
+curl.exe -s -X POST http://localhost:8080/api/v1/webhooks/revenuecat -H "Authorization: Bearer $env:RC_SECRET" `
+  -H "Content-Type: application/json" -d '{\"api_version\":\"1.0\",\"event\":{\"id\":\"test-1\",\"type\":\"TEST\"}}'
+```
+
+### AdMob rewarded ads (free-tier second chance)
+
+1. In [AdMob](https://admob.google.com) add the iOS and Android apps and create one **Rewarded** ad
+   unit per platform (reward item e.g. "Second chance", amount 1).
+2. In each rewarded ad unit → *Server-side verification* → callback URL
+   `https://<your-host>/api/v1/webhooks/admob-ssv` → *Verify URL* (answers 200 with
+   `outcome: ignored`) → save. AdMob signs every callback; the server checks the signature with
+   Google's public keys (`https://www.gstatic.com/admob/reward/verifier-keys.json`, cached for a day,
+   refetched on an unknown key id). No secret to configure. AdMob must reach the URL, so this only
+   works on a public host (or a tunnel such as `cloudflared` / `ngrok` while developing).
+3. The app, before showing the ad, generates a UUID `reward_ref` and sets the SSV options
+   `customData = "<reward_ref>:<session_id>"` and `userId = <member id>`. After the reward it calls
+   `POST /api/v1/play/sessions/{id}/second-chance` with `method: "ad", reward_ref` — 409
+   `ad_reward_pending` until the callback arrived (retry every 2 s), then 200; a used or foreign
+   reward is 403. Rewards are stored in `ad_rewards` (single use).
+4. **Test ad units** while developing (Google's samples, always fill):
+   rewarded iOS `ca-app-pub-3940256099942544/1712485313`, Android `ca-app-pub-3940256099942544/5224354917`.
+   Test units never call your SSV URL — to try the full flow use your real units with your device
+   registered as a *test device* in AdMob (Settings → Test devices).
+5. How ads are requested per age band (non-personalized, under age of consent, max rating) comes
+   from `policy.ad_request` — edit it in the admin under **Policy → Age bands → Ad requests**.
+
+Local check: a request with a bad signature must be rejected:
+
+```powershell
+curl.exe -s "http://localhost:8080/api/v1/webhooks/admob-ssv?ad_network=1&transaction_id=x&signature=AAAA&key_id=1"
+# → 400 {"message":"…","code":"ssv_signature_invalid"}
+```
+
+### Expo push notifications
+
+No key is needed: the server posts to Expo's push API (`https://exp.host/--/api/v2/push/send`) with
+the `ExponentPushToken[...]` the app registers via `PUT /api/v1/me/push-token`. Delivery to devices
+needs the app's push credentials in Expo (EAS: `eas credentials` → APNs key for iOS, FCM V1 service
+account for Android) — that is configured on the app side, not here.
+
+- Optional: if you turn on *Enhanced push security* in the Expo dashboard (Account → Access tokens),
+  create a token and set `EXPO_ACCESS_TOKEN` in `.env`.
+- Sent by the server (queued on Horizon, never during the member's quiet hours): `goal_reached`,
+  `period_closed`, `family_activity` (a member finished a session; at most one per finishing member
+  per hour; not to themself) and `daily_reminder` (scheduled every 15 min by
+  `notifications:daily-reminders`: members whose reminder time falls in the current 15 minutes of the
+  family timezone, who turned the reminder on and haven't started a session today).
+- The `scheduler` container runs `goals:close-periods`, `notifications:daily-reminders` and
+  `billing:reconcile-subscriptions`; `docker compose exec app php artisan schedule:list` shows them.
 
 ## AI batch generator (Filament → Content → AI batch generator)
 

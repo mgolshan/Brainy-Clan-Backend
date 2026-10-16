@@ -86,9 +86,11 @@ class SessionController
      * Use a second chance.
      *
      * Only when the session `failed`. `free` (Family tier, per day) or `ad` (rewarded ad). Resets
-     * mistakes and returns all items plus fresh ones.
+     * mistakes and returns all items plus fresh ones. `ad` needs the `reward_ref` the app passed to
+     * AdMob: 409 `ad_reward_pending` until AdMob's verification callback arrived (retry every 2 s),
+     * 403 `second_chance_unavailable` when it was used or belongs to another member/session.
      */
-    #[ApiErrors('second_chance_unavailable', 'session_not_active')]
+    #[ApiErrors('second_chance_unavailable', 'session_not_active', 'ad_reward_pending')]
     public function secondChance(SecondChanceRequest $request, int $session, GrantSecondChance $grant): SessionPayload
     {
         $rewardRef = $request->input('reward_ref');

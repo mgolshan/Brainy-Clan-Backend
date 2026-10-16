@@ -2,6 +2,7 @@
 
 namespace App\Modules\Family\Models;
 
+use App\Modules\Billing\Models\Subscription;
 use App\Modules\Identity\Models\User;
 use Database\Factories\FamilyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -22,6 +24,7 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property string $country_code
  * @property string $tier
  * @property Carbon|null $deleted_at Set by `DELETE /family` (row kept for the ledger)
+ * @property-read Subscription|null $subscription
  */
 #[Fillable(['owner_user_id', 'name', 'timezone', 'country_code', 'tier'])]
 #[UseFactory(FamilyFactory::class)]
@@ -83,6 +86,16 @@ class Family extends Model
     public function pendingInvites(): HasMany
     {
         return $this->hasMany(Invite::class)->whereNull('used_at')->where('expires_at', '>', now());
+    }
+
+    /**
+     * The family subscription (Billing), mirrored from RevenueCat; null when the family never subscribed.
+     *
+     * @return HasOne<Subscription, $this>
+     */
+    public function subscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class);
     }
 
     public function getActivitylogOptions(): LogOptions

@@ -35,6 +35,9 @@ class AgeBand extends Model
 
     public const array THEMES = ['playful', 'sleek', 'modern', 'classic'];
 
+    /** AdMob max ad content ratings, strictest first. */
+    public const array AD_CONTENT_RATINGS = ['G', 'PG', 'T', 'MA'];
+
     protected function casts(): array
     {
         return [

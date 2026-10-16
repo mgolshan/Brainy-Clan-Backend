@@ -45,7 +45,7 @@ class FamilyController
         $family = $member->family;
         $viewer = $this->currentUser($request);
 
-        $members = $family->members()->with(['user', 'family'])->orderBy('id')->get()
+        $members = $family->members()->with(['user' => fn ($query) => $query->withExists('socialAccounts'), 'family'])->orderBy('id')->get()
             ->map(fn (FamilyMember $m) => MemberResource::forViewer($m, $viewer)->resolve($request))
             ->all();
 

@@ -114,7 +114,29 @@ class User extends Authenticatable implements FilamentUser, HasName
      */
     public function isChildAccount(): bool
     {
-        return $this->email === null && ! $this->socialAccounts()->exists();
+        return ! $this->hasOwnLogin();
+    }
+
+    /**
+     * The user can sign in without the family: an email login or a linked Google/Apple/Facebook
+     * account. Uses an eager-loaded `withExists('socialAccounts')` / `socialAccounts` relation
+     * when present (lists must load one of them), otherwise one query.
+     */
+    public function hasOwnLogin(): bool
+    {
+        if ($this->email !== null) {
+            return true;
+        }
+
+        if (array_key_exists('social_accounts_exists', $this->getAttributes())) {
+            return (bool) $this->getAttribute('social_accounts_exists');
+        }
+
+        if ($this->relationLoaded('socialAccounts')) {
+            return $this->socialAccounts->isNotEmpty();
+        }
+
+        return $this->socialAccounts()->exists();
     }
 
     public function canAccessPanel(Panel $panel): bool

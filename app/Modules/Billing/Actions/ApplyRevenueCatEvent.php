@@ -23,6 +23,8 @@ class ApplyRevenueCatEvent
 
     private const array HANDLED = [...self::ACTIVATING, 'CANCELLATION', 'BILLING_ISSUE', 'EXPIRATION'];
 
+    public function __construct(private readonly ApplyFamilyTier $applyTier) {}
+
     /**
      * Returns the stored event; `wasRecentlyCreated` is false for a duplicate delivery.
      *
@@ -142,13 +144,7 @@ class ApplyRevenueCatEvent
             ]),
         };
 
-        $subscription->save();
-
-        $tier = $subscription->isEntitled() ? Family::TIER_FAMILY : Family::TIER_FREE;
-
-        if ($family->tier !== $tier) {
-            $family->update(['tier' => $tier]);
-        }
+        $this->applyTier->handle($family, $subscription, ApplyFamilyTier::SOURCE_WEBHOOK);
 
         return [WebhookEvent::OUTCOME_APPLIED, null, $family->id];
     }

@@ -57,6 +57,14 @@ class AgeBandResource extends Resource
                 Toggle::make('policy.purchases_allowed')->label('In-app purchases allowed'),
                 Toggle::make('policy.redemption_allowed')->label('Redemption round allowed')->default(true),
             ]),
+            Section::make('Ad requests (AdMob)')->columns(3)
+                ->description('How the app must request rewarded ads for this band (sent to the app as policy.ad_request).')
+                ->schema([
+                    Toggle::make('policy.ad_request.non_personalized')->label('Non-personalized ads only')->default(true),
+                    Toggle::make('policy.ad_request.under_age_of_consent')->label('Tag for under age of consent'),
+                    Select::make('policy.ad_request.max_ad_content_rating')->label('Max ad content rating')
+                        ->options(array_combine(AgeBand::AD_CONTENT_RATINGS, AgeBand::AD_CONTENT_RATINGS))->default('G')->required(),
+                ]),
             Section::make('Difficulty (1–10)')->columns(3)->schema([
                 TextInput::make('policy.difficulty.min')->label('Min')->numeric()->minValue(1)->maxValue(10)->required(),
                 TextInput::make('policy.difficulty.max')->label('Max')->numeric()->minValue(1)->maxValue(10)->required(),

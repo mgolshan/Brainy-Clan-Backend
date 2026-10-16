@@ -80,6 +80,13 @@ return [
     'revenuecat' => [
         'webhook_secret' => env('REVENUECAT_WEBHOOK_SECRET'),
         'entitlement' => env('REVENUECAT_ENTITLEMENT', 'family'),
+        'api_key' => env('REVENUECAT_API_KEY'),
+        'api_url' => env('REVENUECAT_API_URL', 'https://api.revenuecat.com/v1'),
+        'reconcile_after_minutes' => (int) env('REVENUECAT_RECONCILE_AFTER_MINUTES', 60),
+    ],
+
+    'admob' => [
+        'verifier_keys_url' => env('ADMOB_SSV_KEYS_URL', 'https://www.gstatic.com/admob/reward/verifier-keys.json'),
     ],
 
     'slack' => [

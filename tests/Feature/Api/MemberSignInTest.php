@@ -3,6 +3,7 @@
 use App\Modules\Family\Models\SignInCode;
 use App\Modules\Identity\Actions\IssueDeviceToken;
 use App\Modules\Identity\Models\Device;
+use App\Modules\Identity\Models\SocialAccount;
 use App\Modules\Identity\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
@@ -333,6 +334,31 @@ it('shows email, has_password and email_login_allowed only to the member themsel
 
     $this->getJson('/api/v1/me')->assertJsonPath('data.member.email_login_allowed', true);
     $this->patchJson("/api/v1/family/members/{$kid->id}", ['nickname' => 'Sammy'])->assertJsonPath('data.email_login_allowed', false);
+});
+
+it('shows has_own_login (email login or linked social account) only to the member themself and admins', function () {
+    $owner = familyOwner(['tier' => 'family']);
+    $kid = addMember($owner->family, 9);
+    $socialOnly = addMember($owner->family, 30);
+    $socialOnly->user->forceFill(['email' => null, 'password' => null])->save();
+    SocialAccount::factory()->apple()->create(['user_id' => $socialOnly->user_id]);
+
+    actingAsMember($owner);
+    $members = collect($this->getJson('/api/v1/family')->json('data.members'))->keyBy('id');
+    expect($members[$owner->id]['has_own_login'])->toBeTrue()
+        ->and($members[$kid->id]['has_own_login'])->toBeFalse()
+        ->and($members[$socialOnly->id]['has_own_login'])->toBeTrue();
+
+    $this->getJson('/api/v1/me')->assertJsonPath('data.member.has_own_login', true);
+    $this->patchJson("/api/v1/family/members/{$kid->id}", ['nickname' => 'Sammy'])->assertJsonPath('data.has_own_login', false);
+
+    app('auth')->forgetGuards();
+    actingAsMember($kid);
+    $members = collect($this->getJson('/api/v1/family')->json('data.members'))->keyBy('id');
+    expect($members[$kid->id]['has_own_login'])->toBeFalse()
+        ->and($members[$owner->id])->not->toHaveKey('has_own_login')
+        ->and($members[$socialOnly->id])->not->toHaveKey('has_own_login');
+    $this->getJson('/api/v1/me')->assertJsonPath('data.member.has_own_login', false);
 });
 
 // ---------------------------------------------------------------------------------------------

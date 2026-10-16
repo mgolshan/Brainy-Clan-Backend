@@ -117,6 +117,19 @@ class ApiException extends RuntimeException
         return new self('second_chance_unavailable', $message, 403);
     }
 
+    /**
+     * The rewarded ad was watched but AdMob's server-side verification callback has not arrived yet.
+     */
+    public static function adRewardPending(): self
+    {
+        return new self('ad_reward_pending', 'The ad reward has not been confirmed yet. Please try again in a moment.', 409);
+    }
+
+    public static function ssvSignatureInvalid(): self
+    {
+        return new self('ssv_signature_invalid', 'The verification signature is missing or invalid.', 400);
+    }
+
     public static function goalLimitReached(): self
     {
         return new self('goal_limit_reached', 'Your plan does not allow more active goals.', 403);
