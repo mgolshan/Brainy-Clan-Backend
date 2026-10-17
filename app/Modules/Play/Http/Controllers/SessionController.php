@@ -5,6 +5,7 @@ namespace App\Modules\Play\Http\Controllers;
 use App\Modules\Core\Docs\ApiErrors;
 use App\Modules\Core\Http\CurrentMember;
 use App\Modules\Play\Actions\AbandonSession;
+use App\Modules\Play\Actions\FindCurrentSession;
 use App\Modules\Play\Actions\GrantSecondChance;
 use App\Modules\Play\Actions\StartRedemption;
 use App\Modules\Play\Actions\StartSession;
@@ -12,6 +13,7 @@ use App\Modules\Play\Actions\SubmitAnswer;
 use App\Modules\Play\Http\Requests\SecondChanceRequest;
 use App\Modules\Play\Http\Requests\StartSessionRequest;
 use App\Modules\Play\Http\Requests\SubmitAnswerRequest;
+use App\Modules\Play\Http\Resources\SessionItemResource;
 use App\Modules\Play\Http\Resources\SessionPayload;
 use App\Modules\Play\Http\Resources\SessionResource;
 use App\Modules\Play\Models\PlaySession;
@@ -37,6 +39,23 @@ class SessionController
         $session = $start->handle($this->currentMember($request), $request->integer('category_id'));
 
         return (new SessionPayload($session))->response()->setStatusCode(201);
+    }
+
+    /**
+     * The current unfinished session.
+     *
+     * The member's most recent unfinished session (`active`, `failed` or `redemption`) with its
+     * items, so the app can offer "Continue your game"; `data` is `null` when there is none.
+     * Starting a new session abandons older unfinished ones, and sessions with no answer for 24
+     * hours are abandoned automatically.
+     *
+     * @response array{data: array{session: SessionResource, items: list<SessionItemResource>}|null}
+     */
+    public function current(Request $request, FindCurrentSession $find): SessionPayload|JsonResponse
+    {
+        $session = $find->handle($this->currentMember($request));
+
+        return $session === null ? new JsonResponse(['data' => null]) : new SessionPayload($session);
     }
 
     /**

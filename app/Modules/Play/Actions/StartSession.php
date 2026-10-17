@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Starts a session in a category: target and blunder cap from the policy, and an initial batch
- * of target + cap items without answers.
+ * of target + cap items without answers. Abandons the member's previous unfinished sessions.
  */
 class StartSession
 {
@@ -19,6 +19,7 @@ class StartSession
         private readonly ResolveCategoryAccess $access,
         private readonly PolicyResolver $policy,
         private readonly AddSessionItems $addItems,
+        private readonly AbandonSession $abandon,
     ) {}
 
     public function handle(FamilyMember $member, int $categoryId): PlaySession
@@ -30,6 +31,16 @@ class StartSession
         $rules = $this->policy->playRules($member);
 
         return DB::transaction(function () use ($member, $categoryId, $rules): PlaySession {
+            // One game at a time: a new game abandons the member's older unfinished ones.
+            $unfinished = PlaySession::query()
+                ->where('member_id', $member->id)
+                ->whereIn('status', PlaySession::UNFINISHED_STATUSES)
+                ->get();
+
+            foreach ($unfinished as $previous) {
+                $this->abandon->handle($previous);
+            }
+
             $session = PlaySession::query()->create([
                 'family_id' => $member->family_id,
                 'member_id' => $member->id,

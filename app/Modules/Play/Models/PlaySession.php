@@ -41,6 +41,9 @@ class PlaySession extends Model
 
     public const string STATUS_ABANDONED = 'abandoned';
 
+    /** Resumable: the app offers "Continue your game" (`GET /play/sessions/current`). */
+    public const array UNFINISHED_STATUSES = [self::STATUS_ACTIVE, self::STATUS_FAILED, self::STATUS_REDEMPTION];
+
     protected function casts(): array
     {
         return [

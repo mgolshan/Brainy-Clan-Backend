@@ -62,6 +62,9 @@ as written there; if something must change, update `docs/API.md` first and note 
 - **Tier switches only via the server (2026-10-16):** after a purchase the app polls; an admin-only
   `POST /family/subscription/sync` pulls the subscriber from the RevenueCat REST API when a key is
   configured, plus a scheduled reconciliation for subscriptions whose expiry passed without a webhook.
+- **Unfinished games (2026-10-17):** leaving a game keeps it resumable; the app offers "Continue
+  your game" (`GET /play/sessions/current`); a new game abandons older unfinished ones; idle games
+  are abandoned after 24 h so sessions don't pile up.
 - **Full API documentation with Scramble (2026-10-11, requested by Moe):** every endpoint is
   documented with [Scramble](https://scramble.dedoc.co) (`dedoc/scramble`, free, MIT). It
   generates an OpenAPI 3.1 spec from the code itself (routes, Form Requests, API Resources), so

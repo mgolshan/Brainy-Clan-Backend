@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'throttle:api', 'family'])->prefix('play/sessions')->group(function () {
     Route::post('/', [SessionController::class, 'store'])->name('api.v1.play.sessions.store');
+    Route::get('current', [SessionController::class, 'current'])->name('api.v1.play.sessions.current');
     Route::get('{session}', [SessionController::class, 'show'])->whereNumber('session')->name('api.v1.play.sessions.show');
     Route::post('{session}/answers', [SessionController::class, 'answer'])->whereNumber('session')->name('api.v1.play.sessions.answer');
     Route::post('{session}/second-chance', [SessionController::class, 'secondChance'])->whereNumber('session')->name('api.v1.play.sessions.second-chance');

@@ -366,6 +366,31 @@ curl http://localhost:8080/api/v1/health
 
 ## Log
 
+### 2026-10-17 (unfinished games — continue / abandon / idle sweep)
+
+- Per PLAN "Unfinished games (2026-10-17)" and API.md Play: `GET /play/sessions/current` (`FindCurrentSession`)
+  → the member's most recent `active`/`failed`/`redemption` session as `{ data: { session, items } }` (same
+  `SessionPayload` as `GET /play/sessions/{session}`) or `{ data: null }`; registered before `{session}` (which is
+  `whereNumber` anyway). Scramble `@response` documents the nullable `data`.
+- `StartSession` abandons the member's previous unfinished sessions inside its transaction via `AbandonSession`
+  (a failed start, e.g. empty category, rolls back and keeps the old game). No row lock (avoids gap-lock deadlocks;
+  a racing duplicate is picked up by the idle sweep).
+- `play:abandon-idle-sessions` (`AbandonIdleSessions`), hourly, `withoutOverlapping()->onOneServer()`: unfinished
+  sessions whose last activity (last `answered_at`, else `started_at`) is more than 24 h old → `abandoned`. Batches
+  of 500: one id query + one `UPDATE … WHERE id IN (…)` (conditions re-checked) per batch, `NOT EXISTS` on
+  `session_items.answered_at >= cutoff`. Migration `2026_10_17_200000_add_play_sessions_status_index`
+  (`status, started_at`) for the cross-member sweep. `PlaySession::UNFINISHED_STATUSES` constant.
+- Tests: `tests/Feature/Api/UnfinishedSessionsTest.php` (none/completed/abandoned → null; active/failed/redemption
+  returned = GET session payload; most recent wins; other member not returned; no route clash; start abandons
+  previous only for that member; failed start keeps old game; idle boundaries at exactly 24 h for start and answer;
+  2 queries per batch for 2 vs 8 sessions; hourly schedule; constant query count for `current`).
+- Dev: `migrate` (1 migration), OPcache cleared, `config:cache`, app/horizon/scheduler restarted; `schedule:list`
+  shows `0 * * * * play:abandon-idle-sessions`. Live curl `GET /api/v1/play/sessions/current` as
+  `demo-sam-child-token` → 200 with Sam's active session 12 + items. Note: that demo session started 2026-10-11, so
+  the first hourly sweep abandons it (status change only, nothing deleted); `current` then returns `null` until Sam
+  starts a new game. Scramble `/docs/api.json` shows `data` as `object | null` with `session` + `items`.
+- Pint, PHPStan clean. Full Pest suite: 528 passed, 1 failed (`AdRewardsTest` "another member or another session" started a second session, which now abandons the first) — test now restores the first session to `failed`; that file re-run green (16/16).
+
 ### 2026-10-17 (session 16: hardening part 2 — indexes, security review, README)
 
 - **Indexes:** migration `2026_10_17_100000_add_hot_path_indexes` (reversible, explicit names):

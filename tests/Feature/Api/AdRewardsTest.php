@@ -6,6 +6,7 @@ use App\Modules\Billing\Support\HttpAdMobVerifierKeys;
 use App\Modules\Content\Models\Category;
 use App\Modules\Content\Models\ContentItem;
 use App\Modules\Family\Models\FamilyMember;
+use App\Modules\Play\Models\PlaySession;
 use App\Modules\Play\Models\SecondChance;
 use App\Modules\Play\Models\SessionItem;
 use Illuminate\Support\Facades\Http;
@@ -216,6 +217,8 @@ it('refuses a reward stored for another member or another session', function () 
     $other = addMember($member->family, 30);
     $otherSession = test()->postJson('/api/v1/play/sessions', ['category_id' => Category::query()->value('id')])->assertCreated()->json('data.session.id');
     adFail($otherSession);
+    // Starting the other session abandoned the first one; put it back to `failed` (both unfinished).
+    PlaySession::query()->whereKey($sessionId)->update(['status' => PlaySession::STATUS_FAILED]);
 
     AdReward::factory()->create(['reward_ref' => 'foreign-member', 'member_id' => $other->id, 'play_session_id' => $sessionId]);
     AdReward::factory()->create(['reward_ref' => 'other-session', 'member_id' => $member->id, 'play_session_id' => $otherSession]);

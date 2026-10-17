@@ -316,6 +316,10 @@ Challenge payloads). A wrong answer is always 1 mistake.
   listed in any `items` array (answered ones stay). 409 `session_not_active` when not `failed`;
   403 `second_chance_unavailable` when redemption is not allowed or already failed in this session.
 - `POST /play/sessions/{session}/abandon` → `{ data: Session }`
+- `GET /play/sessions/current` → `{ data: { session, items } | null }` — the member's most recent
+  unfinished session (`active`, `failed` or `redemption`), so the app can offer "Continue your game".
+  Starting a new session (`POST /play/sessions`) abandons the member's previous unfinished sessions.
+  Sessions with no answer for **24 hours** are abandoned automatically (hourly job).
 
 ### Challenge payloads (`type` → `payload`, `response`, `correct_response`)
 
@@ -547,3 +551,4 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-16 — Account deletion web page `/account/delete` with emailed confirmation (Play requirement).
 - 2026-10-16 — B9 details: `POST /me/legal-acceptance` → 403 for children, 422 on a stale version; `/me/export` also has `social_accounts` and per-membership `notification_preferences` and is sent as an attachment (`no-store`); social sign-up checks `accept_terms` after birth/age checks; child invites check `parental_consent` before the member limit; webhooks rate-limited (600/min/IP).
 - 2026-10-17 — Login throttled per email as well as per IP; documented request size limits.
+- 2026-10-17 — `GET /play/sessions/current`; a new session abandons older unfinished ones; idle sessions auto-abandoned after 24 h.
