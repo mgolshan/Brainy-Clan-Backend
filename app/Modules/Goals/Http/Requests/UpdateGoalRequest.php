@@ -22,9 +22,9 @@ class UpdateGoalRequest extends FormRequest
             'starts_on' => ['sometimes', 'date_format:Y-m-d'],
             'ends_on' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
             'is_active' => ['sometimes', 'boolean'],
-            'category_ids' => ['sometimes', 'array', 'min:1'],
+            'category_ids' => ['sometimes', 'array', 'min:1', 'max:200'],
             'category_ids.*' => ['integer', 'distinct', 'exists:categories,id'],
-            'members' => ['sometimes', 'nullable', 'array'],
+            'members' => ['sometimes', 'nullable', 'array', 'max:50'],
             'members.*.member_id' => ['required', 'integer', 'distinct'],
             'members.*.target_override' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:10000'],
         ];

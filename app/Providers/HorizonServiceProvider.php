@@ -2,8 +2,8 @@
 
 namespace App\Providers;
 
+use App\Modules\Identity\Models\User;
 use Illuminate\Support\Facades\Gate;
-use Laravel\Horizon\Horizon;
 use Laravel\Horizon\HorizonApplicationServiceProvider;
 
 class HorizonServiceProvider extends HorizonApplicationServiceProvider
@@ -23,14 +23,11 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
     /**
      * Register the Horizon gate.
      *
-     * This gate determines who can access Horizon in non-local environments.
+     * Outside the local environment only staff (the same users who may open the Filament admin)
+     * can see `/horizon`; they sign in through `/admin` first.
      */
     protected function gate(): void
     {
-        Gate::define('viewHorizon', function ($user = null) {
-            return in_array(optional($user)->email, [
-                //
-            ]);
-        });
+        Gate::define('viewHorizon', fn (?User $user = null): bool => $user !== null && $user->is_staff);
     }
 }

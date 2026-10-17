@@ -11,6 +11,7 @@ use App\Modules\Identity\Actions\EraseUser;
 use App\Modules\Identity\Models\SocialAccount;
 use App\Modules\Identity\Models\User;
 use Illuminate\Support\Facades\DB;
+use Spatie\Activitylog\Models\Activity;
 
 /**
  * `DELETE /family` (owner): every membership becomes `removed`, pending invites and unused sign-in
@@ -63,6 +64,13 @@ class DeleteFamily
                 'deleted_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            // Earlier audit entries (created / renamed) carry the old name in their changes; keep the
+            // entries (who did what, when) but drop the values.
+            Activity::query()
+                ->where('subject_type', $family->getMorphClass())
+                ->where('subject_id', $family->id)
+                ->update(['attribute_changes' => null, 'properties' => json_encode(['erased' => true])]);
 
             FamilyDeleted::dispatch($family->id);
 

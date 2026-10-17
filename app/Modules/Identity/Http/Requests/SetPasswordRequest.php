@@ -18,7 +18,7 @@ class SetPasswordRequest extends FormRequest
         return [
             'password' => ['required', 'string', 'min:8', 'max:255', 'confirmed'],
             /** Required only when the user already has a password (`has_password: true`). */
-            'current_password' => [Rule::requiredIf($user instanceof User && $user->password !== null), 'nullable', 'string'],
+            'current_password' => [Rule::requiredIf($user instanceof User && $user->password !== null), 'nullable', 'string', 'max:255'],
         ];
     }
 }

@@ -9,13 +9,24 @@ use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Shared API plumbing: health endpoint and rate limiters
- * (`auth/*` 10/min per IP, everything else 120/min per token).
+ * (`auth/*` 10/min per IP and per email, everything else 120/min per token).
  */
 class CoreServiceProvider extends ModuleServiceProvider
 {
     public function boot(): void
     {
-        RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(10)->by('auth|'.$request->ip()));
+        // 10/min per IP, plus 10/min per email address so a password guesser spread over many
+        // IPs is still slowed down on one account.
+        RateLimiter::for('auth', function (Request $request) {
+            $limits = [Limit::perMinute(10)->by('auth|'.$request->ip())];
+            $email = $request->input('email');
+
+            if (is_string($email) && trim($email) !== '') {
+                $limits[] = Limit::perMinute(10)->by('auth-email|'.hash('sha256', mb_strtolower(trim($email))));
+            }
+
+            return $limits;
+        });
 
         RateLimiter::for('api', function (Request $request) {
             $user = $request->user();

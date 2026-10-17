@@ -19,7 +19,10 @@ and add a line to the changelog at the bottom.
   conflict, 422 validation, 426 app too old, 429 rate limited.
 - Optional header `X-App-Version: 1.0.0`. If lower than `min_app_version` the API answers
   **426** with `code: "app_update_required"` (health endpoint is exempt).
-- Rate limits: `auth/*` 10/min per IP, everything else 120/min per token.
+- Rate limits: `auth/*` 10/min per IP **and** 10/min per email (login), everything else 120/min per token → 429 `rate_limited`.
+- Request size limits (422 `validation_failed`): login `email`/`password` ≤ 255 chars, `current_password` ≤ 255;
+  goals `category_ids` ≤ 200 and `members` ≤ 50; answer `response` ≤ 10 keys, `response.found` ≤ 100,
+  `response.grid` ≤ 16 rows.
 
 ### Error codes
 
@@ -543,3 +546,4 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-16 — Legal clarifications: `GET /legal` `summary`; `GET /family/invites/preview`; `me.legal` current + accepted versions; `/me/export` shape and who may export.
 - 2026-10-16 — Account deletion web page `/account/delete` with emailed confirmation (Play requirement).
 - 2026-10-16 — B9 details: `POST /me/legal-acceptance` → 403 for children, 422 on a stale version; `/me/export` also has `social_accounts` and per-membership `notification_preferences` and is sent as an attachment (`no-store`); social sign-up checks `accept_terms` after birth/age checks; child invites check `parental_consent` before the member limit; webhooks rate-limited (600/min/IP).
+- 2026-10-17 — Login throttled per email as well as per IP; documented request size limits.

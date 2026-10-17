@@ -11,6 +11,38 @@ Project rules and architecture notes for AI assistants and developers: [CLAUDE.m
 
 **Production:** step-by-step deploy guide (Hetzner, Docker, HTTPS, backups, Sentry): [docs/DEPLOY.md](docs/DEPLOY.md).
 
+**Project docs:** [docs/PLAN.md](docs/PLAN.md) (milestones and decisions), [docs/PROGRESS.md](docs/PROGRESS.md)
+(status, next steps, session log), [docs/API.md](docs/API.md) (the app ↔ API contract).
+
+### Quick start
+
+1. Docker Desktop running, then once: `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1`
+   ([One-time setup](#one-time-setup)).
+2. Every day: `docker compose --profile workers up -d` ([Daily use](#daily-use)).
+3. Demo data: `docker compose exec app php artisan db:seed` on an empty database
+   ([Seeded data](#seeded-data-php-artisan-migratefresh---seed)), then sign in to
+   http://localhost:8080/admin as `admin@brainyclan.test` / `password`, or call the API as a demo
+   member (`Authorization: Bearer demo-sam-child-token`).
+4. Before handing in a change: [Tests and checks](#tests-and-checks).
+
+### Setup guides (external accounts)
+
+Everything below is optional for local development; each feature is skipped or answers a clear
+error until its keys are in `.env`.
+
+| Feature | Guide | `.env` keys |
+| --- | --- | --- |
+| Google and Facebook sign-in | [Google and Facebook sign-in — setup](#google-and-facebook-sign-in--setup) | `GOOGLE_CLIENT_ID_*`, `FACEBOOK_CLIENT_*` |
+| Sign in with Apple + token revocation | [Sign in with Apple — setup](#sign-in-with-apple--setup) | `APPLE_CLIENT_IDS`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` |
+| Subscriptions (RevenueCat) | [RevenueCat](#revenuecat-family-plan-subscription) | `REVENUECAT_WEBHOOK_SECRET`, `REVENUECAT_API_KEY` |
+| Rewarded ads (AdMob SSV) | [AdMob rewarded ads](#admob-rewarded-ads-free-tier-second-chance) | none required (`ADMOB_SSV_KEYS_URL` optional) |
+| Push notifications (Expo) | [Expo push notifications](#expo-push-notifications) | none required (`EXPO_ACCESS_TOKEN` optional) |
+| AI content generator | [AI batch generator](#ai-batch-generator-filament--content--ai-batch-generator) | `ANTHROPIC_API_KEY`, `CONTENT_AI_*` |
+| Legal texts, consent, export, deletion page | [Legal, consent and privacy](#legal-consent-and-privacy-b9) | `LEGAL_*` |
+| Error monitoring | [Error monitoring (Sentry)](#error-monitoring-sentry) | `SENTRY_LARAVEL_DSN` |
+| Production server, HTTPS, backups | [docs/DEPLOY.md](docs/DEPLOY.md) | `.env.prod` (from `.env.prod.example`) |
+| Antivirus breaking HTTPS in Docker | [TLS-inspecting antivirus](#tls-inspecting-antivirus-on-the-dev-machine) | - |
+
 ## Prerequisites
 
 - Windows 11 with **Docker Desktop** using the **WSL 2 backend** (Settings > General >
@@ -81,13 +113,38 @@ After changing queued jobs, restart the workers: `docker compose restart horizon
 After changing `docker/php/Dockerfile` or `docker/php/php.ini`, rebuild:
 `docker compose build app` then `docker compose --profile workers up -d`.
 
+## Tests and checks
+
+Every change is done when all four are green (run from the repository root):
+
+```powershell
+docker compose exec app php artisan test --compact                        # full Pest suite (~8 min on a Windows drive)
+docker compose exec app php artisan test --compact tests/Feature/Api/GoalsTest.php   # one file while working
+docker compose exec app ./vendor/bin/pint --dirty --format agent          # code style for changed files
+docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=1G    # Larastan, level 5
+```
+
+- Tests use in-memory SQLite and the array cache, never the dev database, so they are safe to run
+  while the app is in use.
+- Lazy loading is forbidden outside production (`Model::preventLazyLoading()`), so an N+1 fails the
+  suite; list endpoints and busy Filament tables have query-count tests (`QueryCountTest`,
+  `AdminQueryCountTest`).
+- Guard tests worth knowing: `RouteSecurityTest` (every `/api/v1` route authenticated unless
+  allowlisted, every route throttled), `SecurityReviewTest` (cross-family 404s, mass assignment,
+  validation limits, rate limits, secrets at rest, audit log, production cookie/CORS settings),
+  `ApiDocsTest` (every route in the Scramble spec).
+- After changing PHP code on the running dev stack (OPcache does not watch files, see
+  [Performance](#performance-important-on-a-windows-drive)):
+  `docker compose exec app php artisan config:cache` then `docker compose restart app horizon scheduler`.
+  Run `docker compose exec app composer dump-autoload -o` after adding or renaming classes.
+
 ## URLs and credentials
 
 | What | Where | Login |
 | --- | --- | --- |
 | API | http://localhost:8080 (health check: http://localhost:8080/up) | Sanctum tokens |
 | Admin panel (Filament) | http://localhost:8080/admin | `admin@brainyclan.test` / `password` |
-| Horizon dashboard | http://localhost:8080/horizon | open in the local environment |
+| Horizon dashboard | http://localhost:8080/horizon | open in the local environment; elsewhere staff only (sign in at `/admin` first) |
 | API docs (Scramble) | http://localhost:8080/docs/api (OpenAPI JSON: http://localhost:8080/docs/api.json) | open in the local environment |
 | Mailpit (caught e-mails) | http://localhost:8026 | - |
 | MySQL from the host | `127.0.0.1:3307`, database `brainy_clan` | `brainy` / `secret` (root: `root`) |
@@ -145,6 +202,12 @@ http://localhost:8080/docs/api.json).
   `docker compose exec -T app php docker/scripts/write-mcp-json.php`.
 
 ## Seeded data (`php artisan migrate:fresh --seed`)
+
+`migrate:fresh --seed` wipes the database; use it only on a fresh install. On a database you want to
+keep, run `php artisan migrate` for new migrations and re-run single seeders, which are idempotent:
+`php artisan db:seed --class=PolicySeeder` (age bands, tiers, settings), `CategorySeeder`,
+`ChallengeTypeSeeder`, `ContentSeeder`, `WordPuzzleSeeder`, `AdminUserSeeder`, `DemoFamilySeeder`
+(resets the demo tokens and invite codes) and `DemoActivitySeeder` (demo points history and goals).
 
 | Who | How to sign in |
 | --- | --- |
@@ -654,6 +717,31 @@ curl -H "Authorization: Bearer <Mom's token>" http://localhost:8080/api/v1/me   
 curl -H "Authorization: Bearer <Mom's token>" "http://localhost:8080/api/v1/family/invites/preview?birth_year=2018&birth_month=1"
 curl -H "Authorization: Bearer <Mom's token>" http://localhost:8080/api/v1/me/export
 ```
+
+## Security notes
+
+- **Tenancy:** every family-scoped id in a URL (`member`, `device`, `invite`, `plan`, `session`) is looked
+  up inside the caller's family (or their own sessions), so another family's id answers **404
+  `not_found`**, never 403. Ids inside bodies (goal members, session items) are checked the same way (422).
+- **Rate limits** (`CoreServiceProvider`): `auth/*` (login, register, social, join, sign-in code)
+  10/min per IP and 10/min per email address; everything else 120/min per user; `GET /me/export`
+  1/hour; the `/account/delete` form 5/hour per IP; webhooks 600/min per IP.
+- **Secrets at rest:** passwords bcrypt; sign-in codes only as an HMAC (`code_hash`); account
+  deletion links only as SHA-256 (`token_hash`); deletion-page emails and consent IPs only as an
+  HMAC; Apple refresh tokens encrypted with `APP_KEY` (`encrypted` cast, hidden from serialization);
+  Sanctum tokens hashed by Sanctum. **Invite codes are stored in plain text on purpose:** admins
+  see pending invites again (`GET /family/invites`) to read them out to a child; they are single
+  use, expire after `invites.ttl_days` (default 7 days) and have 8 characters from a 32-letter alphabet (~10¹² combinations).
+- **Logs and audit log:** no tokens, codes or personal data in log context; Sentry events are
+  scrubbed (`SentryScrubber`). The audit log (Filament → Activity) records content and admin
+  config changes and family name/timezone/tier changes; deleting a family drops the old values
+  from its entries. Members, users and devices are not audited.
+- **Admin access:** `/admin` and (outside `local`) `/horizon` only for users with `is_staff`
+  (never settable through the API); the API docs are closed outside `local`.
+- **Production settings** (`.env.prod.example`): `APP_DEBUG=false` (the container refuses to start
+  otherwise), secure + httpOnly + SameSite=lax session cookies (secure by default when
+  `APP_ENV=production`), encrypted sessions, and `CORS_ALLOWED_ORIGINS` empty unless a web build
+  needs it (in production there is no localhost default).
 
 ## Error monitoring (Sentry)
 

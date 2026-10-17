@@ -26,9 +26,18 @@ Milestones are defined in `docs/PLAN.md`.
 
 ## Next up
 
-0. **State at last stop (session 15, 2026-10-16, hardening pass — cut short by a usage limit):** Expo connection
+0. **State at last stop (session 16, 2026-10-17, hardening pass part 2):** session 15's items a–c are **done**
+   (indexes, security review, README; see log). Dev DB: `migrate` (1 migration, `add_hot_path_indexes`), no
+   fresh, no reseed. **Next:**
+   a. Item d below (admin config tables in the constant-query test) — optional, low value.
+   b. Contract notes for `docs/API.md` (coordinator): new request limits — `POST /auth/login` `email`/`password`
+      max 255; `PUT /me/password` `current_password` max 255; goals `category_ids` max 200 and `members` max 50;
+      `POST /play/sessions/{id}/answers` `response` at most 10 keys, `response.found` max 100, `response.grid` max 16
+      (all 422 `validation_failed`). `auth/*` throttle is now also 10/min **per email** (429 `rate_limited`).
+   c. Then the items of session 14 below (Moe: server, lawyer, Norton cert, content).
+   Previous: **State at last stop (session 15, 2026-10-16, hardening pass — cut short by a usage limit):** Expo connection
    errors handled with a bounded retry; N+1 audit partly done (new query-count tests, see log). No migrations.
-   **Not done yet, in order (pick up here):**
+   **Not done yet, in order (done in session 16 except d):**
    a. **Index check:** `devices.push_token` has no index but is looked up by value (`DeliverPushNotification` clears
       invalid tokens, `SetPushToken` clears the same token from other devices) → add an index via migration after an
       `EXPLAIN` on a seeded dataset. `play_sessions` "started since local midnight" (daily reminders) uses
@@ -165,6 +174,9 @@ Milestones are defined in `docs/PLAN.md`.
 - Goal periods are closed by `php artisan goals:close-periods` (scheduled every 5 minutes by
   `GoalsServiceProvider`; the `scheduler` container runs it). Current periods are also opened on
   demand when the API reads plans.
+- **Per-email auth limit (session 16):** someone who knows an adult's email can keep that account's
+  `/auth/login` throttled (10/min) — accepted trade-off against distributed password guessing; the
+  person can still sign in with Google/Apple/Facebook (no email in that request) or an admin-issued sign-in code.
 - PHPStan: `treatPhpDocTypesAsCertain: false` because Sanctum's `currentAccessToken()` can be a
   `TransientToken` at runtime.
 
@@ -353,6 +365,45 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-10-17 (session 16: hardening part 2 — indexes, security review, README)
+
+- **Indexes:** migration `2026_10_17_100000_add_hot_path_indexes` (reversible, explicit names):
+  `devices_push_token_index` and `play_sessions_member_id_started_at_index`. `EXPLAIN` on the dev DB: the push-token
+  `UPDATE … WHERE push_token = ?` and `WHERE push_token IN (…)` use the new index (range, was a full scan); the daily
+  reminder's `member_id IN (…) AND started_at >= ? GROUP BY member_id` uses the new composite ("Using index for
+  group-by"). Also checked: leaderboard window (`point_entries_family_id_created_at_index`), sign-in code lookup
+  (`code_hash`), reminder candidates (`notification_preferences` unique + PK), active session (`member_id,status`) —
+  all indexed already.
+- **Security review** (`tests/Feature/Api/SecurityReviewTest.php`, 33 tests):
+  - Cross-family: every route id (`member`, `device`, `invite`, `plan`, `session`, sign-in codes, member notification
+    preferences) of another family → 404 `not_found` and nothing changes; removed members and another member's
+    session in the same family → 404; another family's member in goal `members` / another session's item in an
+    answer → 422. All were already correct (scoped lookups); now locked in by tests.
+  - Mass assignment: every model has a non-empty `#[Fillable]` (test walks `app/Modules/*/Models`); no request
+    `->all()` into create/update (only the RevenueCat webhook stores its raw payload, by design); `is_staff`,
+    `tier`, `owner_user_id`, `family_id`, `status` can't be set through the API (test).
+  - Validation limits added: login `email`/`password` max 255, `current_password` max 255, goals `category_ids` max
+    200 + `members` max 50, answers `response` max 10 keys + `response.found` max 100 + `response.grid` max 16.
+  - Rate limits: `auth` limiter now also 10/min **per email** (hashed key) on top of 10/min per IP, so guessing one
+    account's password from many IPs is slowed; tests for that, for `/auth/code` and the export / deletion-page /
+    webhook limiters.
+  - Secrets at rest verified by tests: sign-in codes only as HMAC; Apple refresh token encrypted + hidden. Invite
+    codes stay plain by design (admins re-display them) — documented in README "Security notes".
+  - Logs / audit log: log contexts carry no tokens or PII (reviewed every `Log::` call). **Fixed:** deleting a family
+    left its old name in earlier activity-log entries (`created`/renamed) — `DeleteFamily` now clears
+    `attribute_changes`/`properties` of the family's entries (kept as who/when).
+  - Admin: `canAccessPanel` = `is_staff` (existing test). **Fixed:** the Horizon gate was the stub (empty email list =
+    nobody outside local); now staff only (test).
+  - Production config: `SESSION_SECURE_COOKIE` defaults to true when `APP_ENV=production`; `.env.prod.example` adds
+    `SESSION_HTTP_ONLY=true`, `SESSION_SAME_SITE=lax`, `SESSION_ENCRYPT=true` and an empty `CORS_ALLOWED_ORIGINS`;
+    `config/cors.php` no longer falls back to the localhost Expo origins in production. Test checks these.
+- **README:** quick start, setup-guide index (social, Apple, RevenueCat, AdMob, Expo, AI generator, legal, Sentry,
+  DEPLOY.md, antivirus) with their `.env` keys, "Tests and checks", non-destructive reseeding (which seeders are
+  idempotent), "Security notes", Horizon access row.
+- Contract-relevant limits listed in Next up 0b (no `docs/API.md` edit by me).
+- Checks: full Pest 515 passed (5024 assertions), Pint and PHPStan clean. Deployed to dev once (opcache cleared,
+  `config:cache`, app/horizon/scheduler restarted; `/api/v1/health` and `/me` 200).
 
 ### 2026-10-16 (session 15: hardening — Expo retries, N+1 audit part 1)
 
