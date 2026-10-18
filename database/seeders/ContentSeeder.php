@@ -14,32 +14,217 @@ use Illuminate\Database\Seeder;
  * - Multiple choice: hand-written items (data/multiple_choice.php) plus items generated from
  *   data/countries.php (capitals, continents), times tables, mental math and anagrams.
  * - Wisdom cards: public-domain quotes and original cards (data/wisdom_cards.php).
+ * - The launch question bank (data/questions/*.php, see its README): multiple choice and wisdom
+ *   cards in English and/or French, validated strictly by QuestionBank.
+ * - French versions of generated items: capitals and continents from data/countries_fr.php
+ *   (when present), times tables and mental math.
  *
- * Every item has a stable `source_ref`, so re-running updates instead of duplicating.
- * Choice order is shuffled deterministically per item.
+ * Every item has a stable `source_ref`, so re-running updates instead of duplicating. Translations
+ * share a `translation_group` (the English ref without "seed:", or `q:<id>` for the question bank);
+ * English items of language-bound categories are `cross_locale` = false (docs/PLAN.md "Launch
+ * question bank and French content"). Choice order is shuffled deterministically per item.
  */
 class ContentSeeder extends Seeder
 {
     private const array CONTINENTS = ['Europe', 'Asia', 'Africa', 'North America', 'South America', 'Oceania'];
 
+    /** English continent => French name. */
+    public const array CONTINENTS_FR = [
+        'Europe' => 'Europe', 'Asia' => 'Asie', 'Africa' => 'Afrique',
+        'North America' => 'Amérique du Nord', 'South America' => 'Amérique du Sud', 'Oceania' => 'Océanie',
+    ];
+
+    /**
+     * Categories whose items depend on the English language (words, spelling, idioms): their
+     * English items are never offered to members of another locale.
+     */
+    public const array LANGUAGE_BOUND_CATEGORIES = [
+        'anagrams', 'missing-letter', 'word-search', 'spelling', 'idioms', 'synonyms', 'grades-1-3', 'grades-4-6', 'grades-7-9',
+    ];
+
+    public const array WISDOM_QUESTION = ['en' => 'What is the main idea?', 'fr' => "Quelle est l'idée principale ?"];
+
+    public string $questionsPath = __DIR__.'/data/questions';
+
+    public string $countriesFrPath = __DIR__.'/data/countries_fr.php';
+
     /** @var array<string, int> */
     private array $categoryIds = [];
+
+    /** @var array<string, ContentItem> existing seed items by source_ref */
+    private array $existing = [];
 
     public function __construct(private readonly SaveContentItem $save) {}
 
     public function run(): void
     {
-        $this->categoryIds = Category::query()->pluck('id', 'slug')->map(fn ($id) => (int) $id)->all();
+        $this->prepare();
 
         // No audit-log rows for seed data.
         Model::withoutEvents(function (): void {
             $this->seedHandWritten();
             $this->seedGeography();
+            $this->seedFrenchGeography();
             $this->seedTimesTables();
             $this->seedMentalMath();
             $this->seedAnagrams();
             $this->seedWisdomCards();
+            $this->seedQuestionBank();
         });
+    }
+
+    /**
+     * Seeds only the question bank (used by tests with fixture files).
+     */
+    public function runQuestionBank(): void
+    {
+        $this->prepare();
+        Model::withoutEvents(fn () => $this->seedQuestionBank());
+    }
+
+    /**
+     * Seeds only the French generated geography (used by tests with a fixture file).
+     */
+    public function runFrenchGeography(): void
+    {
+        $this->prepare();
+        Model::withoutEvents(fn () => $this->seedFrenchGeography());
+    }
+
+    /**
+     * Leaf category slugs (categories without children), the only valid question bank categories.
+     *
+     * @return list<string>
+     */
+    public static function leafCategorySlugs(): array
+    {
+        $parents = Category::query()->whereNotNull('parent_id')->distinct()->pluck('parent_id')->all();
+
+        return Category::query()->whereNotIn('id', $parents)->orderBy('slug')->pluck('slug')->all();
+    }
+
+    private function prepare(): void
+    {
+        $this->categoryIds = Category::query()->pluck('id', 'slug')->map(fn ($id) => (int) $id)->all();
+        $this->existing = ContentItem::query()->where('source_ref', 'like', 'seed:%')->get()->keyBy('source_ref')->all();
+    }
+
+    private function seedQuestionBank(): void
+    {
+        foreach (QuestionBank::load($this->questionsPath, self::leafCategorySlugs()) as $entry) {
+            $crossLocale = $entry['cross_locale'] ?? ! in_array($entry['category'], self::LANGUAGE_BOUND_CATEGORIES, true);
+
+            foreach ($entry['locales'] as $locale => $block) {
+                $ref = "q:{$entry['id']}:{$locale}";
+                [$choices, $answerId] = $this->shuffledChoices($block['answer'], $block['wrong'], $ref);
+
+                $payload = $entry['type'] === 'wisdom_card'
+                    ? ['card' => ['text' => $block['text'], 'author' => $block['author'], 'source' => $block['source']], 'question' => self::WISDOM_QUESTION[$locale], 'choices' => $choices]
+                    : ['question' => $block['question'], 'choices' => $choices, 'image_url' => null];
+
+                $this->store($entry['category'], $entry['type'], $entry['difficulty'], $payload,
+                    ['choice_id' => $answerId, 'explanation' => $block['explanation']], $ref, [
+                        'locale' => $locale,
+                        'translation_group' => "q:{$entry['id']}",
+                        'cross_locale' => $crossLocale,
+                        'min_age' => $entry['min_age'] ?? self::minAgeFor($entry['difficulty']),
+                    ]);
+            }
+        }
+    }
+
+    /**
+     * French capitals and continents for the countries in data/countries_fr.php (optional file),
+     * in the same translation groups as the English items. Distractors are French capitals of
+     * the same scope / French continent names.
+     */
+    private function seedFrenchGeography(): void
+    {
+        if (! is_file($this->countriesFrPath)) {
+            return;
+        }
+
+        /** @var list<array{0: string, 1: string, 2: string, 3: string, 4: int}> $countries */
+        $countries = require __DIR__.'/data/countries.php';
+        $french = $this->frenchCountries(array_column($countries, 0));
+
+        foreach ($countries as [$country, , , $scope, $difficulty]) {
+            if (! isset($french[$country])) {
+                continue;
+            }
+
+            $fr = $french[$country];
+            $sameScope = [];
+
+            foreach ($countries as $other) {
+                $capital = $french[$other[0]]['capital'] ?? null;
+
+                if ($other[3] === $scope && $capital !== null && $capital !== $fr['capital'] && ! in_array($capital, $sameScope, true)) {
+                    $sameScope[] = $capital;
+                }
+            }
+
+            if (count($sameScope) >= 3) {
+                $this->multipleChoice($scope, $difficulty,
+                    $fr['capital_question'] ?? "Quelle est la capitale de ce pays : {$fr['country']} ?",
+                    $fr['capital'], $this->pick($sameScope, 3, "capital:{$country}:fr"), null, "capital:{$country}:fr",
+                    ['locale' => 'fr', 'translation_group' => "capital:{$country}"]);
+            }
+
+            $otherContinents = array_values(array_diff(array_values(self::CONTINENTS_FR), [$fr['continent']]));
+            $this->multipleChoice('continents', max(1, min(10, $difficulty - 1)),
+                $fr['continent_question'] ?? "Sur quel continent se trouve ce pays : {$fr['country']} ?",
+                $fr['continent'], $this->pick($otherContinents, 3, "continent:{$country}:fr"), null, "continent:{$country}:fr",
+                ['locale' => 'fr', 'translation_group' => "continent:{$country}"]);
+        }
+    }
+
+    /**
+     * @param  list<string>  $englishCountries
+     * @return array<string, array{country: string, capital: string, continent: string, capital_question: string|null, continent_question: string|null}>
+     */
+    private function frenchCountries(array $englishCountries): array
+    {
+        $data = require $this->countriesFrPath;
+
+        if (! is_array($data)) {
+            throw new \RuntimeException('countries_fr.php must return an array.');
+        }
+
+        $known = array_flip($englishCountries);
+        $out = [];
+
+        foreach ($data as $country => $row) {
+            if (! is_string($country) || ! isset($known[$country])) {
+                throw new \RuntimeException("countries_fr.php: [{$country}] is not a country in countries.php.");
+            }
+
+            foreach (['country', 'capital', 'continent'] as $key) {
+                if (! is_array($row) || ! is_string($row[$key] ?? null) || trim($row[$key]) === '') {
+                    throw new \RuntimeException("countries_fr.php: [{$country}.{$key}] must be a non-empty string.");
+                }
+            }
+
+            if (! in_array($row['continent'], self::CONTINENTS_FR, true)) {
+                throw new \RuntimeException("countries_fr.php: [{$country}] continent [{$row['continent']}] is not one of: ".implode(', ', self::CONTINENTS_FR).'.');
+            }
+
+            foreach (['capital_question', 'continent_question'] as $key) {
+                if (array_key_exists($key, $row) && (! is_string($row[$key]) || trim($row[$key]) === '')) {
+                    throw new \RuntimeException("countries_fr.php: [{$country}.{$key}] must be a non-empty string when present.");
+                }
+            }
+
+            $out[$country] = [
+                'country' => $row['country'],
+                'capital' => $row['capital'],
+                'continent' => $row['continent'],
+                'capital_question' => $row['capital_question'] ?? null,
+                'continent_question' => $row['continent_question'] ?? null,
+            ];
+        }
+
+        return $out;
     }
 
     private function seedHandWritten(): void
@@ -48,7 +233,8 @@ class ContentSeeder extends Seeder
         $items = require __DIR__.'/data/multiple_choice.php';
 
         foreach ($items as [$slug, $difficulty, $question, $correct, $wrong, $explanation]) {
-            $this->multipleChoice($slug, $difficulty, $question, $correct, $wrong, $explanation, 'mc:'.md5($slug.'|'.$question.'|'.$correct));
+            $this->multipleChoice($slug, $difficulty, $question, $correct, $wrong, $explanation, 'mc:'.md5($slug.'|'.$question.'|'.$correct),
+                ['cross_locale' => ! in_array($slug, self::LANGUAGE_BOUND_CATEGORIES, true)]);
         }
     }
 
@@ -85,9 +271,11 @@ class ContentSeeder extends Seeder
             $answer = $a * $b;
             $difficulty = max($a, $b) <= 5 ? 1 : (max($a, $b) <= 9 ? 3 : 5);
 
-            $this->multipleChoice('times-tables', $difficulty, "What is {$a} × {$b}?", (string) $answer,
-                $this->numericDistractors($answer, [$answer + $a, $answer - $b, ($a + 1) * $b, $a * ($b - 1)]),
-                null, "times:{$a}x{$b}");
+            $wrong = $this->numericDistractors($answer, [$answer + $a, $answer - $b, ($a + 1) * $b, $a * ($b - 1)]);
+
+            $this->multipleChoice('times-tables', $difficulty, "What is {$a} × {$b}?", (string) $answer, $wrong, null, "times:{$a}x{$b}");
+            $this->multipleChoice('times-tables', $difficulty, "Combien font {$a} × {$b} ?", (string) $answer, $wrong, null, "times:{$a}x{$b}:fr",
+                ['locale' => 'fr', 'translation_group' => "times:{$a}x{$b}"]);
         }
     }
 
@@ -101,9 +289,11 @@ class ContentSeeder extends Seeder
         ];
 
         foreach ($problems as [$expression, $answer, $difficulty]) {
-            $this->multipleChoice('mental-math', $difficulty, "What is {$expression}?", (string) $answer,
-                $this->numericDistractors($answer, [$answer + 10, $answer - 1, $answer + 2, $answer - 10]),
-                null, 'mental:'.$expression);
+            $wrong = $this->numericDistractors($answer, [$answer + 10, $answer - 1, $answer + 2, $answer - 10]);
+
+            $this->multipleChoice('mental-math', $difficulty, "What is {$expression}?", (string) $answer, $wrong, null, 'mental:'.$expression);
+            $this->multipleChoice('mental-math', $difficulty, "Combien font {$expression} ?", (string) $answer, $wrong, null, "mental:{$expression}:fr",
+                ['locale' => 'fr', 'translation_group' => 'mental:'.$expression]);
         }
     }
 
@@ -119,7 +309,7 @@ class ContentSeeder extends Seeder
         foreach ($words as [$scrambled, $word, $difficulty]) {
             $sameLength = array_values(array_filter($answers, fn ($w) => strlen($w) === strlen($word) && $w !== $word));
             $this->multipleChoice('anagrams', $difficulty, "Unscramble the letters: {$scrambled}", $word,
-                $this->pick($sameLength, 3, "anagram:{$word}"), null, "anagram:{$word}");
+                $this->pick($sameLength, 3, "anagram:{$word}"), null, "anagram:{$word}", ['cross_locale' => false]);
         }
     }
 
@@ -142,8 +332,9 @@ class ContentSeeder extends Seeder
 
     /**
      * @param  list<string>  $wrong
+     * @param  array<string, mixed>  $overrides  see store()
      */
-    private function multipleChoice(string $slug, int $difficulty, string $question, string $correct, array $wrong, ?string $explanation, string $ref): void
+    private function multipleChoice(string $slug, int $difficulty, string $question, string $correct, array $wrong, ?string $explanation, string $ref, array $overrides = []): void
     {
         [$choices, $answerId] = $this->shuffledChoices($correct, $wrong, $ref);
 
@@ -151,22 +342,27 @@ class ContentSeeder extends Seeder
             'question' => $question,
             'choices' => $choices,
             'image_url' => null,
-        ], ['choice_id' => $answerId, 'explanation' => $explanation], $ref);
+        ], ['choice_id' => $answerId, 'explanation' => $explanation], $ref, $overrides);
     }
 
     /**
+     * Defaults: English, `translation_group` = the ref, `cross_locale` true, min age from difficulty.
+     *
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $answer
+     * @param  array<string, mixed>  $overrides  locale, translation_group, cross_locale, min_age
      */
-    private function store(string $slug, string $type, int $difficulty, array $payload, array $answer, string $ref): void
+    private function store(string $slug, string $type, int $difficulty, array $payload, array $answer, string $ref, array $overrides = []): void
     {
         $categoryId = $this->categoryIds[$slug] ?? throw new \RuntimeException("Unknown category slug [{$slug}] in seed data.");
         $sourceRef = 'seed:'.$ref;
 
-        $this->save->handle([
+        $this->existing[$sourceRef] = $this->save->handle([
             'category_id' => $categoryId,
             'type_key' => $type,
             'locale' => 'en',
+            'translation_group' => $ref,
+            'cross_locale' => true,
             'difficulty' => $difficulty,
             'min_age' => self::minAgeFor($difficulty),
             'max_age' => null,
@@ -175,7 +371,8 @@ class ContentSeeder extends Seeder
             'status' => ContentItem::STATUS_PUBLISHED,
             'source' => 'seed',
             'source_ref' => $sourceRef,
-        ], ContentItem::query()->where('source_ref', $sourceRef)->first());
+            ...$overrides,
+        ], $this->existing[$sourceRef] ?? null);
     }
 
     /**

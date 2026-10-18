@@ -2,14 +2,19 @@
 
 namespace App\Modules\Core;
 
+use App\Modules\Core\Console\FlushReferenceCachesCommand;
+use App\Modules\Core\Support\ReferenceCache;
 use App\Modules\Identity\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
- * Shared API plumbing: health endpoint and rate limiters
- * (`auth/*` 10/min per IP and per email, everything else 120/min per token).
+ * Shared API plumbing: health endpoint, rate limiters
+ * (`auth/*` 10/min per IP and per email, everything else 120/min per token) and the reference
+ * cache plumbing (ReferenceCache, `reference-cache:flush`).
  */
 class CoreServiceProvider extends ModuleServiceProvider
 {
@@ -46,6 +51,13 @@ class CoreServiceProvider extends ModuleServiceProvider
 
         // Public account deletion page: 5 form posts per hour per IP.
         RateLimiter::for('account-deletion', fn (Request $request) => Limit::perHour(5)->by('account-deletion|'.$request->ip()));
+
+        // A migration may change reference rows with raw SQL: start from fresh reference caches.
+        Event::listen(MigrationsEnded::class, fn () => ReferenceCache::flush(...ReferenceCache::ALL));
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([FlushReferenceCachesCommand::class]);
+        }
 
         parent::boot();
     }

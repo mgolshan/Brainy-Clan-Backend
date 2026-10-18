@@ -6,8 +6,10 @@ use App\Modules\Goals\Events\GoalReached;
 use App\Modules\Goals\Events\PeriodClosed;
 use App\Modules\Goals\Models\GoalPlan;
 use App\Modules\Identity\Models\Device;
+use App\Modules\Notifications\Actions\CheckPushReceipts;
 use App\Modules\Notifications\Actions\SendDailyReminders;
 use App\Modules\Notifications\Contracts\ExpoPushSender;
+use App\Modules\Notifications\Jobs\CheckPushReceiptsJob;
 use App\Modules\Notifications\Jobs\DeliverPushNotification;
 use App\Modules\Notifications\Listeners\NotifyFamilyActivity;
 use App\Modules\Notifications\Listeners\NotifyGoalReached;
@@ -536,4 +538,79 @@ it('schedules daily reminders every 15 minutes', function () {
 
     expect($event)->not->toBeNull()
         ->and($event->expression)->toBe('*/15 * * * *');
+});
+
+it('returns accepted ticket ids with their tokens for the receipts check', function () {
+    Http::fake(['exp.host/*' => Http::response(['data' => [
+        ['status' => 'ok', 'id' => 'ticket-a'],
+        ['status' => 'error', 'details' => ['error' => 'DeviceNotRegistered']],
+    ]])]);
+    $messages = array_map(fn (string $token) => ['to' => $token, 'title' => 'T', 'body' => 'B', 'data' => []],
+        ['ExponentPushToken[a]', 'ExponentPushToken[b]']);
+
+    $result = app(HttpExpoPushSender::class)->send($messages);
+
+    expect($result->tickets)->toBe(['ticket-a' => 'ExponentPushToken[a]'])
+        ->and($result->invalidTokens)->toBe(['ExponentPushToken[b]']);
+});
+
+it('queues a receipts check 15 minutes after a delivery with accepted tickets', function () {
+    Queue::fake([CheckPushReceiptsJob::class]);
+    $owner = familyOwner();
+    Device::factory()->create(['user_id' => $owner->user_id, 'push_token' => 'ExponentPushToken[a]']);
+    Http::fake(['exp.host/*' => Http::response(['data' => [['status' => 'ok', 'id' => 'ticket-a']]])]);
+    app()->bind(ExpoPushSender::class, HttpExpoPushSender::class);
+
+    (new DeliverPushNotification([$owner->id], 'T', 'B', ['type' => 'goal_reached'], CarbonImmutable::now()))->handle(app(ExpoPushSender::class));
+
+    Queue::assertPushed(CheckPushReceiptsJob::class, fn (CheckPushReceiptsJob $job) => $job->tickets === ['ticket-a' => 'ExponentPushToken[a]']
+        && $job->delay instanceof DateTimeInterface
+        && abs(CarbonImmutable::now()->diffInMinutes($job->delay) - 15) < 1);
+});
+
+it('checks receipts in batches of 1000, clears DeviceNotRegistered tokens and logs other errors without PII', function () {
+    Log::spy();
+    $owner = familyOwner();
+    $dead = Device::factory()->create(['user_id' => $owner->user_id, 'push_token' => 'ExponentPushToken[dead]']);
+    $alive = Device::factory()->create(['user_id' => $owner->user_id, 'push_token' => 'ExponentPushToken[t1]']);
+
+    $tickets = [];
+    foreach (range(1, 1200) as $i) {
+        $tickets["ticket-{$i}"] = "ExponentPushToken[t{$i}]";
+    }
+    $tickets['ticket-dead'] = 'ExponentPushToken[dead]';
+
+    Http::fake(['exp.host/--/api/v2/push/getReceipts' => function (Request $request) {
+        $receipts = [];
+        foreach ($request->data()['ids'] as $id) {
+            $receipts[$id] = match ($id) {
+                'ticket-dead' => ['status' => 'error', 'message' => 'ExponentPushToken[dead] is not registered', 'details' => ['error' => 'DeviceNotRegistered']],
+                'ticket-7' => ['status' => 'error', 'message' => 'too big', 'details' => ['error' => 'MessageTooBig']],
+                default => ['status' => 'ok'],
+            };
+        }
+
+        return Http::response(['data' => $receipts]);
+    }]);
+
+    (new CheckPushReceiptsJob($tickets))->handle(app(CheckPushReceipts::class));
+
+    Http::assertSentCount(2);
+    Http::assertSent(fn (Request $request) => count($request->data()['ids']) === 1000);
+    expect($dead->refresh()->push_token)->toBeNull()->and($alive->refresh()->push_token)->toBe('ExponentPushToken[t1]');
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context) => $message === 'Expo push receipts reported errors'
+        && $context === ['errors' => ['MessageTooBig' => 1]])->once();
+});
+
+it('skips the receipts check when Expo fails, without logging tokens', function () {
+    Log::spy();
+    $owner = familyOwner();
+    $device = Device::factory()->create(['user_id' => $owner->user_id, 'push_token' => 'ExponentPushToken[a]']);
+    Http::fake(['exp.host/*' => Http::response(['errors' => [['code' => 'INTERNAL_SERVER_ERROR', 'message' => 'ExponentPushToken[a]']]], 500)]);
+
+    $result = app(CheckPushReceipts::class)->handle(['ticket-a' => 'ExponentPushToken[a]']);
+
+    expect($result)->toBe(['checked' => 0, 'cleared' => 0])->and($device->refresh()->push_token)->toBe('ExponentPushToken[a]');
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context) => $message === 'Expo receipts request failed'
+        && ! str_contains((string) json_encode($context), 'ExponentPushToken'))->once();
 });

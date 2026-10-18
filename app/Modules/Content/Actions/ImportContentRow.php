@@ -11,7 +11,8 @@ use Illuminate\Validation\ValidationException;
  * Turns one flat CSV row into a content item (used by the Filament CSV importer).
  *
  * Common columns: category_slug, type_key, difficulty, min_age, max_age, locale, status,
- * tags (separated by ";"), source_ref (optional; re-importing the same ref updates the item).
+ * tags (separated by ";"), source_ref (optional; re-importing the same ref updates the item),
+ * translation_group and cross_locale (optional, 0/1; empty cells keep the stored value).
  * Type-specific columns come from the plugin's flatColumns().
  */
 class ImportContentRow
@@ -51,6 +52,16 @@ class ImportContentRow
 
         $existing = $sourceRef !== '' ? ContentItem::query()->where('source_ref', $sourceRef)->first() : null;
 
+        $translation = [];
+
+        if (trim((string) ($row['translation_group'] ?? '')) !== '') {
+            $translation['translation_group'] = trim((string) $row['translation_group']);
+        }
+
+        if (trim((string) ($row['cross_locale'] ?? '')) !== '') {
+            $translation['cross_locale'] = filter_var($row['cross_locale'], FILTER_VALIDATE_BOOLEAN);
+        }
+
         $item = $this->save->handle([
             'category_id' => $category->id,
             'type_key' => $typeKey,
@@ -64,6 +75,7 @@ class ImportContentRow
             'source' => 'csv',
             'source_ref' => $sourceRef !== '' ? $sourceRef : null,
             'content_batch_id' => $batchId,
+            ...$translation,
         ], $existing);
 
         $tags = array_filter(array_map('trim', explode(';', (string) ($row['tags'] ?? ''))));

@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\Log;
 /**
  * Pushes one notification to every device of the given members (preferences and quiet hours were
  * already checked by {@see SendMemberNotification}). Dropped when
- * older than {@see self::MAX_AGE_HOURS}. Tokens Expo reports as not registered are cleared.
+ * older than {@see self::MAX_AGE_HOURS}. Tokens Expo reports as not registered are cleared; accepted
+ * tickets are checked later by {@see CheckPushReceiptsJob} (receipts can report more dead tokens).
  *
  * When Expo is temporarily unavailable (see {@see PushSendResult::$retryTokens})
  * a follow-up job is queued for just those tokens after {@see self::RETRY_DELAYS_SECONDS}; tokens that were
@@ -74,6 +75,10 @@ class DeliverPushNotification implements ShouldQueue
 
         if ($result->invalidTokens !== []) {
             Device::query()->whereIn('push_token', $result->invalidTokens)->update(['push_token' => null]);
+        }
+
+        if ($result->tickets !== []) {
+            dispatch((new CheckPushReceiptsJob($result->tickets))->delay(CarbonImmutable::now()->addMinutes(CheckPushReceiptsJob::DELAY_MINUTES)));
         }
 
         if ($result->retryTokens === []) {

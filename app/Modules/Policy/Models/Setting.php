@@ -2,9 +2,12 @@
 
 namespace App\Modules\Policy\Models;
 
+use App\Modules\Core\Contracts\InvalidatesReferenceCache;
+use App\Modules\Core\Support\ReferenceDataBuilder;
 use App\Modules\Policy\PolicyResolver;
 use Database\Factories\SettingFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,7 +27,8 @@ use Spatie\Activitylog\Support\LogOptions;
  */
 #[Fillable(['key', 'scope', 'scope_id', 'value', 'description'])]
 #[UseFactory(SettingFactory::class)]
-class Setting extends Model
+#[UseEloquentBuilder(ReferenceDataBuilder::class)]
+class Setting extends Model implements InvalidatesReferenceCache
 {
     /** @use HasFactory<SettingFactory> */
     use HasFactory, LogsActivity;
@@ -44,10 +48,12 @@ class Setting extends Model
         ];
     }
 
-    protected static function booted(): void
+    /**
+     * Called after every Eloquent write (ReferenceDataBuilder).
+     */
+    public static function flushReferenceCaches(): void
     {
-        static::saved(fn () => PolicyResolver::flushCache());
-        static::deleted(fn () => PolicyResolver::flushCache());
+        PolicyResolver::flushCache();
     }
 
     public function getActivitylogOptions(): LogOptions

@@ -158,7 +158,7 @@ return [
     ['money-basics', 7, 'A man is rich in proportion to the number of things which he can afford to let alone.', 'Henry David Thoreau', 'Walden (1854)',
         'Being able to live without many things is a kind of wealth', ['Rich people own the most things', 'You should buy everything you can afford'],
         'Not needing much is a form of freedom.'],
-    ['money-basics', 1, 'A budget is a plan that tells your money where to go.', null, $original,
+    ['money-basics', 1, 'A budget is a plan you make before you spend.', null, $original,
         'Planning your spending helps you use money wisely', ['A budget means you can never buy anything', 'Money decides by itself where it goes'],
         'With a plan, you choose how your money is used.'],
     ['money-basics', 1, 'Needs come first; wants can wait.', null, $original,

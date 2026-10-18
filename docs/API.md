@@ -13,7 +13,9 @@ and add a line to the changelog at the bottom.
   simpler to type in TypeScript.
 - Keys are `snake_case`. Ids are integers. Timestamps are ISO 8601 UTC strings (`2026-10-10T14:00:00Z`).
 - Localized strings (category names, content) are resolved server-side to the member's `locale`
-  (fallback `en`); the API returns plain strings.
+  (fallback `en`); the API returns plain strings. A play session never holds the same question in
+  two languages: an English item is used only when it has no published translation in the
+  member's locale.
 - **Errors:** `{ "message": "Human readable", "code": "snake_case_code", "errors": { "field": ["..."] } }`.
   `errors` only on 422. Status codes: 401 unauthenticated, 403 forbidden / limit, 404, 409 state
   conflict, 422 validation, 426 app too old, 429 rate limited.
@@ -552,3 +554,4 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-16 — B9 details: `POST /me/legal-acceptance` → 403 for children, 422 on a stale version; `/me/export` also has `social_accounts` and per-membership `notification_preferences` and is sent as an attachment (`no-store`); social sign-up checks `accept_terms` after birth/age checks; child invites check `parental_consent` before the member limit; webhooks rate-limited (600/min/IP).
 - 2026-10-17 — Login throttled per email as well as per IP; documented request size limits.
 - 2026-10-17 — `GET /play/sessions/current`; a new session abandons older unfinished ones; idle sessions auto-abandoned after 24 h.
+- 2026-10-17 — Content locale: items in the member's `locale`, English only where no translation exists (no duplicates across languages). No shape change.

@@ -4,8 +4,8 @@ namespace App\Modules\ChallengeTypes;
 
 use App\Modules\ChallengeTypes\Contracts\ChallengeType;
 use App\Modules\Content\Models\ChallengeType as ChallengeTypeRecord;
+use App\Modules\Core\Support\ReferenceCache;
 use Illuminate\Contracts\Container\Container;
-use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 
 /**
@@ -14,8 +14,6 @@ use InvalidArgumentException;
  */
 class ChallengeTypeRegistry
 {
-    private const string CACHE_KEY = 'challenge_types:records:v1';
-
     /** @var array<string, array{handler_class: string, is_active: bool}>|null */
     private ?array $records = null;
 
@@ -26,7 +24,7 @@ class ChallengeTypeRegistry
 
     public static function flush(): void
     {
-        Cache::forget(self::CACHE_KEY);
+        ReferenceCache::flush(ReferenceCache::CHALLENGE_TYPES);
 
         if (app()->resolved(self::class)) {
             $registry = app(self::class);
@@ -100,7 +98,7 @@ class ChallengeTypeRegistry
         }
 
         /** @var array<string, array{handler_class: string, is_active: bool}> $records */
-        $records = Cache::rememberForever(self::CACHE_KEY, fn (): array => ChallengeTypeRecord::query()->get()
+        $records = ReferenceCache::remember(ReferenceCache::CHALLENGE_TYPES, fn (): array => ChallengeTypeRecord::query()->get()
             ->mapWithKeys(fn (ChallengeTypeRecord $type) => [$type->key => ['handler_class' => $type->handler_class, 'is_active' => $type->is_active]])
             ->all());
 

@@ -35,6 +35,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -42,8 +43,8 @@ use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 /**
- * Content items: filter by category (incl. sub-categories), type, difficulty, age, status and
- * source; bulk publish / archive / retag; CSV import; open an item in the content preview.
+ * Content items: filter by category (incl. sub-categories), type, locale, difficulty, age, status
+ * and source; bulk publish / archive / retag; CSV import; open an item in the content preview.
  * Payload and answer are validated by the item's challenge type plugin.
  */
 class ContentItemResource extends Resource
@@ -72,6 +73,10 @@ class ContentItemResource extends Resource
                 TextInput::make('max_age')->numeric()->minValue(0)->maxValue(120),
                 Select::make('status')->options(array_combine(ContentItem::STATUSES, ContentItem::STATUSES))->default(ContentItem::STATUS_DRAFT)->required(),
                 Select::make('source')->options(array_combine(ContentItem::SOURCES, ContentItem::SOURCES))->default('manual')->required(),
+                TextInput::make('translation_group')->maxLength(64)->disabledOn('edit')->dehydrated(fn (string $operation) => $operation === 'create')
+                    ->helperText('Translations of one item share this key (seed items: e.g. q:flags-001).'),
+                Toggle::make('cross_locale')->label('Offer to other languages')->default(true)->inline(false)
+                    ->helperText('Off for language-bound English items (spelling, idioms, words).'),
                 Select::make('tags')->relationship('tags', 'name')->multiple()->preload()->createOptionForm([
                     TextInput::make('name')->required()->maxLength(60),
                 ])->columnSpan(3),
@@ -115,6 +120,7 @@ class ContentItemResource extends Resource
                 TextColumn::make('id')->sortable(),
                 TextColumn::make('category.slug')->label('Category')->formatStateUsing(fn (ContentItem $record) => CategoryResource::path($record->category))->wrap(),
                 TextColumn::make('type_key')->label('Type')->badge(),
+                TextColumn::make('locale')->badge()->color('gray'),
                 TextColumn::make('summary')->label('Question / card')->state(fn (ContentItem $record) => self::summary($record))->limit(70)->wrap(),
                 TextColumn::make('difficulty')->sortable(),
                 TextColumn::make('min_age')->label('Ages')->state(fn (ContentItem $record) => ($record->min_age ?? 0).'–'.($record->max_age ?? '∞'))->toggleable(),
@@ -134,6 +140,8 @@ class ContentItemResource extends Resource
                         ? $query->whereIn('category_id', app(CategoryTree::class)->subtreeIds((int) $data['value']))
                         : $query),
                 SelectFilter::make('type_key')->label('Type')->options(fn () => collect(app(ChallengeTypeRegistry::class)->handlers())->mapWithKeys(fn ($c, $k) => [$k => $k])->all()),
+                SelectFilter::make('locale')->options(['en' => 'en', 'fr' => 'fr']),
+                TernaryFilter::make('cross_locale')->label('Offered to other languages'),
                 SelectFilter::make('status')->options(array_combine(ContentItem::STATUSES, ContentItem::STATUSES)),
                 SelectFilter::make('source')->options(array_combine(ContentItem::SOURCES, ContentItem::SOURCES)),
                 SelectFilter::make('difficulty')->multiple()->options(array_combine(range(1, 10), array_map('strval', range(1, 10)))),

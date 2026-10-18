@@ -12,7 +12,8 @@ use Illuminate\Support\Collection;
 
 /**
  * Chooses content for a member: published items of an active type in the category subtree,
- * suitable for the member's age and locale, inside their difficulty range, least-seen first.
+ * suitable for the member's age and locale (translations replace their English original, see
+ * ContentItem::whereAvailableInLocale), inside their difficulty range, least-seen first.
  * When the range runs dry it falls back to the nearest difficulties, and (when allowed) to
  * repeats, so a session can always continue.
  */
@@ -112,8 +113,9 @@ class PickContentItems
             })
             ->where('content_items.status', ContentItem::STATUS_PUBLISHED)
             ->whereIn('content_items.category_id', $this->tree->subtreeIds($categoryId))
-            ->whereIn('content_items.type_key', $this->registry->activeKeys())
-            ->whereIn('content_items.locale', array_values(array_unique([$locale, 'en'])));
+            ->whereIn('content_items.type_key', $this->registry->activeKeys());
+
+        ContentItem::whereAvailableInLocale($query, $locale);
 
         if ($age !== null) {
             $query->where(fn (Builder $q) => $q->whereNull('content_items.min_age')->orWhere('content_items.min_age', '<=', $age))

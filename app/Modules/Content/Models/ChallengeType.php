@@ -3,7 +3,10 @@
 namespace App\Modules\Content\Models;
 
 use App\Modules\ChallengeTypes\ChallengeTypeRegistry;
+use App\Modules\Core\Contracts\InvalidatesReferenceCache;
+use App\Modules\Core\Support\ReferenceDataBuilder;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -20,7 +23,8 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property bool $is_active
  */
 #[Fillable(['key', 'name', 'handler_class', 'config', 'is_active'])]
-class ChallengeType extends Model
+#[UseEloquentBuilder(ReferenceDataBuilder::class)]
+class ChallengeType extends Model implements InvalidatesReferenceCache
 {
     use LogsActivity;
 
@@ -32,10 +36,12 @@ class ChallengeType extends Model
         ];
     }
 
-    protected static function booted(): void
+    /**
+     * Called after every Eloquent write (ReferenceDataBuilder).
+     */
+    public static function flushReferenceCaches(): void
     {
-        static::saved(fn () => ChallengeTypeRegistry::flush());
-        static::deleted(fn () => ChallengeTypeRegistry::flush());
+        ChallengeTypeRegistry::flush();
     }
 
     public function getActivitylogOptions(): LogOptions

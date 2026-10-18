@@ -1,6 +1,8 @@
 <?php
 
 use App\Filament\Resources\AgeBands\Pages\EditAgeBand;
+use App\Filament\Resources\ContentItems\Pages\EditContentItem;
+use App\Filament\Resources\ContentItems\Pages\ListContentItems;
 use App\Modules\ChallengeTypes\Generators\WordSearchBuilder;
 use App\Modules\Content\Models\Category;
 use App\Modules\Content\Models\ContentItem;
@@ -90,4 +92,29 @@ it('edits a band\'s ad request configuration', function () {
         ->assertHasNoFormErrors();
 
     expect($teen->fresh()->rule('ad_request'))->toBe(['non_personalized' => false, 'under_age_of_consent' => true, 'max_ad_content_rating' => 'PG']);
+});
+
+it('shows the translation group read-only and toggles cross_locale on a content item', function () {
+    $item = ContentItem::factory()->create(['translation_group' => 'q:flags-001', 'locale' => 'en']);
+    $this->actingAs(User::factory()->staff()->create());
+
+    Livewire::test(EditContentItem::class, ['record' => $item->getRouteKey()])
+        ->assertFormSet(['translation_group' => 'q:flags-001', 'cross_locale' => true])
+        ->assertFormFieldIsDisabled('translation_group')
+        ->fillForm(['cross_locale' => false])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($item->refresh()->cross_locale)->toBeFalse()->and($item->translation_group)->toBe('q:flags-001');
+});
+
+it('filters content items by locale', function () {
+    $en = ContentItem::factory()->create(['locale' => 'en']);
+    $fr = ContentItem::factory()->create(['locale' => 'fr']);
+    $this->actingAs(User::factory()->staff()->create());
+
+    Livewire::test(ListContentItems::class)
+        ->filterTable('locale', 'fr')
+        ->assertCanSeeTableRecords([$fr])
+        ->assertCanNotSeeTableRecords([$en]);
 });

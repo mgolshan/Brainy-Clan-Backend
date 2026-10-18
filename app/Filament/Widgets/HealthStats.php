@@ -1,0 +1,49 @@
+<?php
+
+namespace App\Filament\Widgets;
+
+use App\Filament\Resources\WebhookEvents\WebhookEventResource;
+use App\Filament\Support\DashboardMetrics;
+use App\Modules\Billing\Models\WebhookEvent;
+use Filament\Support\Icons\Heroicon;
+use Filament\Widgets\StatsOverviewWidget;
+use Filament\Widgets\StatsOverviewWidget\Stat;
+
+/**
+ * Failed jobs, webhook errors, push readiness and account-deletion requests.
+ */
+class HealthStats extends StatsOverviewWidget
+{
+    protected static ?int $sort = 3;
+
+    protected ?string $pollingInterval = '60s';
+
+    protected ?string $heading = 'System health';
+
+    protected function getStats(): array
+    {
+        $health = app(DashboardMetrics::class)->health();
+        $pushShare = $health['devices'] > 0 ? round(100 * $health['devices_with_push'] / $health['devices']) : 0;
+
+        return [
+            Stat::make('Failed jobs', number_format($health['failed_jobs']))
+                ->icon(Heroicon::OutlinedExclamationTriangle)
+                ->description(number_format($health['failed_jobs_day']).' in the last 24 hours')
+                ->color($health['failed_jobs_day'] > 0 ? 'danger' : 'success')
+                ->url(url(config('horizon.path', 'horizon').'/failed')),
+            Stat::make('Webhook errors', number_format($health['webhook_errors_week']))
+                ->icon(Heroicon::OutlinedBolt)
+                ->description('Failed RevenueCat events in 7 days')
+                ->color($health['webhook_errors_week'] > 0 ? 'danger' : 'success')
+                ->url(WebhookEventResource::getUrl('index', ['filters' => ['outcome' => ['value' => WebhookEvent::OUTCOME_FAILED]]])),
+            Stat::make('Push-ready devices', number_format($health['devices_with_push']))
+                ->icon(Heroicon::OutlinedDevicePhoneMobile)
+                ->description($pushShare.'% of '.number_format($health['devices']).' devices · '.number_format($health['failed_push_jobs']).' failed push jobs')
+                ->descriptionColor($health['failed_push_jobs'] > 0 ? 'danger' : 'gray'),
+            Stat::make('Pending deletions', number_format($health['deletion_requests_pending']))
+                ->icon(Heroicon::OutlinedTrash)
+                ->description('Awaiting email confirmation · '.number_format($health['deletion_requests_blocked_week']).' blocked in 7 days')
+                ->color($health['deletion_requests_pending'] > 0 ? 'warning' : 'gray'),
+        ];
+    }
+}

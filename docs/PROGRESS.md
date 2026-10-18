@@ -20,13 +20,24 @@ Milestones are defined in `docs/PLAN.md`.
 | B6a API documentation (Scramble) | Done | Module tags, contract error envelope + codes per endpoint (`ErrorResponsesExtension`, `#[ApiErrors]`), typed answer/leaderboard responses, summaries on every endpoint, spec coverage test |
 | B6b Social sign-in (Google, Facebook) | Done | Socialite 5.31, `social_accounts`, verifiers (Google ID token via JWKS, Facebook `debug_token` + `/me`), sign-in/link/unlink/list, Filament column, README setup guide, Pest + live smoke test. Needs real Google/Facebook IDs to try end to end |
 | B6c Sign in with Apple | Done | **Account deletion + Apple token revocation done** (session 12): `GET /me/deletion-check`, `DELETE /me`, `DELETE /family`, child erasure on member removal, one `EraseUser` action, `AppleTokenClient` (code exchange + revoke, ES256 client secret, skipped without keys), 12 Pest tests. **Sign-in done** (session 9): `AppleIdTokenVerifier` (JWKS `appleid.apple.com/auth/keys`, cached + refetch on unknown kid, `iss`, `aud` ∈ `APPLE_CLIENT_IDS`, `exp`, optional `nonce` = sha256 hex), provider `apple` on `/auth/social/{provider}` and `/me/social-accounts/{provider}`, `display_name` from the app (fallback "Player", never a private relay), Filament column "Social sign-in", README "Sign in with Apple — setup", Pest + live curl. |
-| B7 Remaining launch content | In progress | Sudoku + Math Sprint generated per session, Word Puzzles seeded, item `points`, Filament preview + category generators; **AI batch generator done** (Laravel AI SDK, Horizon `ai` queue, review/approve page; needs `ANTHROPIC_API_KEY` to run for real). Left: content for all 8 categories (generate + review batches) |
+| B7 Remaining launch content | In progress | Sudoku + Math Sprint generated per session, Word Puzzles seeded, item `points`, Filament preview + category generators; **AI batch generator done** (Laravel AI SDK, Horizon `ai` queue, review/approve page; needs `ANTHROPIC_API_KEY` to run for real). **Session 17:** launch question bank (`data/questions/*.php`, en + fr, strict validator + CI test), French content (translation groups, picker dedupe, French capitals/continents/math/word puzzles) seeded on dev. Fact-checked by independent reviewers (quotes string-matched against the public-domain texts) and re-seeded. Left: more content via the AI generator |
 | B8 Billing, ads and notifications | Done | Billing core (s8), push token + preferences (s10), sending + goal notifications (s11); **session 13:** `has_own_login`, `family_activity` (1/member/hour), `daily_reminder` (every 15 min, family tz), `POST /family/subscription/sync` (RevenueCat REST v1), hourly reconciliation, AdMob SSV (`ad_rewards`, ECDSA) + ad second chance (409 `ad_reward_pending`), Policy `ad_request`, Filament subscription section + Webhook events, README setup guide. Needs real RevenueCat/AdMob accounts to try end to end |
 | B9 Production | Done (needs a real server + lawyer) | **Session 14:** legal API (consents, `GET /legal`, terms/privacy pages en+fr drafts, `accept_terms`, `parental_consent`, invite preview, `me.legal`, legal acceptance, `/me/export`), account deletion web page `/account/delete`, Filament consents, Sentry (`sentry/sentry-laravel` 4.29, PII scrubber), production image (`docker/prod/Dockerfile`), `docker-compose.prod.yml` (Caddy HTTPS), encrypted off-site backups + restore drill, `docs/DEPLOY.md`, route security test. Not done on a real server: DNS/HTTPS, Storage Box upload, Sentry DSN. Texts need lawyer review |
 
 ## Next up
 
-0. **State at last stop (session 16, 2026-10-17, hardening pass part 2):** session 15's items a–c are **done**
+0. **State at last stop (session 17, 2026-10-17, launch question bank + French content):** done (see log). Dev DB:
+   `migrate` (1 migration, `add_translation_fields_to_content_items`) + `ContentSeeder` and `WordPuzzleSeeder` re-run
+   (idempotent via `source_ref`; no fresh). Expo receipts check done. **Next:**
+   a. Done (coordinator, 2026-10-17): independent fact-check pass on all bank files, `countries_fr.php` and `words_fr.php`;
+      both seeders re-run. Moe can archive any item in Filament (filter by locale / "Offered to other languages").
+   b. Known seed quirks (pre-existing, not changed): the MC anagram refs `seed:anagram:<WORD>` collide with the
+      word-puzzle anagram refs for words in both lists (APPLE, TIGER, …); whichever seeder runs last owns those rows
+      (run `ContentSeeder` then `WordPuzzleSeeder`, as now). One orphan `seed:wisdom:99716a…` item (id 365 on dev)
+      from an older wisdom text has no `translation_group` — archived by the coordinator (old Ramsey-like budget text).
+   c. Contract note for docs/API.md (coordinator): none (content locale rule already noted 2026-10-17; no shape change).
+   d. Then the items of session 16 below.
+   Previous: **State at last stop (session 16, 2026-10-17, hardening pass part 2):** session 15's items a–c are **done**
    (indexes, security review, README; see log). Dev DB: `migrate` (1 migration, `add_hot_path_indexes`), no
    fresh, no reseed. **Next:**
    a. Item d below (admin config tables in the constant-query test) — optional, low value.
@@ -365,6 +376,130 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-10-17 caching
+- **Audit** (queries per warm request, before → after): `GET /health` 0, `GET /legal` 0 (config),
+  `GET /me` 6 → 6, `GET /categories` 1 → 0, `GET /family` 4, `GET /family/leaderboard` 3, `GET /goals` 1+,
+  `GET /me/stats` 4, `POST /play/sessions` ~53 (writes), `POST …/answers` 17 (writes), `GET /play/sessions/{id}` 5.
+  Plus per real request: Sanctum token lookup, user, `last_used_at` update (never cached). What is left is
+  per-member/live data, so only reference data is cached.
+- **Gaps found in the existing caches and fixed:** (1) Filament's category **reorder** is a mass `CASE`
+  update that fires no model events → the category tree stayed in the old order forever; (2) any
+  query-builder update/delete/insert (`Category::query()->update()`, `Setting::insert()`) and
+  `withoutEvents`/`saveQuietly` writes bypassed invalidation; (3) the cache was forgotten **inside** the
+  transaction, so a concurrent reader could refill it with the old rows before the commit (stale
+  forever); (4) the same race with a slow reader that read the DB before the write and stored after the
+  forget. Fix: one helper `App\Modules\Core\Support\ReferenceCache` — versioned keys
+  (`ref:{name}:version` holds a random token, the value lives under `ref:{name}:{token}`, 7-day TTL for
+  garbage), the token is replaced **after commit** (`DB::afterCommit`; a rollback leaves the cache alone),
+  values computed inside an open transaction are never stored; and `ReferenceDataBuilder` (Eloquent
+  builder via `#[UseEloquentBuilder]`) that invalidates after every write method (update, delete, insert*,
+  upsert, increment*, touch, truncate…), which also covers model saves/deletes with events off.
+  `php artisan reference-cache:flush` for raw-SQL edits; `MigrationsEnded` flushes everything. No tags
+  (tag flushes are not atomic either; versioned keys work on every store).
+- **Tests run with a Redis-like store:** array store with `serialize` on (`CACHE_ARRAY_SERIALIZE=true` in
+  phpunit.xml; values must survive a round trip and contain no objects, as on Redis).
+
+| Cached | Key | Invalidated by | Gain |
+| --- | --- | --- | --- |
+| Age bands + settings (`PolicyResolver`) | `ref:policy.v2:{token}` | any `AgeBand`/`Setting` Eloquent write: Filament age-band edit, settings create/edit/delete, `PolicySeeder`, mass updates, migrations | 2 queries per request/job that asks a rule (was cached before; now race-free and mass-update-proof) |
+| Category tree (`CategoryTree`) | `ref:category-tree.v2:{token}` | any `Category` write: Filament edit/create, **reorder**, active toggle, `CategorySeeder`, deletes, mass updates | 1 query (`/categories`, play start, admin pages) |
+| Challenge type records (`ChallengeTypeRegistry`) | `ref:challenge-types.v2:{token}` | any `ChallengeType` write: Filament toggle/edit, `ChallengeTypeSeeder`, mass updates | 1 query (`/categories`, play, session payloads) |
+| Content availability (`ContentAvailability`, new) — distinct category/type/locale/cross_locale/age rows of published items; age, locale and active-type filters in PHP | `ref:content-availability.v1:{token}` | any `ContentItem` write: `SaveContentItem` (Filament create/edit), bulk publish/review/archive, CSV import, AI batch approve/reject, `ContentSeeder`/`WordPuzzleSeeder` (under `withoutEvents`), deletes, mass updates | 1 `DISTINCT` scan of `content_items` per `GET /categories` → 0 |
+
+- **Deliberately not cached:** points/ledger, streaks, leaderboard, `/me/stats`, goal progress (live,
+  append-only ledger); answers, play sessions and session items; subscriptions/tier (webhook-driven,
+  entitlement); Sanctum tokens, sign-in codes, throttles, consents, second-chance usage (security/limits);
+  `activeMembership()` and family member counts (per-user, a removed member must lose access at once —
+  would need risky per-family invalidation for 1 indexed query); the play picker query (per member,
+  depends on history). `GET /legal` and `/health` already run 0 queries (config + policy cache). Scramble
+  docs are closed outside local (Scramble has its own `scramble:cache` if they are opened). The
+  `exists:categories` rule on play start (1 PK lookup) stays: replacing it would change the API docs.
+- **Production config verified:** `docker/prod/entrypoint.sh` runs `php artisan optimize` per container
+  (config, events, routes, views + package tasks `filament:optimize` and `icons:cache`); OPcache on with
+  `validate_timestamps=0`; optimized Composer autoloader. `route:cache`, `event:cache`, `view:cache`,
+  `filament:cache-components` and `icons:cache` all succeed on this code base. Documented in
+  `docs/DEPLOY.md` §7 (plus `reference-cache:flush`). Dev OPcache settings unchanged.
+- Non-cache opportunities noticed (not done): play start does one insert per session item and one
+  `member_item_history` select+insert per item (~53 queries; could be batched); answer loads the session
+  and family twice (17 queries).
+- Tests: `tests/Feature/Actions/ReferenceCacheTest.php` (helper: commit/rollback, no store inside a
+  transaction, stale late writer, lost version key, flush command + migrations; each cache: 0 queries on
+  the next request and every write path incl. Filament reorder/toggle/edit/delete, seeders, mass updates,
+  `withoutEvents`), `tests/Feature/Api/ContentAvailabilityTest.php` (equivalence with the old SQL for
+  ages × locales × type filters; publish, Filament bulk archive, CSV import, AI approval, mass update,
+  delete, ContentSeeder). With invalidation switched off, 13 of these tests fail. Full suite 596 passed;
+  Pint and PHPStan clean.
+
+### 2026-10-17 admin dashboard
+
+- PLAN "Admin dashboard (2026-10-17)". The Filament dashboard (`/admin`) replaces the lone account
+  widget with widgets in `app/Filament/Widgets` (auto-discovered, polled every 60 s):
+  - stat cards: **Activity** (families + new in 7 d, members + played today / 7 d, plays today with a
+    7-day sparkline, points awarded today / 7 d with sparkline), **Subscriptions and content** (paying /
+    trial / grace, family-plan share, published items with en/fr split, items awaiting review + AI
+    batches to review), **System health** (failed jobs + last 24 h → Horizon, webhook errors 7 d →
+    filtered webhook events, push-ready devices + failed push jobs, pending/blocked deletion requests);
+  - charts: plays per day (30 d, full width), new families per day (30 d), plays per top-level
+    category (7 d, bar);
+  - lists: recent families (plan, subscription, `withCount` members), AI batches awaiting review
+    (→ batch review page), recent webhook errors (shown only when there was one in 7 days).
+  Cards and lists link to the matching resource page (with table filters where useful).
+- All aggregates live in `App\Filament\Support\DashboardMetrics` (sections activity / trend /
+  plays-per-category / business / health): fixed GROUP BY / COUNT queries, `Cache::remember` 60 s,
+  UTC calendar days (`DATE()` works in MySQL and SQLite). Category names come from the cached
+  `CategoryTree`. Chart.js options in `DashboardChartOptions`.
+- Migration `2026_10_17_400000_add_dashboard_indexes`: covering indexes `play_sessions(started_at,
+  member_id, category_id)` and `point_entries(created_at, amount)` (EXPLAIN showed full scans of both
+  for the 7/30-day windows; now range scans).
+- Tests: `tests/Feature/Admin/DashboardTest.php` (10 tests): dashboard renders for staff (403
+  otherwise), exact figures for a known dataset per section and widget, lists, cache TTL, constant
+  query count per widget for small vs. large data (cache flushed between), no aggregate queries
+  while the cache is warm.
+
+### 2026-10-17 (session 17: launch question bank, French content, Expo receipts)
+
+- PLAN "Launch question bank and French content (2026-10-17)". Migration
+  `2026_10_17_300000_add_translation_fields_to_content_items`: `translation_group` (nullable string 64),
+  `cross_locale` (bool, default true), index `(translation_group, locale, status)`. Model fillable/casts;
+  `SaveContentItem` stores them (blank group → null); CSV import accepts optional `translation_group` / `cross_locale`
+  columns (empty cells keep the stored value).
+- `ContentItem::whereAvailableInLocale()`: `en` member → `en` items only; other locale L → items in L, plus `en` items
+  with `cross_locale` and no published L item in the same `translation_group` (one correlated `NOT EXISTS`). Used by
+  `PickContentItems::query()` and (without the dedupe) by `BuildCategoryTree` so a category's `challenge_types` only
+  lists types playable in the member's locale.
+- `ContentSeeder`: existing items keep their `source_ref`s and now get `translation_group` = ref without `seed:`;
+  `LANGUAGE_BOUND_CATEGORIES` constant (anagrams, missing-letter, word-search, spelling, idioms, synonyms,
+  grades-1-3/4-6/7-9) → those English items `cross_locale` = false (also MC anagrams). French times tables and mental
+  math ("Combien font 3 × 4 ?", same group, ref `…:fr`). French capitals/continents from `data/countries_fr.php`
+  (optional `capital_question`/`continent_question`, else a generic French wording; distractors = French capitals of
+  the same scope / French continent names; capital item skipped when a scope has < 3 other French capitals).
+  Question bank: `QuestionBank::load()` (new `database/seeders/QuestionBank.php`) reads `data/questions/*.php` sorted,
+  validates strictly (duplicate id across files, unknown/non-leaf category, difficulty 1-10, 3 wrong for MC / 2 for
+  wisdom cards, answer or duplicates in `wrong`, empty strings, no locale, unknown type; message names file + id),
+  then seeds per locale: ref `seed:q:<id>:<locale>`, group `q:<id>`, `min_age` override, `cross_locale` (entry value,
+  default true except language-bound categories), deterministic shuffle seeded with the ref; wisdom question
+  "What is the main idea?" / "Quelle est l'idée principale ?". Existing seed rows prefetched once per run.
+- `WordPuzzleSeeder`: English puzzles `cross_locale` = false; `data/words_fr.php` (validated: uppercase A-Z, hint)
+  seeds French anagrams / missing letters / word searches (locale `fr`, refs `seed:fr:…`).
+- Filament content items: locale column + filter, "Offered to other languages" ternary filter, `cross_locale` toggle,
+  `translation_group` shown read-only on edit (editable on create).
+- Expo receipts (stretch): `HttpExpoPushSender` returns `ok` ticket ids → token (`PushSendResult::$tickets`);
+  `DeliverPushNotification` queues `CheckPushReceiptsJob` 15 min later; `CheckPushReceipts` action posts to
+  `services.expo.receipts_url` (`EXPO_RECEIPTS_URL`, default `https://exp.host/--/api/v2/push/getReceipts`) in batches
+  of 1000 ids, clears `DeviceNotRegistered` tokens, logs other errors as counts per code (no tokens, ids or bodies);
+  failed requests are logged and skipped (best effort). Ticket ids live in the job payload (no table).
+- Tests: `tests/Feature/Actions/ContentLocaleTest.php` (fr gets the fr version not both, en without translation still
+  offered, `cross_locale` false hidden, en member never gets fr, draft fr keeps en, constant queries, category tree),
+  `tests/Feature/Actions/QuestionBankTest.php` (real data files incl. countries_fr/words_fr, 13 validation cases,
+  empty/missing dir, seeding en+fr idempotently, French geography, language-bound flags, French word puzzles),
+  admin tests (translation group read-only + toggle, locale filter), 4 receipts tests in `PushNotificationsTest`.
+- Dev: `migrate` (1 migration), `db:seed --class=ContentSeeder` then `--class=WordPuzzleSeeder`; OPcache cleared,
+  `config:cache`, app/horizon/scheduler restarted. Seed content now: en MC 787 (213 language-bound), en wisdom 151,
+  en word puzzles 493; fr MC 617, fr wisdom 100, fr word puzzles 385; 1126 question-bank items. Data files were still
+  being fact-checked during the session (transient parse errors seen in `wisdom.php`, `vocabulary.php`,
+  `words_fr.php`); all parsed and validated at seed time — re-run the two seeders after later edits.
+- Pint, PHPStan clean. Full Pest suite: 564 passed (5233 assertions).
 
 ### 2026-10-17 (unfinished games — continue / abandon / idle sweep)
 

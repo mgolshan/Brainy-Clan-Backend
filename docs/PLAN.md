@@ -85,6 +85,32 @@ as written there; if something must change, update `docs/API.md` first and note 
   question / card text / word, any category, including rejected items) are skipped; items land as drafts and are
   published only by a reviewer. Reject = archive, never delete. Wisdom-card quotes need author, source and an author
   who died 71+ years ago; everything else must be original text. Sudoku and Math Sprint stay code-generated.
+- **Admin dashboard (2026-10-17, requested by Moe):** the Filament dashboard shows stat cards and
+  widgets for the things an operator checks daily: families/members/active players, plays and
+  points (today, 7 days, trend), subscriptions (active, trial, grace, churn), content (published per
+  category and locale, drafts waiting for review, AI batches), notifications/push health, failed jobs
+  and webhook errors, and recent sign-ups. Each widget is a fixed small number of aggregate queries
+  (no per-row queries; query-count test), aggregates cached for 60 s at most (dashboard figures may
+  be a minute old; every list/resource page stays live). Staff-only like the rest of the panel.
+- **Caching (2026-10-17, requested by Moe):** cache only where it cannot serve wrong data:
+  reference data that changes only through the admin (policies, category tree, challenge types,
+  settings, age bands, legal versions…) is cached forever and invalidated on every write (model
+  events / the saving Action, including imports and seeders); per-member data is cached only with
+  explicit invalidation on the events that change it, never TTL-only. Scores, points, answers,
+  sessions, subscriptions and anything security-related (tokens, codes, throttles) are never served
+  from a cache. Redis is the store; tests prove invalidation. Mechanism (2026-10-17): one helper,
+  `ReferenceCache` (versioned keys, version bumped after the transaction commits, nothing stored
+  from inside a transaction); cached models use `ReferenceDataBuilder`, so every Eloquent write
+  (saves, mass updates, Filament reorder, seeders under `withoutEvents`) invalidates; raw SQL needs
+  `php artisan reference-cache:flush`; `migrate` flushes automatically. No per-family caches yet.
+- **Launch question bank and French content (2026-10-17):** while the AI generator waits for an API key, the
+  launch bank is hand-written as seed data in `database/seeders/data/questions/*.php` (one file per area, stable
+  `id` per entry, English plus an optional French version; language-specific items such as spelling or idioms may
+  exist in one language only). Seeded items are published (source `seed`) after a separate fact-check pass; Moe can
+  archive any item in Filament. Rules: well-established facts only (no records, populations, "current" holders,
+  disputed facts), exactly one defensible answer, plausible but clearly wrong distractors, original wording,
+  child-safe. Translations share a `translation_group`; a member whose locale is not `en` gets the item in their
+  locale and the English item only when no translation of it is published (picker dedupe, one `NOT EXISTS`).
 
 ## Working rules
 

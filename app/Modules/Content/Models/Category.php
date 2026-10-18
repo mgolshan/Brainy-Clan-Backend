@@ -4,8 +4,11 @@ namespace App\Modules\Content\Models;
 
 use App\Modules\ChallengeTypes\Support\GeneratorSpec;
 use App\Modules\Content\Support\CategoryTree;
+use App\Modules\Core\Contracts\InvalidatesReferenceCache;
+use App\Modules\Core\Support\ReferenceDataBuilder;
 use Database\Factories\CategoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -31,7 +34,8 @@ use Spatie\Activitylog\Support\LogOptions;
  */
 #[Fillable(['parent_id', 'slug', 'name', 'icon', 'sort', 'min_age', 'max_age', 'is_active', 'generators'])]
 #[UseFactory(CategoryFactory::class)]
-class Category extends Model
+#[UseEloquentBuilder(ReferenceDataBuilder::class)]
+class Category extends Model implements InvalidatesReferenceCache
 {
     /** @use HasFactory<CategoryFactory> */
     use HasFactory, LogsActivity;
@@ -51,10 +55,13 @@ class Category extends Model
         ];
     }
 
-    protected static function booted(): void
+    /**
+     * Called after every Eloquent write (ReferenceDataBuilder), including Filament's
+     * reorder (a mass `CASE` update) and seeders.
+     */
+    public static function flushReferenceCaches(): void
     {
-        static::saved(fn () => CategoryTree::flush());
-        static::deleted(fn () => CategoryTree::flush());
+        CategoryTree::flush();
     }
 
     /**

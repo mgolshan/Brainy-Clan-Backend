@@ -4,8 +4,8 @@ namespace App\Modules\Content\Actions;
 
 use App\Modules\ChallengeTypes\ChallengeTypeRegistry;
 use App\Modules\Content\Models\Category;
-use App\Modules\Content\Models\ContentItem;
 use App\Modules\Content\Support\CategoryTree;
+use App\Modules\Content\Support\ContentAvailability;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Policy\PolicyResolver;
 
@@ -21,6 +21,7 @@ class BuildCategoryTree
         private readonly PolicyResolver $policy,
         private readonly ResolveCategoryAccess $access,
         private readonly ChallengeTypeRegistry $registry,
+        private readonly ContentAvailability $availability,
     ) {}
 
     /**
@@ -31,7 +32,7 @@ class BuildCategoryTree
         $age = $this->policy->memberAge($member);
         $locale = $member->user->locale;
         $locked = $this->access->lockedRootIds($member);
-        $typesByCategory = $this->typesByCategory($age);
+        $typesByCategory = $this->typesByCategory($age, $locale);
 
         $nodes = [];
 
@@ -93,26 +94,13 @@ class BuildCategoryTree
     }
 
     /**
-     * Active challenge types with published, age-appropriate content directly in each category.
+     * Active challenge types with published, age-appropriate content playable in the member's
+     * locale directly in each category (no translation dedupe needed for an existence check).
      *
      * @return array<int, list<string>>
      */
-    private function typesByCategory(?int $age): array
+    private function typesByCategory(?int $age, string $locale): array
     {
-        $active = $this->registry->activeKeys();
-        $map = [];
-
-        ContentItem::query()
-            ->published()
-            ->forAge($age)
-            ->whereIn('type_key', $active)
-            ->select(['category_id', 'type_key'])
-            ->distinct()
-            ->get()
-            ->each(function (ContentItem $row) use (&$map): void {
-                $map[$row->category_id][] = $row->type_key;
-            });
-
-        return $map;
+        return $this->availability->typesByCategory($age, $locale, $this->registry->activeKeys());
     }
 }

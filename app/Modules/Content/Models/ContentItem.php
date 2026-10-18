@@ -2,15 +2,20 @@
 
 namespace App\Modules\Content\Models;
 
+use App\Modules\Content\Support\ContentAvailability;
+use App\Modules\Core\Contracts\InvalidatesReferenceCache;
+use App\Modules\Core\Support\ReferenceDataBuilder;
 use App\Modules\Identity\Models\User;
 use Database\Factories\ContentItemFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -23,6 +28,8 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property int $category_id
  * @property string $type_key
  * @property string $locale
+ * @property string|null $translation_group
+ * @property bool $cross_locale
  * @property int $difficulty
  * @property int|null $min_age
  * @property int|null $max_age
@@ -36,9 +43,10 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property Carbon|null $published_at
  * @property-read Category $category
  */
-#[Fillable(['category_id', 'type_key', 'locale', 'difficulty', 'min_age', 'max_age', 'payload', 'answer', 'status', 'source', 'source_ref', 'content_batch_id', 'reviewed_by', 'published_at'])]
+#[Fillable(['category_id', 'type_key', 'locale', 'translation_group', 'cross_locale', 'difficulty', 'min_age', 'max_age', 'payload', 'answer', 'status', 'source', 'source_ref', 'content_batch_id', 'reviewed_by', 'published_at'])]
 #[UseFactory(ContentItemFactory::class)]
-class ContentItem extends Model
+#[UseEloquentBuilder(ReferenceDataBuilder::class)]
+class ContentItem extends Model implements InvalidatesReferenceCache
 {
     /** @use HasFactory<ContentItemFactory> */
     use HasFactory, LogsActivity;
@@ -58,6 +66,7 @@ class ContentItem extends Model
     protected function casts(): array
     {
         return [
+            'cross_locale' => 'boolean',
             'difficulty' => 'integer',
             'min_age' => 'integer',
             'max_age' => 'integer',
@@ -65,6 +74,15 @@ class ContentItem extends Model
             'answer' => 'array',
             'published_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Called after every Eloquent write (ReferenceDataBuilder): saves, CSV imports, AI batch
+     * reviews, bulk status changes and seeders running under `withoutEvents`.
+     */
+    public static function flushReferenceCaches(): void
+    {
+        ContentAvailability::flush();
     }
 
     /**
@@ -129,6 +147,38 @@ class ContentItem extends Model
     {
         return $query->where(fn (Builder $q) => $q->whereNull('min_age')->orWhere('min_age', '<=', $age))
             ->where(fn (Builder $q) => $q->whereNull('max_age')->orWhere('max_age', '>=', $age));
+    }
+
+    /**
+     * Items a member with this locale may play (docs/PLAN.md "Launch question bank and French
+     * content"): English members get English items only; members of another locale get their
+     * locale's items plus English items that are not language-bound (`cross_locale`) and, when
+     * `$dedupe`, have no published translation in that locale (one correlated NOT EXISTS).
+     *
+     * @template TBuilder of Builder<ContentItem>
+     *
+     * @param  TBuilder  $query
+     * @return TBuilder
+     */
+    public static function whereAvailableInLocale(Builder $query, string $locale, bool $dedupe = true): Builder
+    {
+        if ($locale === 'en') {
+            return $query->where('content_items.locale', 'en');
+        }
+
+        return $query->where(fn (Builder $q) => $q->where('content_items.locale', $locale)
+            ->orWhere(function (Builder $english) use ($locale, $dedupe): void {
+                $english->where('content_items.locale', 'en')->where('content_items.cross_locale', true);
+
+                if ($dedupe) {
+                    $english->where(fn (Builder $g) => $g->whereNull('content_items.translation_group')
+                        ->orWhereNotExists(fn (QueryBuilder $sub) => $sub->selectRaw('1')
+                            ->from('content_items as translations')
+                            ->whereColumn('translations.translation_group', 'content_items.translation_group')
+                            ->where('translations.locale', $locale)
+                            ->where('translations.status', self::STATUS_PUBLISHED)));
+                }
+            }));
     }
 
     public function allowsAge(?int $age): bool

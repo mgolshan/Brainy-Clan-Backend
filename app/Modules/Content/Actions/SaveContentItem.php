@@ -8,7 +8,9 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Creates or updates a content item after the challenge type plugin validated its
- * payload and answer. Used by the admin, the CSV importer and seeders.
+ * payload and answer. Used by the admin, the CSV importer and seeders. Translations of one
+ * item share a `translation_group`; `cross_locale` = false keeps an English item from members
+ * of other locales (see ContentItem::whereAvailableInLocale).
  */
 class SaveContentItem
 {
@@ -23,6 +25,10 @@ class SaveContentItem
     {
         $item ??= new ContentItem;
         $item->fill($data);
+
+        if (blank($item->translation_group)) {
+            $item->translation_group = null;
+        }
 
         $this->assertValid($item);
 

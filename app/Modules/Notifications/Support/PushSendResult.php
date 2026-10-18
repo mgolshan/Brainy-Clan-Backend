@@ -13,9 +13,11 @@ final readonly class PushSendResult
      * @param  list<string>  $invalidTokens  tokens Expo reported as `DeviceNotRegistered` (the caller clears them)
      * @param  list<string>  $retryTokens  tokens whose message was not delivered for a temporary reason
      *                                     (connection error, HTTP 429/5xx, ticket `MessageRateExceeded`)
+     * @param  array<string, string>  $tickets  accepted messages: Expo ticket id => token, for the receipts check
      */
     public function __construct(
         public array $invalidTokens = [],
         public array $retryTokens = [],
+        public array $tickets = [],
     ) {}
 }

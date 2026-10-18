@@ -3,23 +3,21 @@
 namespace App\Modules\Content\Support;
 
 use App\Modules\Content\Models\Category;
+use App\Modules\Core\Support\ReferenceCache;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Cache;
 
 /**
- * The whole category tree, loaded once and cached until a category changes
- * (a few hundred rows at most).
+ * The whole category tree, loaded once per request/job and cached (ReferenceCache::CATEGORY_TREE)
+ * until any category row is written (a few hundred rows at most).
  */
 class CategoryTree
 {
-    private const string CACHE_KEY = 'content:category-tree:v1';
-
     /** @var Collection<int, Category>|null */
     private ?Collection $categories = null;
 
     public static function flush(): void
     {
-        Cache::forget(self::CACHE_KEY);
+        ReferenceCache::flush(ReferenceCache::CATEGORY_TREE);
 
         if (app()->resolved(self::class)) {
             app(self::class)->categories = null;
@@ -36,7 +34,7 @@ class CategoryTree
         }
 
         /** @var list<array<string, mixed>> $raw */
-        $raw = Cache::rememberForever(self::CACHE_KEY, fn (): array => Category::query()
+        $raw = ReferenceCache::remember(ReferenceCache::CATEGORY_TREE, fn (): array => Category::query()
             ->orderBy('sort')->orderBy('id')->get()
             ->map(fn (Category $category) => $category->getAttributes())
             ->all());

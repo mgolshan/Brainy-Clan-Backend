@@ -36,7 +36,8 @@ return [
 
         'array' => [
             'driver' => 'array',
-            'serialize' => false,
+            // Tests set CACHE_ARRAY_SERIALIZE=true so cached values round-trip like on Redis.
+            'serialize' => (bool) env('CACHE_ARRAY_SERIALIZE', false),
         ],
 
         'database' => [

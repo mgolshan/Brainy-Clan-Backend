@@ -2,6 +2,7 @@
 
 namespace App\Modules\Policy;
 
+use App\Modules\Core\Support\ReferenceCache;
 use App\Modules\Family\Models\Family;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Identity\Models\User;
@@ -10,7 +11,6 @@ use App\Modules\Policy\Models\AgeBand;
 use App\Modules\Policy\Models\Setting;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Cache;
 
 /**
  * The single place that answers rule questions ("can this member see ads?", "what difficulty
@@ -18,12 +18,10 @@ use Illuminate\Support\Facades\Cache;
  * Actions and controllers ask this class; they never hard-code rules.
  *
  * Bound as a scoped singleton: age bands and settings are loaded once per request/job and
- * cached in the cache store until an AgeBand or Setting changes.
+ * cached (ReferenceCache::POLICY) until any AgeBand or Setting row is written.
  */
 class PolicyResolver
 {
-    private const string CACHE_KEY = 'policy:snapshot:v1';
-
     /** Defaults used when a setting is missing from the database. */
     private const array DEFAULT_SETTINGS = [
         'min_app_version' => '1.0.0',
@@ -48,9 +46,13 @@ class PolicyResolver
 
     public function __construct(private readonly SecondChanceUsage $secondChanceUsage) {}
 
+    /**
+     * Called on every AgeBand/Setting write (ReferenceDataBuilder): forgets this request's copy
+     * now and invalidates the shared cache once the write is committed.
+     */
     public static function flushCache(): void
     {
-        Cache::forget(self::CACHE_KEY);
+        ReferenceCache::flush(ReferenceCache::POLICY);
 
         if (app()->resolved(self::class)) {
             app(self::class)->snapshot = null;
@@ -449,7 +451,7 @@ class PolicyResolver
         }
 
         /** @var array{bands: list<array<string, mixed>>, settings: array<string, mixed>} $raw */
-        $raw = Cache::rememberForever(self::CACHE_KEY, function (): array {
+        $raw = ReferenceCache::remember(ReferenceCache::POLICY, function (): array {
             $settings = [];
 
             foreach (Setting::query()->get() as $setting) {

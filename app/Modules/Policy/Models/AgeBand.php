@@ -2,9 +2,12 @@
 
 namespace App\Modules\Policy\Models;
 
+use App\Modules\Core\Contracts\InvalidatesReferenceCache;
+use App\Modules\Core\Support\ReferenceDataBuilder;
 use App\Modules\Policy\PolicyResolver;
 use Database\Factories\AgeBandFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,7 +31,8 @@ use Spatie\Activitylog\Support\LogOptions;
  */
 #[Fillable(['code', 'name', 'min_age', 'max_age', 'country_code', 'policy'])]
 #[UseFactory(AgeBandFactory::class)]
-class AgeBand extends Model
+#[UseEloquentBuilder(ReferenceDataBuilder::class)]
+class AgeBand extends Model implements InvalidatesReferenceCache
 {
     /** @use HasFactory<AgeBandFactory> */
     use HasFactory, LogsActivity;
@@ -47,10 +51,12 @@ class AgeBand extends Model
         ];
     }
 
-    protected static function booted(): void
+    /**
+     * Called after every Eloquent write (ReferenceDataBuilder).
+     */
+    public static function flushReferenceCaches(): void
     {
-        static::saved(fn () => PolicyResolver::flushCache());
-        static::deleted(fn () => PolicyResolver::flushCache());
+        PolicyResolver::flushCache();
     }
 
     public function contains(int $age): bool

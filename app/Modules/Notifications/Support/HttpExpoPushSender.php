@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Expo push over HTTP: POST {services.expo.push_url} in batches of at most 100 messages. Tickets are
- * returned in message order; a ticket error `DeviceNotRegistered` marks that token as invalid.
+ * returned in message order; a ticket error `DeviceNotRegistered` marks that token as invalid, and `ok`
+ * ticket ids are returned for the later receipts check (CheckPushReceiptsJob).
  *
  * Temporary failures (connection errors, HTTP 429 / 5xx after the short in-request retries, ticket error
  * `MessageRateExceeded`) put the batch's tokens into {@see PushSendResult::$retryTokens} so the job can
@@ -24,6 +25,7 @@ class HttpExpoPushSender implements ExpoPushSender
     {
         $invalid = [];
         $retry = [];
+        $tickets = [];
 
         foreach (array_chunk($messages, self::BATCH_SIZE) as $batch) {
             $batchTokens = array_column($batch, 'to');
@@ -63,7 +65,17 @@ class HttpExpoPushSender implements ExpoPushSender
             }
 
             foreach ((array) $response->json('data', []) as $index => $ticket) {
-                if (! is_array($ticket) || ($ticket['status'] ?? null) !== 'error' || ! isset($batch[$index])) {
+                if (! is_array($ticket) || ! isset($batch[$index])) {
+                    continue;
+                }
+
+                if (($ticket['status'] ?? null) === 'ok' && is_string($ticket['id'] ?? null) && $ticket['id'] !== '') {
+                    $tickets[$ticket['id']] = $batch[$index]['to'];
+
+                    continue;
+                }
+
+                if (($ticket['status'] ?? null) !== 'error') {
                     continue;
                 }
 
@@ -77,6 +89,6 @@ class HttpExpoPushSender implements ExpoPushSender
             }
         }
 
-        return new PushSendResult(array_values(array_unique($invalid)), array_values(array_unique($retry)));
+        return new PushSendResult(array_values(array_unique($invalid)), array_values(array_unique($retry)), $tickets);
     }
 }

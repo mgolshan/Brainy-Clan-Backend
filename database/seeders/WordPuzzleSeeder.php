@@ -22,6 +22,10 @@ use Illuminate\Database\Seeder;
  *
  * Grade → difficulty 1–2 / 3–4 / 5–6 (min age via ContentSeeder::minAgeFor). Stable `source_ref`s,
  * so re-running updates instead of duplicating.
+ *
+ * Word puzzles are language-bound (`cross_locale` = false): English words from data/words.php
+ * (locale "en"), and French words from data/words_fr.php when present (same shape, uppercase
+ * A–Z without accents, French theme names; locale "fr", refs prefixed "fr:").
  */
 class WordPuzzleSeeder extends Seeder
 {
@@ -32,28 +36,72 @@ class WordPuzzleSeeder extends Seeder
         3 => [10, 7, 'hard', 6],
     ];
 
+    public string $frenchWordsPath = __DIR__.'/data/words_fr.php';
+
     /** @var array<string, int> */
     private array $categoryIds = [];
+
+    /** @var array<string, ContentItem> existing seed items by source_ref */
+    private array $existing = [];
 
     public function __construct(private readonly SaveContentItem $save, private readonly WordSearchBuilder $builder) {}
 
     public function run(): void
     {
         $this->categoryIds = Category::query()->pluck('id', 'slug')->map(fn ($id) => (int) $id)->all();
+        $this->existing = ContentItem::query()->where('source_ref', 'like', 'seed:%')->get()->keyBy('source_ref')->all();
 
         /** @var array<string, array<int, list<array{0: string, 1: string}>>> $themes */
         $themes = require __DIR__.'/data/words.php';
+        $french = is_file($this->frenchWordsPath) ? self::validWords(require $this->frenchWordsPath, 'words_fr.php') : null;
 
-        Model::withoutEvents(function () use ($themes): void {
-            $this->seedAnagramsAndMissingLetters($themes);
-            $this->seedWordSearches($themes);
+        Model::withoutEvents(function () use ($themes, $french): void {
+            $this->seedAnagramsAndMissingLetters($themes, 'en');
+            $this->seedWordSearches($themes, 'en');
+
+            if ($french !== null) {
+                $this->seedAnagramsAndMissingLetters($french, 'fr');
+                $this->seedWordSearches($french, 'fr');
+            }
         });
+    }
+
+    /**
+     * @return array<string, array<int, list<array{0: string, 1: string}>>>
+     */
+    public static function validWords(mixed $themes, string $file): array
+    {
+        if (! is_array($themes)) {
+            throw new \RuntimeException("{$file} must return theme => grade => [[WORD, hint]].");
+        }
+
+        foreach ($themes as $theme => $grades) {
+            if (! is_string($theme) || trim($theme) === '' || ! is_array($grades)) {
+                throw new \RuntimeException("{$file}: theme [{$theme}] must be a name with grades.");
+            }
+
+            foreach ($grades as $grade => $words) {
+                if (! isset(self::WORD_SEARCH[$grade]) || ! is_array($words)) {
+                    throw new \RuntimeException("{$file}: [{$theme}] grade [{$grade}] must be 1, 2 or 3 with a list of words.");
+                }
+
+                foreach ($words as $pair) {
+                    if (! is_array($pair) || ! is_string($pair[0] ?? null) || ! preg_match('/^[A-Z]{2,}$/', $pair[0])
+                        || ! is_string($pair[1] ?? null) || trim($pair[1]) === '') {
+                        throw new \RuntimeException("{$file}: [{$theme}] grade [{$grade}] has an invalid entry (".json_encode($pair).'); words are uppercase A-Z without accents, with a hint.');
+                    }
+                }
+            }
+        }
+
+        /** @var array<string, array<int, list<array{0: string, 1: string}>>> $themes */
+        return $themes;
     }
 
     /**
      * @param  array<string, array<int, list<array{0: string, 1: string}>>>  $themes
      */
-    private function seedAnagramsAndMissingLetters(array $themes): void
+    private function seedAnagramsAndMissingLetters(array $themes, string $locale): void
     {
         $byLetters = [];
 
@@ -82,7 +130,7 @@ class WordPuzzleSeeder extends Seeder
                         'variant' => 'anagram',
                         'letters' => WordPuzzle::scramble($word, $word),
                         'hint' => $hint,
-                    ], ['words' => array_values(array_unique([$word, ...$alternatives]))], "anagram:{$word}");
+                    ], ['words' => array_values(array_unique([$word, ...$alternatives]))], "anagram:{$word}", $locale);
 
                     $hidden = match ($grade) {
                         1 => 1,
@@ -94,7 +142,7 @@ class WordPuzzleSeeder extends Seeder
                         'variant' => 'missing_letter',
                         'pattern' => WordPuzzle::hideLetters($word, $hidden, $word),
                         'hint' => $hint,
-                    ], ['word' => $word], "missing:{$word}");
+                    ], ['word' => $word], "missing:{$word}", $locale);
                 }
             }
         }
@@ -103,7 +151,7 @@ class WordPuzzleSeeder extends Seeder
     /**
      * @param  array<string, array<int, list<array{0: string, 1: string}>>>  $themes
      */
-    private function seedWordSearches(array $themes): void
+    private function seedWordSearches(array $themes, string $locale): void
     {
         foreach ($themes as $theme => $grades) {
             foreach ($grades as $grade => $words) {
@@ -111,7 +159,7 @@ class WordPuzzleSeeder extends Seeder
                 $list = array_values(array_filter(array_column($words, 0), fn (string $w) => strlen($w) <= $size));
 
                 for ($n = 1; $n <= 3; $n++) {
-                    $ref = "wordsearch:{$theme}:{$grade}:{$n}";
+                    $ref = ($locale === 'en' ? '' : "{$locale}:")."wordsearch:{$theme}:{$grade}:{$n}";
                     mt_srand(crc32($ref));
                     shuffle($list);
                     mt_srand();
@@ -123,7 +171,7 @@ class WordPuzzleSeeder extends Seeder
                         'grid' => $built['grid'],
                         'words' => array_column($built['found'], 'word'),
                         'hint' => $theme,
-                    ], ['found' => $built['found']], $ref);
+                    ], ['found' => $built['found']], $ref, $locale, prefixed: true);
                 }
             }
         }
@@ -133,15 +181,17 @@ class WordPuzzleSeeder extends Seeder
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $answer
      */
-    private function store(string $slug, int $difficulty, array $payload, array $answer, string $ref): void
+    private function store(string $slug, int $difficulty, array $payload, array $answer, string $ref, string $locale, bool $prefixed = false): void
     {
         $categoryId = $this->categoryIds[$slug] ?? throw new \RuntimeException("Unknown category slug [{$slug}].");
-        $sourceRef = 'seed:'.$ref;
+        $sourceRef = 'seed:'.($prefixed || $locale === 'en' ? '' : "{$locale}:").$ref;
 
-        $this->save->handle([
+        $this->existing[$sourceRef] = $this->save->handle([
             'category_id' => $categoryId,
             'type_key' => 'word_puzzle',
-            'locale' => 'en',
+            'locale' => $locale,
+            'translation_group' => null,
+            'cross_locale' => false,
             'difficulty' => $difficulty,
             'min_age' => ContentSeeder::minAgeFor($difficulty),
             'max_age' => null,
@@ -150,7 +200,7 @@ class WordPuzzleSeeder extends Seeder
             'status' => ContentItem::STATUS_PUBLISHED,
             'source' => 'seed',
             'source_ref' => $sourceRef,
-        ], ContentItem::query()->where('source_ref', $sourceRef)->first());
+        ], $this->existing[$sourceRef] ?? null);
     }
 
     private function sortedLetters(string $word): string

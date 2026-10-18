@@ -145,6 +145,15 @@ then `APP_IMAGE_TAG=previous $C up -d` (images tagged above). A migration is onl
 `php artisan migrate:rollback --step=1` if it has a safe `down()`; otherwise restore the backup taken
 before the deploy (`$C run --rm backup backup.sh` right before risky migrations).
 
+**Caches (nothing to do by hand).** Every container start runs `php artisan optimize`
+(`docker/prod/entrypoint.sh`): config, events, routes, views, plus Filament components and Blade
+icons (`filament:optimize`, `icons:cache`, registered by the packages). OPcache is on with
+`validate_timestamps=0` (`docker/prod/php.ini`); a deploy starts new containers, so OPcache starts
+empty. Composer's autoloader is optimized in the image. Reference data (age bands, settings,
+categories, challenge types, content availability) is cached in Redis and invalidated by every
+Eloquent write and after each `migrate`; if you ever change those tables with raw SQL, run
+`$C exec app php artisan reference-cache:flush` (it leaves throttles and other cache entries alone).
+
 ## 8. Monitoring
 
 - **Errors:** Sentry (section 10). Personal data is scrubbed before sending (`SentryScrubber`).

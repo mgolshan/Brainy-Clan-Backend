@@ -29,6 +29,7 @@ class ContentItemImporter extends Importer
             'source_ref' => 'capitals-2026-001', 'question' => 'What is the capital of Peru?', 'choice_a' => 'Lima', 'choice_b' => 'Quito',
             'choice_c' => 'Bogotá', 'choice_d' => 'Santiago', 'choice_e' => '', 'choice_f' => '', 'correct' => 'a', 'explanation' => '',
             'image_url' => '', 'card_text' => '', 'card_author' => '', 'card_source' => '',
+            'translation_group' => '', 'cross_locale' => '',
         ];
 
         $columns = [
