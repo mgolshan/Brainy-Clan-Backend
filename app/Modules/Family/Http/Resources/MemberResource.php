@@ -6,7 +6,9 @@ use App\Modules\Core\Support\Iso;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Support\Accessibility;
 use App\Modules\Identity\Models\User;
+use App\Modules\Policy\Actions\EvaluateWorldUnlocks;
 use App\Modules\Policy\PolicyResolver;
+use App\Modules\Policy\Support\WorldProgress;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,10 +22,17 @@ class MemberResource extends JsonResource
 {
     private ?User $viewer = null;
 
-    public static function forViewer(FamilyMember $member, ?User $viewer): self
+    private ?WorldProgress $worldProgress = null;
+
+    /**
+     * @param  WorldProgress|null  $worldProgress  from EvaluateWorldUnlocks::progressForMembers() in lists, so
+     *                                             `theme_unlocked` needs no query per member
+     */
+    public static function forViewer(FamilyMember $member, ?User $viewer, ?WorldProgress $worldProgress = null): self
     {
         $resource = new self($member);
         $resource->viewer = $viewer;
+        $resource->worldProgress = $worldProgress;
 
         return $resource;
     }
@@ -53,6 +62,8 @@ class MemberResource extends JsonResource
             'difficulty_override' => $member->difficulty_override,
             'accessibility' => Accessibility::forMember($member, $band),
             'default_ui_theme' => (string) ($band?->rule('ui_theme') ?? 'modern'),
+            // False when the stored theme world is locked again (e.g. the family plan ended); the theme is kept.
+            'theme_unlocked' => app(EvaluateWorldUnlocks::class)->themeUnlocked($member, $this->worldProgress),
             'status' => $member->status,
             'joined_at' => Iso::format($member->joined_at ?? $member->created_at),
             'email' => $this->when($showPrivate, $member->user->email),

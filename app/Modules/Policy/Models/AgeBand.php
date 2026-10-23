@@ -37,8 +37,11 @@ class AgeBand extends Model implements InvalidatesReferenceCache
     /** @use HasFactory<AgeBandFactory> */
     use HasFactory, LogsActivity;
 
-    /** Theme keys ("worlds", docs/API.md Member). Any member may pick any world. */
-    public const array THEMES = ['playful', 'sleek', 'modern', 'classic', 'jungle', 'space', 'neon'];
+    /** Theme keys ("worlds", docs/API.md Member). Which worlds a member may pick: the ThemeWorld catalog. */
+    public const array THEMES = [
+        'playful', 'sleek', 'modern', 'classic', 'jungle', 'space', 'neon',
+        'sea', 'dino', 'sticker', 'lofi', 'nature', 'midnight',
+    ];
 
     /** Readable names for the admin (the app shows the same names). */
     public const array THEME_LABELS = [
@@ -49,6 +52,12 @@ class AgeBand extends Model implements InvalidatesReferenceCache
         'jungle' => 'Jungle Adventure',
         'space' => 'Space Explorers',
         'neon' => 'Neon Arcade',
+        'sea' => 'Under the Sea',
+        'dino' => 'Dino Valley',
+        'sticker' => 'Sticker Street',
+        'lofi' => 'Lo-fi Dusk',
+        'nature' => 'Calm Nature',
+        'midnight' => 'Midnight',
     ];
 
     /** AdMob max ad content ratings, strictest first. */

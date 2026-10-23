@@ -11,6 +11,7 @@ use App\Modules\Family\Http\Requests\UpdateFamilyRequest;
 use App\Modules\Family\Http\Resources\FamilyResource;
 use App\Modules\Family\Http\Resources\MemberResource;
 use App\Modules\Family\Models\FamilyMember;
+use App\Modules\Policy\Actions\EvaluateWorldUnlocks;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -39,19 +40,23 @@ class FamilyController
     /**
      * My family and its members.
      */
-    public function show(Request $request): JsonResponse
+    public function show(Request $request, EvaluateWorldUnlocks $worlds): JsonResponse
     {
         $member = $this->currentMember($request);
         $family = $member->family;
         $viewer = $this->currentUser($request);
 
-        $members = $family->members()->with(['user' => fn ($query) => $query->withExists('socialAccounts'), 'family'])->orderBy('id')->get()
-            ->map(fn (FamilyMember $m) => MemberResource::forViewer($m, $viewer)->resolve($request))
+        $members = $family->members()->with(['user' => fn ($query) => $query->withExists('socialAccounts'), 'family'])->orderBy('id')->get();
+        // `theme_unlocked`: points/streaks for the whole list in two queries (none when no theme needs them).
+        $progress = $worlds->progressForMembers($members);
+
+        $rows = $members
+            ->map(fn (FamilyMember $m) => MemberResource::forViewer($m, $viewer, $progress[$m->id] ?? null)->resolve($request))
             ->all();
 
         return new JsonResponse(['data' => [
             'family' => (new FamilyResource($family))->resolve($request),
-            'members' => $members,
+            'members' => $rows,
         ]]);
     }
 

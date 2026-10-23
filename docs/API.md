@@ -51,6 +51,7 @@ and add a line to the changelog at the bottom.
 | `item_already_answered` | 409 | Session item was already answered |
 | `second_chance_unavailable` | 403 | No second chance of that method left / allowed |
 | `goal_limit_reached` | 403 | Tier limit on active goal plans reached |
+| `world_locked` | 403 | That theme world isn't unlocked for this member (see `GET /me/worlds`) |
 | `ad_reward_pending` | 409 | Rewarded-ad callback not received yet — retry shortly |
 | `ssv_signature_invalid` | 400 | AdMob SSV callback signature could not be verified |
 | `app_update_required` | 426 | App older than `min_app_version` |
@@ -95,11 +96,39 @@ and add a line to the changelog at the bottom.
 - `age_band`: `child` | `teen` | `adult` | `senior` (codes come from the `age_bands` table).
 - `default_ui_theme`: the theme the member's age band policy gives (what "Automatic" resolves to). Lets an admin preview another member's look.
 - `accessibility.theme`: `null` (use the policy default) or a theme key (see Policy). Lets a member
-  pick another look; it never changes rules. **Theme keys ("worlds", 2026-10-23):** `playful`
+  pick another look; it never changes rules. **Theme keys ("worlds"):** `playful`
   (shown as "Candy Land"), `sleek` (shown as "Glass"), `modern`, `classic`, `jungle`, `space`,
-  `neon`. Any member may pick any world (no age rule); in phase 1 all worlds are available to
-  everyone (unlocks and Family-plan-only worlds come later, decided by the server). Unknown key →
-  422 `validation_failed`.
+  `neon`, `sea`, `dino`, `sticker`, `lofi`, `nature`, `midnight`. Any member may pick any
+  **unlocked** world (no age rule; see `GET /me/worlds`). Unknown key → 422 `validation_failed`;
+  a locked world → 403 `world_locked`.
+- `theme_unlocked`: `false` when the stored `accessibility.theme` is no longer unlocked for this
+  member (e.g. the family plan ended); the app then shows `default_ui_theme`. The stored choice is
+  kept so it comes back if the world unlocks again. `true` when `theme` is null.
+
+#### Worlds and unlocks (2026-10-23, phase 2)
+- `GET /me/worlds` (auth, needs family) → the catalog for the signed-in member, in display order:
+```json
+{ "data": [
+  { "key": "playful", "unlock": { "type": "free" }, "unlocked": true },
+  { "key": "jungle", "unlock": { "type": "points", "required": 50, "progress": 23 }, "unlocked": false },
+  { "key": "sea", "unlock": { "type": "streak", "required": 3, "progress": 2 }, "unlocked": false },
+  { "key": "dino", "unlock": { "type": "family_plan" }, "unlocked": false }
+] }
+```
+- Unlock types: `free` (always); `points` — the member's lifetime points (`/me/stats` `points_total`;
+  strictly the points earned, so a later correction entry never lowers it) ≥ `required`; `streak` — the member's longest streak in days (`streak.longest`) ≥ `required`;
+  `family_plan` — the family's tier is the paid Family plan (active, trial or grace). `progress` is
+  present for `points`/`streak`. Once a `points`/`streak` world is unlocked it stays unlocked
+  (lifetime and longest values never go down; a corrected ledger does not re-lock). `family_plan`
+  worlds lock again when the plan ends.
+- Seeded catalog (editable in the admin; thresholds and types are server data, the app never
+  hard-codes them): free `playful`, `sleek`, `modern`, `classic`; points `jungle` 50, `sticker`
+  100, `space` 150, `nature` 200; streak `sea` 3, `lofi` 7; family plan `dino`, `neon`, `midnight`.
+- `PATCH /me/accessibility` and the admin member PATCH reject a locked `theme` with 403
+  `world_locked` (`null` always allowed). An admin can only pick worlds unlocked for that member:
+  `GET /family/members/{member}/worlds` (admin) returns the same catalog for that member.
+- Computing the catalog is a fixed number of queries (no per-world queries); it is not cached
+  (points and streaks change during play).
 - `accessibility.sound_effects`: `null` (use the policy default
   `accessibility_defaults.sound_effects`; seeded child `true`, teen/adult/senior `false`) or a bool.
 - `birth_year` / `birth_month` only for the member themself and for admins.
@@ -600,3 +629,4 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-22 — Avatars: the Clan set, 22 species × (kid, teen, mom, dad, grandma, grandpa) = 132 keys (`tiger`, `tiger-mom`, …); existing keys unchanged.
 - 2026-10-22 — Legal pages moved to `/terms` and `/privacy` on the website host; `GET /legal` URLs point there (`https://brainyclan.com/terms`), the old `/legal/terms` and `/legal/privacy` answer 301. No shape change.
 - 2026-10-23 — Theme "worlds": new theme keys `jungle`, `space`, `neon`; member `accessibility.sound_effects` (null | bool) and policy `accessibility_defaults.sound_effects` (child true, others false).
+- 2026-10-23 — Worlds phase 2: keys `sea`, `dino`, `sticker`, `lofi`, `nature`, `midnight`; `GET /me/worlds` (unlock catalog: free / points / streak / family_plan); 403 `world_locked`; Member `theme_unlocked`.

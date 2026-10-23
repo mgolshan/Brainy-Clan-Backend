@@ -5,6 +5,7 @@ namespace App\Modules\Policy;
 use App\Modules\Core\ModuleServiceProvider;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Policy\Contracts\SecondChanceUsage;
+use App\Modules\Policy\Support\ThemeWorldCatalog;
 
 class PolicyServiceProvider extends ModuleServiceProvider
 {
@@ -23,5 +24,6 @@ class PolicyServiceProvider extends ModuleServiceProvider
 
         // Scoped: fresh per request / queued job, so long-running workers never keep stale rules.
         $this->app->scoped(PolicyResolver::class);
+        $this->app->scoped(ThemeWorldCatalog::class);
     }
 }

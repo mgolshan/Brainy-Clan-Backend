@@ -6,6 +6,7 @@ use App\Modules\Family\Http\Controllers\InviteController;
 use App\Modules\Family\Http\Controllers\MemberController;
 use App\Modules\Family\Http\Controllers\MemberDeviceController;
 use App\Modules\Family\Http\Controllers\SignInCodeController;
+use App\Modules\Family\Http\Controllers\WorldController;
 use Illuminate\Support\Facades\Route;
 
 // Loaded under /api/v1 by FamilyServiceProvider.
@@ -26,6 +27,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::middleware('family')->group(function () {
         Route::get('family', [FamilyController::class, 'show'])->name('api.v1.family.show');
         Route::patch('me/accessibility', [MemberController::class, 'updateAccessibility'])->name('api.v1.me.accessibility');
+        Route::get('me/worlds', [WorldController::class, 'me'])->name('api.v1.me.worlds');
 
         // Admins, or the member themself (checked in the Action).
         Route::get('family/members/{member}/devices', [MemberDeviceController::class, 'index'])->whereNumber('member')->name('api.v1.family.members.devices.index');
@@ -37,6 +39,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::patch('family/members/{member}', [MemberController::class, 'update'])->whereNumber('member')->name('api.v1.family.members.update');
         Route::delete('family/members/{member}', [MemberController::class, 'destroy'])->whereNumber('member')->name('api.v1.family.members.destroy');
         Route::post('family/members/{member}/sign-in-codes', [SignInCodeController::class, 'store'])->whereNumber('member')->name('api.v1.family.members.sign-in-codes.store');
+        Route::get('family/members/{member}/worlds', [WorldController::class, 'forMember'])->whereNumber('member')->name('api.v1.family.members.worlds');
         Route::get('family/invites', [InviteController::class, 'index'])->name('api.v1.family.invites.index');
         Route::get('family/invites/preview', [InviteController::class, 'preview'])->name('api.v1.family.invites.preview');
         Route::post('family/invites', [InviteController::class, 'store'])->name('api.v1.family.invites.store');

@@ -10,7 +10,8 @@ use Illuminate\Support\Str;
 
 /**
  * The one way to cache admin-maintained reference data (docs/PLAN.md "Caching"): age bands +
- * settings, the category tree, challenge type records and published-content availability.
+ * settings, the category tree, challenge type records, published-content availability and the
+ * theme world catalog.
  *
  * Keys are versioned instead of deleted: `ref:{name}:version` holds a random token and the value
  * lives under `ref:{name}:{token}`. A write never deletes the value, it replaces the token
@@ -40,7 +41,10 @@ final class ReferenceCache
     /** Distinct category/type/locale/age combinations of published content (ContentAvailability). */
     public const string CONTENT_AVAILABILITY = 'content-availability.v1';
 
-    public const array ALL = [self::POLICY, self::CATEGORY_TREE, self::CHALLENGE_TYPES, self::CONTENT_AVAILABILITY];
+    /** Active theme worlds in display order (ThemeWorldCatalog). */
+    public const string THEME_WORLDS = 'theme-worlds.v1';
+
+    public const array ALL = [self::POLICY, self::CATEGORY_TREE, self::CHALLENGE_TYPES, self::CONTENT_AVAILABILITY, self::THEME_WORLDS];
 
     /** Abandoned versions expire on their own; the current one is simply recomputed after a week. */
     private const int TTL_SECONDS = 7 * 24 * 3600;

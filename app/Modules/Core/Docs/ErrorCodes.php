@@ -21,6 +21,7 @@ final class ErrorCodes
         'category_not_allowed' => ['status' => 403, 'meaning' => 'Category outside tier/age policy'],
         'second_chance_unavailable' => ['status' => 403, 'meaning' => 'No second chance of that method left / allowed'],
         'goal_limit_reached' => ['status' => 403, 'meaning' => 'Tier limit on active goal plans reached'],
+        'world_locked' => ['status' => 403, 'meaning' => 'That theme world isn\'t unlocked for this member (see `GET /me/worlds`)'],
         'not_found' => ['status' => 404, 'meaning' => 'Not found'],
         'no_family' => ['status' => 409, 'meaning' => 'Endpoint needs a family membership and the user has none'],
         'already_in_family' => ['status' => 409, 'meaning' => 'User already belongs to a family'],

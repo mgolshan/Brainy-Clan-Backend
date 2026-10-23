@@ -12,10 +12,16 @@
         'jungle' => ['bg' => '#ECF7E4', 'card' => '#FFFFFF', 'accent' => '#2F855A', 'font' => '1.1rem', 'radius' => '20px'],
         'space' => ['bg' => '#0B1026', 'card' => '#1A2147', 'accent' => '#A78BFA', 'font' => '1rem', 'radius' => '16px'],
         'neon' => ['bg' => '#0A0A0F', 'card' => '#17171F', 'accent' => '#22D3EE', 'font' => '1rem', 'radius' => '10px'],
+        'sea' => ['bg' => '#E6F6FB', 'card' => '#FFFFFF', 'accent' => '#0E7490', 'font' => '1.1rem', 'radius' => '20px'],
+        'dino' => ['bg' => '#F3F0E2', 'card' => '#FFFFFF', 'accent' => '#65A30D', 'font' => '1.1rem', 'radius' => '18px'],
+        'sticker' => ['bg' => '#FFF1F7', 'card' => '#FFFFFF', 'accent' => '#DB2777', 'font' => '1.1rem', 'radius' => '22px'],
+        'lofi' => ['bg' => '#2A2238', 'card' => '#3A3050', 'accent' => '#F9A8D4', 'font' => '1rem', 'radius' => '14px'],
+        'nature' => ['bg' => '#F1F5EE', 'card' => '#FFFFFF', 'accent' => '#4D7C0F', 'font' => '1rem', 'radius' => '16px'],
+        'midnight' => ['bg' => '#05070F', 'card' => '#111827', 'accent' => '#818CF8', 'font' => '1rem', 'radius' => '14px'],
     ];
     $compact ??= false;
     $t = $themes[$preview['ui_theme']] ?? $themes['modern'];
-    $dark = in_array($preview['ui_theme'], ['sleek', 'space', 'neon'], true);
+    $dark = in_array($preview['ui_theme'], ['sleek', 'space', 'neon', 'lofi', 'midnight'], true);
 @endphp
 <div style="background:{{ $t['bg'] }}; color:{{ $dark ? '#E2E8F0' : '#111827' }}; border-radius:{{ $compact ? '16px' : '28px' }}; padding:{{ $compact ? '.75rem' : '1.25rem' }}; border:{{ $compact ? '3px' : '8px' }} solid #111827; min-height:{{ $compact ? '0' : '520px' }}; font-size:{{ $compact ? '.9rem' : $t['font'] }};">
     <div style="font-size:.75rem; opacity:.7; margin-bottom:.75rem;">

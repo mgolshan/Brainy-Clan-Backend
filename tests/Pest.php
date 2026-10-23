@@ -1,8 +1,12 @@
 <?php
 
+use App\Modules\Content\Models\Category;
 use App\Modules\Family\Models\Family;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Identity\Models\User;
+use App\Modules\Scoring\Actions\AppendPoints;
+use App\Modules\Scoring\Models\PointEntry;
+use App\Modules\Scoring\Models\Streak;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -54,4 +58,35 @@ function actingAsMember(FamilyMember $member): User
     Sanctum::actingAs($user);
 
     return $user;
+}
+
+/**
+ * Append a ledger entry for this member (negative = a compensating correction).
+ */
+function earnPoints(FamilyMember $member, int $amount): void
+{
+    $categoryId = Category::query()->value('id') ?? Category::factory()->create()->id;
+    $reason = $amount < 0 ? PointEntry::REASON_CORRECTION : PointEntry::REASON_CORRECT_ANSWER;
+
+    app(AppendPoints::class)->handle($member->family_id, $member->id, (int) $categoryId, $amount, $reason);
+}
+
+/**
+ * Set the member's streak record (longest and current days).
+ */
+function setStreak(FamilyMember $member, int $longest, int $current = 0): void
+{
+    Streak::query()->updateOrCreate(['member_id' => $member->id], ['longest' => $longest, 'current' => $current, 'last_active_date' => null]);
+}
+
+/**
+ * Unlock every seeded theme world for the member: family plan, 1000 points, a 30-day streak.
+ */
+function unlockAllWorlds(FamilyMember $member): FamilyMember
+{
+    $member->family->forceFill(['tier' => Family::TIER_FAMILY])->save();
+    earnPoints($member, 1000);
+    setStreak($member, 30);
+
+    return $member;
 }

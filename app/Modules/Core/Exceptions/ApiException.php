@@ -156,6 +156,14 @@ class ApiException extends RuntimeException
     }
 
     /**
+     * The theme world is not unlocked for this member (docs/API.md "Worlds and unlocks").
+     */
+    public static function worldLocked(): self
+    {
+        return new self('world_locked', 'This theme world is not unlocked yet.', 403);
+    }
+
+    /**
      * A 422 with field errors, for domain validation that happens inside an Action.
      */
     public static function validation(string $field, string $message): self

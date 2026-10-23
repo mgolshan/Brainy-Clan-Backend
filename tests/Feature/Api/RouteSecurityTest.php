@@ -58,7 +58,7 @@ it('rate-limits every /api/v1 route', function () {
 
 it('keeps admin-only family routes behind the family:admin middleware', function () {
     $adminRoutes = apiRouteMiddleware()
-        ->filter(fn (array $middleware, string $route) => Str::contains($route, ['family/invites', 'sign-in-codes', 'family/subscription/sync']) || $route === 'PATCH api/v1/family')
+        ->filter(fn (array $middleware, string $route) => Str::contains($route, ['family/invites', 'sign-in-codes', 'family/subscription/sync', 'family/members/{member}/worlds']) || $route === 'PATCH api/v1/family')
         ->reject(fn (array $middleware) => in_array('family:admin', $middleware, true))
         ->keys()
         ->all();

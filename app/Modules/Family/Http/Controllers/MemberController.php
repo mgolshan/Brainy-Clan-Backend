@@ -25,9 +25,10 @@ class MemberController
      *
      * Nickname, avatar, difficulty override, birth data, role, accessibility and the member's
      * `email` login (when the band allows it). The owner cannot be demoted; only the owner may
-     * change the owner's email.
+     * change the owner's email. A theme world must be unlocked for that member (see
+     * `GET /family/members/{member}/worlds`), else 403 `world_locked`; `null` always works.
      */
-    #[ApiErrors('forbidden')]
+    #[ApiErrors('forbidden', 'world_locked')]
     public function update(UpdateMemberRequest $request, int $member, UpdateMember $update): MemberResource
     {
         $target = $this->findInFamily($request, $member);
@@ -52,9 +53,12 @@ class MemberController
      * Update my accessibility settings.
      *
      * Text scale, reduced motion, calm timers, theme (`null` = the band's default; keys `playful`,
-     * `sleek`, `modern`, `classic`, `jungle`, `space`, `neon`) and sound effects (`null` = the
-     * band's `accessibility_defaults.sound_effects`). Never changes rules.
+     * `sleek`, `modern`, `classic`, `jungle`, `space`, `neon`, `sea`, `dino`, `sticker`, `lofi`,
+     * `nature`, `midnight`) and sound effects (`null` = the band's
+     * `accessibility_defaults.sound_effects`). Never changes rules. The theme must be a world
+     * unlocked for me (`GET /me/worlds`), else 403 `world_locked`; `null` always works.
      */
+    #[ApiErrors('world_locked')]
     public function updateAccessibility(UpdateAccessibilityRequest $request, UpdateAccessibility $update): MemberResource
     {
         $member = $update->handle($this->currentMember($request), $request->validated());

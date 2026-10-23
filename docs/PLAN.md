@@ -128,8 +128,12 @@ as written there; if something must change, update `docs/API.md` first and note 
 - **Theme worlds (2026-10-23, Moe):** theme keys gain `jungle`, `space`, `neon` (app-side design
   in the frontend PLAN); member `accessibility.sound_effects` (null|bool) with policy default
   `accessibility_defaults.sound_effects` (child true, others false; editable per age band in the
-  admin). Phase 2: world unlocks by streak/points and 2–3 Family-plan-only worlds, decided by the
-  server (contract to be written then).
+  admin). **Phase 2 (2026-10-23):** keys `sea`, `dino`, `sticker`, `lofi`, `nature`, `midnight`;
+  a world catalog (key, order, unlock type free/points/streak/family_plan, threshold) stored as
+  reference data editable in Filament (cached via ReferenceCache, invalidated on write); unlock
+  evaluation per member from lifetime points + longest streak + family tier in a fixed number of
+  queries (not cached); `GET /me/worlds`, admin `GET /family/members/{member}/worlds`, 403
+  `world_locked`, Member `theme_unlocked` (see `docs/API.md`).
 - **Launch question bank and French content (2026-10-17):** while the AI generator waits for an API key, the
   launch bank is hand-written as seed data in `database/seeders/data/questions/*.php` (one file per area, stable
   `id` per entry, English plus an optional French version; language-specific items such as spelling or idioms may

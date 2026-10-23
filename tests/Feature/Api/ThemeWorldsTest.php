@@ -19,13 +19,13 @@ function soundDefaultForAge(int $age): bool
     return app(PolicyResolver::class)->forUser(User::factory()->aged($age)->create())['accessibility_defaults']['sound_effects'];
 }
 
-it('accepts every theme world key', function (string $theme) {
-    actingAsMember(familyOwner());
+it('accepts every theme world key once unlocked', function (string $theme) {
+    actingAsMember(unlockAllWorlds(familyOwner()));
 
     $this->patchJson('/api/v1/me/accessibility', ['theme' => $theme])
         ->assertOk()
         ->assertJsonPath('data.accessibility.theme', $theme);
-})->with(['playful', 'sleek', 'modern', 'classic', 'jungle', 'space', 'neon']);
+})->with(AgeBand::THEMES);
 
 it('rejects an unknown theme key with 422', function (mixed $theme) {
     actingAsMember(familyOwner());
@@ -42,7 +42,7 @@ it('keeps the band default themes unchanged', function () {
 });
 
 it('round-trips sound_effects true, false and null', function () {
-    $owner = familyOwner();
+    $owner = unlockAllWorlds(familyOwner());
     actingAsMember($owner);
 
     $this->getJson('/api/v1/me')->assertJsonPath('data.member.accessibility.sound_effects', null);
@@ -88,7 +88,7 @@ it('gives each band its sound effects default in the policy', function (int $age
 
 it('lets a family admin set a member theme world and sound effects', function () {
     $owner = familyOwner(['tier' => 'family']);
-    $kid = addMember($owner->family, 9);
+    $kid = unlockAllWorlds(addMember($owner->family, 9));
     actingAsMember($owner);
 
     $this->patchJson("/api/v1/family/members/{$kid->id}", ['accessibility' => ['theme' => 'jungle', 'sound_effects' => false]])

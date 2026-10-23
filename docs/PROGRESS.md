@@ -377,6 +377,22 @@ curl http://localhost:8080/api/v1/health
 
 ## Log
 
+### 2026-10-23 world unlocks
+- **Catalog** (PLAN "Theme worlds" phase 2): table `theme_worlds` (key, sort, unlock_type
+  free|points|streak|family_plan, required, active), model `Policy\Models\ThemeWorld`
+  (ReferenceDataBuilder, cache `ReferenceCache::THEME_WORLDS`, read via scoped `ThemeWorldCatalog`).
+  Migration `2026_10_23_200000_create_theme_worlds_table` inserts the contract catalog (insertOrIgnore);
+  `ThemeWorldSeeder` (in DatabaseSeeder) only adds missing keys, so admin edits stay. Filament: Policy →
+  Theme worlds (edit, reorder, active toggle; `required` needed for points/streak, cleared otherwise).
+  `AgeBand::THEMES` adds `sea, dino, sticker, lofi, nature, midnight` (+ labels, preview palettes).
+- **Unlocks**: `Policy\Actions\EvaluateWorldUnlocks` — lifetime points = sum of positive ledger
+  entries (corrections never re-lock), `streaks.longest`, family tier `family` (active/trial/grace).
+  2 queries per member, 2 per member list (none when no stored theme needs points/streak). Not cached.
+- **API**: `GET /me/worlds`, `GET /family/members/{member}/worlds` (admin, 404 cross-family); 403
+  `world_locked` on `PATCH /me/accessibility` and the admin member PATCH (null always OK); Member
+  `theme_unlocked` (family list batches the lookups).
+- Tests: `tests/Feature/Api/WorldUnlocksTest.php`; `ThemeWorldsTest` unlocks worlds before picking them.
+
 ### 2026-10-23 theme worlds + sound setting
 - **Theme worlds** (PLAN "Theme worlds (2026-10-23, Moe)"): `AgeBand::THEMES` adds `jungle`, `space`,
   `neon`; `AgeBand::THEME_LABELS` gives the admin names (Candy Land, Glass, Modern, Classic, Jungle

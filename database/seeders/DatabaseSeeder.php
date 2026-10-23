@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             PolicySeeder::class,
+            ThemeWorldSeeder::class,
             AdminUserSeeder::class,
             CategorySeeder::class,
             ChallengeTypeSeeder::class,
