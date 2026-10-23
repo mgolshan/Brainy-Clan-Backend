@@ -28,8 +28,10 @@
         th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--border); }
         form { margin: 16px 0; }
         label { display: block; font-weight: 600; margin-bottom: 4px; }
-        input[type=email] { width: 100%; max-width: 420px; padding: 10px 12px; font-size: 1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--fg); }
+        input[type=email], input[type=password] { width: 100%; max-width: 420px; padding: 10px 12px; font-size: 1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--fg); }
         button { margin-top: 12px; padding: 10px 18px; font-size: 1rem; border: 0; border-radius: 8px; background: #c81e1e; color: #fff; cursor: pointer; }
+        button.primary { background: #4c51bf; }
+        label.spaced { margin-top: 12px; }
         .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
         .notice { border-left: 4px solid var(--accent); padding: 8px 12px; margin: 16px 0; }
         .error { color: #c81e1e; }

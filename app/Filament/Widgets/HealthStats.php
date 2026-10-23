@@ -2,9 +2,11 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Resources\AccountDeletionRequests\AccountDeletionRequestResource;
 use App\Filament\Resources\WebhookEvents\WebhookEventResource;
 use App\Filament\Support\DashboardMetrics;
 use App\Modules\Billing\Models\WebhookEvent;
+use App\Modules\Family\Models\AccountDeletionRequest;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -43,7 +45,8 @@ class HealthStats extends StatsOverviewWidget
             Stat::make('Pending deletions', number_format($health['deletion_requests_pending']))
                 ->icon(Heroicon::OutlinedTrash)
                 ->description('Awaiting email confirmation · '.number_format($health['deletion_requests_blocked_week']).' blocked in 7 days')
-                ->color($health['deletion_requests_pending'] > 0 ? 'warning' : 'gray'),
+                ->color($health['deletion_requests_pending'] > 0 ? 'warning' : 'gray')
+                ->url(AccountDeletionRequestResource::getUrl('index', ['filters' => ['status' => ['value' => AccountDeletionRequest::STATUS_PENDING]]])),
         ];
     }
 }

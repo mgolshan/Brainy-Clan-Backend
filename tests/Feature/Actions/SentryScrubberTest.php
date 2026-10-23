@@ -23,7 +23,7 @@ it('strips user details, cookies, auth headers and request bodies', function () 
     $event = Event::createEvent();
     $event->setUser(UserDataBag::createFromArray(['id' => 42, 'email' => 'mom@example.com', 'username' => 'Mom', 'ip_address' => '203.0.113.9']));
     $event->setRequest([
-        'url' => 'https://api.brainyclan.app/account/delete/confirm/'.str_repeat('a1B2', 16),
+        'url' => 'https://brainyclan.com/account/delete/confirm/'.str_repeat('a1B2', 16),
         'method' => 'POST',
         'query_string' => 'email=mom@example.com',
         'headers' => ['Authorization' => 'Bearer 12|secrettoken', 'Cookie' => 'session=abc', 'User-Agent' => 'Brainy/1.0', 'X-App-Version' => '1.0.0'],
@@ -44,7 +44,7 @@ it('strips user details, cookies, auth headers and request bodies', function () 
         ->and($request['headers']['Authorization'])->toBe('[Filtered]')
         ->and($request['headers']['Cookie'])->toBe('[Filtered]')
         ->and($request['headers']['User-Agent'])->toBe('Brainy/1.0')
-        ->and($request['url'])->toBe('https://api.brainyclan.app/account/delete/confirm/[Filtered]')
+        ->and($request['url'])->toBe('https://brainyclan.com/account/delete/confirm/[Filtered]')
         ->and($request['query_string'])->toBe('email=[Filtered]');
 });
 

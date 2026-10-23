@@ -5,7 +5,9 @@ namespace App\Modules\Identity\Http\Controllers;
 use App\Modules\Core\Docs\ApiErrors;
 use App\Modules\Identity\Actions\LoginWithPassword;
 use App\Modules\Identity\Actions\RegisterAdult;
+use App\Modules\Identity\Actions\RequestPasswordReset;
 use App\Modules\Identity\Actions\RevokeCurrentDevice;
+use App\Modules\Identity\Http\Requests\ForgotPasswordRequest;
 use App\Modules\Identity\Http\Requests\LoginRequest;
 use App\Modules\Identity\Http\Requests\RegisterRequest;
 use App\Modules\Identity\Http\Resources\MeResource;
@@ -39,8 +41,11 @@ class AuthController
      * Sign in with email and password.
      *
      * 401 `invalid_credentials` for a wrong email or password. Creates a device-bound token.
+     * Sign-in lockout: 429 `login_locked` (body `retry_after` seconds + `Retry-After` header) after
+     * repeated failures per email + IP (5 → 5 min, 1 h, then 24 h), per email (20 within 1 h →
+     * 15 min) or per IP (30 within 1 h → 1 h); the same answer whether or not the email exists.
      */
-    #[ApiErrors('invalid_credentials')]
+    #[ApiErrors('invalid_credentials', 'login_locked')]
     public function login(LoginRequest $request, LoginWithPassword $login): MeResource
     {
         $result = $login->handle(
@@ -49,9 +54,30 @@ class AuthController
             (string) $request->string('device_name'),
             (string) $request->string('platform'),
             $request->appVersion(),
+            $request->ip(),
         );
 
         return MeResource::withToken($result['user'], $result['token']);
+    }
+
+    /**
+     * Forgot password: email a reset link.
+     *
+     * Always 202 `{ "data": { "sent": true } }`, whether or not the email has an account. When it
+     * has, a one-time link to the web page `/password/reset` is emailed (valid 60 minutes; a newer
+     * link replaces older ones). The page sets the new password, signs the user out of every
+     * device and clears the sign-in lockouts of the email. 3 requests per hour per email and 10
+     * per IP; over that the answer is the same and no email is sent.
+     *
+     * @status 202
+     */
+    public function forgotPassword(ForgotPasswordRequest $request, RequestPasswordReset $requestReset): JsonResponse
+    {
+        $locale = $request->input('locale');
+
+        $requestReset->handle((string) $request->string('email'), is_string($locale) ? $locale : null, $request->ip());
+
+        return new JsonResponse(['data' => ['sent' => true]], 202);
     }
 
     /**

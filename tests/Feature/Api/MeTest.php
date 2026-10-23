@@ -44,6 +44,27 @@ it('updates the profile', function () {
     $this->patchJson('/api/v1/me', ['avatar' => 'spaceship'])->assertStatus(422)->assertJsonValidationErrors('avatar');
 });
 
+it('accepts every Clan avatar key and nothing else', function () {
+    $species = ['fox', 'owl', 'panda', 'lion', 'koala', 'penguin', 'tiger', 'rabbit', 'bear', 'frog', 'cat',
+        'dog', 'unicorn', 'dragon', 'turtle', 'octopus', 'elephant', 'giraffe', 'hedgehog', 'otter', 'raccoon', 'monkey'];
+    $expected = [];
+
+    foreach ($species as $name) {
+        foreach (['', '-teen', '-mom', '-dad', '-grandma', '-grandpa'] as $variant) {
+            $expected[] = $name.$variant;
+        }
+    }
+
+    expect(User::AVATARS)->toBe($expected)->toHaveCount(132);
+    expect(max(array_map('strlen', User::AVATARS)))->toBeLessThanOrEqual(30);
+
+    Sanctum::actingAs(User::factory()->create());
+
+    $this->patchJson('/api/v1/me', ['avatar' => 'tiger-mom'])->assertOk()->assertJsonPath('data.avatar', 'tiger-mom');
+    $this->patchJson('/api/v1/me', ['avatar' => 'hedgehog-grandpa'])->assertOk()->assertJsonPath('data.avatar', 'hedgehog-grandpa');
+    $this->patchJson('/api/v1/me', ['avatar' => 'tiger-aunt'])->assertStatus(422)->assertJsonValidationErrors('avatar');
+});
+
 it('updates accessibility settings and resets the theme with null', function () {
     $owner = familyOwner();
     actingAsMember($owner);

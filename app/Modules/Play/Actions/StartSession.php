@@ -56,7 +56,7 @@ class StartSession
             ]);
             $session->setRelation('member', $member);
 
-            $added = $this->addItems->handle($session, $rules['target_points'] + $rules['blunder_cap']);
+            $added = $this->addItems->handle($session, $rules['target_points'] + $rules['blunder_cap'], isNew: true);
 
             if ($added->isEmpty()) {
                 throw ApiException::validation('category_id', 'There is no playable content in this category yet.');

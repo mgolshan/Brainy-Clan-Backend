@@ -103,6 +103,28 @@ as written there; if something must change, update `docs/API.md` first and note 
   from inside a transaction); cached models use `ReferenceDataBuilder`, so every Eloquent write
   (saves, mass updates, Filament reorder, seeders under `withoutEvents`) invalidates; raw SQL needs
   `php artisan reference-cache:flush`; `migrate` flushes automatically. No per-family caches yet.
+- **Decisions (2026-10-22, Moe's answers):**
+  - **Domains:** website `https://brainyclan.com` (`www` redirects to it), API and admin
+    `https://api.brainyclan.com` (replaces every `brainyclan.app` in config/docs). Support email
+    `support@brainyclan.com`, mail from `no-reply@brainyclan.com`. The backend serves the website
+    from the same app/server (Caddy host routing): a bilingual landing page, `/support`,
+    `/privacy`, `/terms`, `/account/delete`, `/password/reset`. These are the store listing URLs.
+  - **Audience:** parents and children under 13 can both find and install the app. Google Play
+    target audience: ages 6–8, 9–12, 13–15, 16–17, 18+ (mixed audience under the Families Policy):
+    Families-certified ad SDK only (AdMob), no ads ever for children (policy), child-directed and
+    under-age-of-consent tags where they apply, IARC rating "Everyone", Data safety form, no
+    advertising ID for children. Apple: not in the Kids Category (it forbids third-party ads, which
+    teens/adults on the free tier see); primary category Education, age rating 4+. All content is
+    reviewed before publishing (seed bank fact-checked; AI batches need a reviewer).
+  - **Ads:** free-tier teens and adults see rewarded ads (opt-in second chance); children never.
+    Every ad request is non-personalized with max content rating **G**; teens are also tagged
+    under the age of consent. Moe additionally blocks sensitive ad categories in AdMob (README).
+    Business reason (Moe): ads on the free tier nudge families to the paid plan.
+  - **Login lockout:** progressive, per email+IP, per email and per IP (`docs/API.md` Auth →
+    Lockout), 429 `login_locked`; plus `POST /auth/password/forgot` with a web reset page so a
+    locked-out or forgetful adult can always get back in. Replaces the "per-email throttle"
+    trade-off question.
+  - **Devices:** iPhone and iPad (app milestone; layouts get a max content width on tablets).
 - **Launch question bank and French content (2026-10-17):** while the AI generator waits for an API key, the
   launch bank is hand-written as seed data in `database/seeders/data/questions/*.php` (one file per area, stable
   `id` per entry, English plus an optional French version; language-specific items such as spelling or idioms may
@@ -223,24 +245,22 @@ as written there; if something must change, update `docs/API.md` first and note 
   S3-compatible), retention 14 days, restore drill documented.
 - Sentry (`sentry/sentry-laravel`, approved in the design doc) with PII scrubbing (no child data).
 - Step-by-step deploy guide for Moe: Hetzner VPS sizing (CX22 ≈ €5/month fits the budget), SSH keys,
-  firewall, Docker install, DNS for brainyclan.app, `.env` for production, first deploy, updates,
+  firewall, Docker install, DNS for brainyclan.com (website) and api.brainyclan.com, `.env` for production, first deploy, updates,
   rollbacks, monitoring.
 - Privacy policy, terms and parental consent support in the API per `docs/API.md` "Legal, consent
   and privacy (B9)" — drafts must be reviewed by a lawyer before store submission.
 
 ## Open questions
-- **Waiting for Moe (2026-10-16):**
-  1. Norton Web/Mail Shield intercepts HTTPS in Docker (cURL error 60): disable HTTPS scanning for
-     Docker or drop the Norton root cert into `Brainy-Clan-Backend/docker/php/extra-ca/` and rebuild.
+- **Answered by Moe (2026-10-22)** — see "Decisions (2026-10-22)" above: iPhone + iPad; Play
+  target audience includes children (Families Policy); website `brainyclan.com`, support
+  `support@brainyclan.com`; teens on the free tier see rewarded ads (age-appropriate only); login
+  lockout designed by Claude; UMP message set up by Moe with the AdMob account.
+- **Still waiting for Moe:**
+  1. Norton: turn off HTTPS scanning or add the Norton root cert to `docker/php/extra-ca/` (steps
+     given 2026-10-22; Claude recommends the certificate).
   2. Lawyer review of the legal drafts, company details (`LEGAL_*`), then `LEGAL_DRAFT=false`.
-  3. Accounts: Hetzner, Apple Developer, Google Play Console, RevenueCat, AdMob, Sentry, SMTP
-     provider, Anthropic API key (AI content generator).
+  3. Accounts (Moe, a weekend): Hetzner, Apple Developer, Google Play Console, RevenueCat, AdMob
+     (+ UMP message), Sentry, SMTP provider, Anthropic API key; production review account.
   4. Approve or replace the owl mascot "Ollie".
-  5. iPhone-only for v1 (`supportsTablet: false`)?
-  6. Google Play target audience: include under-13 age groups (Families Policy) or mixed audience
-     where children only join through a parent's family?
-  7. Support email and website URLs for the store listings; production review account.
-  8. EU/UK release needs Google's UMP ad-consent form (not built).
-- Whether teens on the free tier see rewarded ads.
 - Production hosting: same Docker images on Hetzner (default) or Forge without Docker.
 - CIPO and USPTO trademark search for "Brainy Clan".

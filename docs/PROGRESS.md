@@ -63,8 +63,8 @@ Milestones are defined in `docs/PLAN.md`.
       codes are plaintext by design because admins re-display them), no PII in logs/activity log, `canAccessPanel`.
    c. **README refresh** (not started): setup, run, seeded logins/tokens, index of all setup guides, `docs/DEPLOY.md`
       link, tests/checks; "admin tour" still thin.
-   d. Admin config tables (age bands, settings, challenge types) have no relation columns; they are only in the
-      render test, not the constant-query test (their row count does not grow with families).
+   d. ~~Admin config tables (age bands, settings, challenge types) have no relation columns; they are only in the
+      render test, not the constant-query test (their row count does not grow with families).~~ Done 2026-10-22.
    Then the items of session 14 below (Moe: server, lawyer, Norton cert, content).
    Previous: **State at last stop (session 14, 2026-10-16):** **B9 done locally** (see log). Dev DB: `migrate` (2 migrations:
    `consents`, `account_deletion_requests`) + `AdminUserSeeder` and `DemoFamilySeeder` re-run (demo consents). **Next:**
@@ -376,6 +376,56 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-10-22 lockout, password reset, play perf
+- **Sign-in lockout** (API.md Auth → "Lockout"): `Identity\Lockout\LoginLockout` (Redis via the
+  cache, atomic counters, HMAC-SHA256 keys of email / IP), wired into `LoginWithPassword`,
+  `SignInWithCode`, `JoinFamilyWithInvite`. 429 `login_locked` + `retry_after` + `Retry-After`
+  (also on the failure that starts a lock); credentials not checked while locked; unknown emails
+  hash a dummy password. Owner notice mail (`SignInAttemptsNotice`, once per 24 h). Thresholds in
+  `config/auth.php` → `lockout`. `php artisan auth:unlock {email} {--ip=}`. Scramble documents
+  `login_locked` with `retry_after`.
+- **Forgot password**: `POST /auth/password/forgot` (always 202, 3/h per email, 10/h per IP
+  silently dropped), token SHA-256 in `password_reset_tokens` (one row per email, 60 min), web
+  page `GET/POST /password/reset` (legal layout, en/fr + switch, CSRF, 10 posts/h per IP). Success
+  sets the password, revokes all tokens + devices (`RevokeAllDevices`), clears lockouts, queues
+  `PasswordChanged`. Links built from `app.website_url`. `auth:clear-resets` scheduled daily.
+- **Play performance**: `POST /play/sessions` 53 → 12 queries (one bulk insert of session items,
+  one history upsert, no lookups on a brand-new session); `POST /play/sessions/{id}/answers`
+  17 → 12 in tests (session loaded once with the lock, member reused; 4 of the 12 are the queued
+  streak listener, which runs sync in tests). `tests/Feature/Api/PlayQueryCountTest.php`.
+- Tests: `SignInLockoutTest`, `PasswordResetTest`, `PlayQueryCountTest`; `SecurityReviewTest`
+  code-guess test now expects `login_locked` from the 5th guess.
+
+### 2026-10-22 website + domains
+- **Domains** (PLAN "Decisions (2026-10-22)"): every `brainyclan.app` in config/docs/tests → website
+  `brainyclan.com` (`www` → 301 apex), API + admin `api.brainyclan.com`; support `support@brainyclan.com`
+  (`config('legal.support_email')`, `LEGAL_SUPPORT_EMAIL`; `LEGAL_CONTACT_EMAIL` default too), mail from
+  `no-reply@brainyclan.com`. New config `app.website_url` (`WEBSITE_URL`, falls back to `APP_URL`) and
+  `app.website_host` (`WEBSITE_HOST`, empty = no host routing). `.env.prod.example`, `.env.example`,
+  `docker-compose.prod.yml` (Caddy gets `WEBSITE_HOST`), Caddyfile (API host, website host, `www` redirect).
+- **Website** served by this app (`routes/web.php`, `WebsiteController`, `resources/views/website/`): bilingual
+  landing page `/` (`?lang=`, else Accept-Language; what it is, 8 categories, safe for kids, free vs Family plan
+  with limits read from the policy settings, "coming soon" store notes), `/support` (FAQ: child sign-in code,
+  forgot password, lockout, deletion, subscription, data; support email), `/terms` + `/privacy` (old
+  `/legal/{terms,privacy}` → 301, query kept), `robots.txt` (API host: `Disallow: /`), `sitemap.xml` (en + fr with
+  hreflang). Inline CSS, light/dark, no JS/cookies/analytics/external fonts; strict CSP (`SecurityHeaders`).
+  Owl copied to `public/images/owl.svg`; Laravel `welcome` view and static `public/robots.txt` removed (dev nginx
+  now sends `/robots.txt` to Laravel).
+- **Host routing** (only with `WEBSITE_HOST`): `RouteByHost` (global; `www` → apex, `/api`, `/admin`, `/horizon`,
+  `/docs`, `/livewire`, `/up` on the website host → API host) + `RedirectToWebsiteHost` (website group; website
+  paths on the API host → website host; 301, 308 for non-GET). `Website::route()` builds legal URLs (`GET /legal`)
+  and the deletion email link on `WEBSITE_URL`. The other agent's `/password/reset` routes sit inside the website group.
+- **Admin:** read-only "Deletion requests" resource (Families group; created, account `#id · name · m***@domain`,
+  status, confirmed at, completed at; status filter; view page; eager-loaded); dashboard "Pending deletions"
+  card links to it (filtered to pending). Admin config tables (age bands, settings, challenge types) and
+  deletion requests are now in the constant-query test (PROGRESS item d done).
+- **Tests:** `tests/Feature/Api/WebsiteTest.php` (pages en/fr, language switch, links, plans, SEO, robots,
+  sitemap, host routing, website URLs in `/legal` and the deletion email), LegalTest/SentryScrubberTest paths,
+  AdminQueryCountTest, DashboardTest link.
+- **Moe:** DNS A/AAAA for `brainyclan.com`, `www`, `api`; `support@` mailbox (MX at the mail provider);
+  SMTP provider domain verification for `no-reply@` (SPF/DKIM/DMARC) — `docs/DEPLOY.md` section 4. Store
+  listing URLs: `https://brainyclan.com`, `/support`, `/privacy`, `/account/delete`.
 
 ### 2026-10-17 caching
 - **Audit** (queries per warm request, before → after): `GET /health` 0, `GET /legal` 0 (config),

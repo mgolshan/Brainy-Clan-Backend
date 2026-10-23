@@ -14,6 +14,7 @@ const PUBLIC_API_ROUTES = [
     'GET api/v1/legal',
     'POST api/v1/auth/register',
     'POST api/v1/auth/login',
+    'POST api/v1/auth/password/forgot',
     'POST api/v1/auth/social/{provider}',
     'POST api/v1/auth/join',
     'POST api/v1/auth/code',

@@ -7,6 +7,7 @@ use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Models\Invite;
 use App\Modules\Identity\Actions\AcceptLegalTerms;
 use App\Modules\Identity\Actions\IssueDeviceToken;
+use App\Modules\Identity\Lockout\LoginLockout;
 use App\Modules\Identity\Models\Consent;
 use App\Modules\Identity\Models\User;
 use App\Modules\Policy\PolicyResolver;
@@ -25,9 +26,14 @@ class JoinFamilyWithInvite
         private readonly PolicyResolver $policy,
         private readonly IssueDeviceToken $issueToken,
         private readonly AcceptLegalTerms $acceptLegalTerms,
+        private readonly LoginLockout $lockout,
     ) {}
 
     /**
+     * Lockout (docs/API.md Auth → "Lockout"): a locked IP gets 429 `login_locked` before the code
+     * is looked up; unknown, used or expired codes count towards the IP's locks, a valid one
+     * resets the code count.
+     *
      * @return array{user: User, token: string}
      */
     public function handle(
@@ -39,6 +45,36 @@ class JoinFamilyWithInvite
         ?string $appVersion = null,
         bool $acceptedTerms = false,
         ?string $ipAddress = null,
+    ): array {
+        $this->lockout->ensureCodeAllowed($ipAddress);
+
+        try {
+            $result = $this->join($code, $deviceName, $platform, $email, $password, $appVersion, $acceptedTerms, $ipAddress);
+        } catch (ApiException $e) {
+            if ($e->errorCode === 'invite_invalid' && ($retryAfter = $this->lockout->recordCodeFailure($ipAddress)) > 0) {
+                throw ApiException::loginLocked($retryAfter);
+            }
+
+            throw $e;
+        }
+
+        $this->lockout->recordCodeSuccess($ipAddress);
+
+        return $result;
+    }
+
+    /**
+     * @return array{user: User, token: string}
+     */
+    private function join(
+        string $code,
+        string $deviceName,
+        string $platform,
+        ?string $email,
+        ?string $password,
+        ?string $appVersion,
+        bool $acceptedTerms,
+        ?string $ipAddress,
     ): array {
         return DB::transaction(function () use ($code, $deviceName, $platform, $email, $password, $appVersion, $acceptedTerms, $ipAddress): array {
             $invite = Invite::query()

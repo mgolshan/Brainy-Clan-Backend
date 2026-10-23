@@ -51,18 +51,72 @@ usermod -aG docker deploy
 
 Log in again as `deploy` (`ssh deploy@<IPv4>`) and check `docker compose version`.
 
-## 4. DNS (server)
+## 4. DNS, hosts and email (server)
 
-At the registrar of **brainyclan.app** add:
+Three hosts point at the same server; one Laravel app serves them all (decision 2026-10-22):
+
+| Host | What it serves |
+| --- | --- |
+| `brainyclan.com` | the public **website**: landing page `/`, `/support`, `/privacy`, `/terms`, `/account/delete`, `/password/reset`, `robots.txt`, `sitemap.xml` |
+| `www.brainyclan.com` | 301 → `https://brainyclan.com` (same path) |
+| `api.brainyclan.com` | the **API** `/api/v1`, the **admin** `/admin`, **Horizon** `/horizon`, `/docs/api` |
+
+At the registrar of **brainyclan.com** add (keep a low TTL, e.g. 300, until everything works):
 
 | Type | Name | Value |
 | --- | --- | --- |
-| A | api | `<IPv4>` |
-| AAAA | api | `<IPv6>` |
+| A | `@` (brainyclan.com) | `<IPv4>` |
+| AAAA | `@` | `<IPv6>` |
+| A | `www` | `<IPv4>` |
+| AAAA | `www` | `<IPv6>` |
+| A | `api` | `<IPv4>` |
+| AAAA | `api` | `<IPv6>` |
 
-Wait until `nslookup api.brainyclan.app` returns the server. Caddy requests the Let's Encrypt
-certificate on first start (ports 80/443 must be reachable). `.app` domains are HTTPS-only (HSTS
-preloaded), which Caddy handles.
+(`www` may also be a `CNAME` to `brainyclan.com`.) Wait until `nslookup brainyclan.com`,
+`nslookup www.brainyclan.com` and `nslookup api.brainyclan.com` return the server. Caddy requests a
+Let's Encrypt certificate for each host on first start (ports 80/443 must be reachable).
+
+### Website and hosts
+
+- **Caddy** (`docker/caddy/Caddyfile`): `{$API_DOMAIN}` and `{$WEBSITE_HOST}` both go to php-fpm;
+  `www.{$WEBSITE_HOST}` is a permanent redirect to `https://{$WEBSITE_HOST}{uri}`.
+- **Laravel** (`.env.prod`): `APP_URL=https://api.brainyclan.com`, `WEBSITE_URL=https://brainyclan.com`,
+  `WEBSITE_HOST=brainyclan.com`. With `WEBSITE_HOST` set the app routes by host:
+  website paths requested on the API host get a 301 to the website host (old links such as
+  `https://api.brainyclan.com/account/delete` keep working; non-GET requests get a 308), and `/api`,
+  `/admin`, `/horizon`, `/docs`, `/livewire` and `/up` requested on the website host get a 301 to
+  the API host (`App\Modules\Core\Http\Middleware\RouteByHost` and `RedirectToWebsiteHost`).
+  Links the app and the emails get (legal pages, account deletion confirmation, password reset)
+  are built on `WEBSITE_URL` (`App\Modules\Core\Support\Website::route()`).
+- `robots.txt` lets crawlers index the website host only (the API host answers `Disallow: /`) and
+  points to `https://brainyclan.com/sitemap.xml`.
+- **Local dev:** `WEBSITE_HOST` empty, `WEBSITE_URL` defaults to `APP_URL`: every page answers at
+  the same path on `http://localhost:8080` (`/`, `/support`, `/privacy`, …) — no host routing.
+- **Store listings:** website `https://brainyclan.com`, support URL `https://brainyclan.com/support`,
+  privacy policy `https://brainyclan.com/privacy`, account deletion URL
+  `https://brainyclan.com/account/delete`, support email `support@brainyclan.com`.
+
+### Email DNS
+
+Two addresses, two different services:
+
+- **`support@brainyclan.com` (receiving)** — a real mailbox at your mail provider (e.g. Google
+  Workspace, Fastmail, Zoho, or the registrar's email forwarding). Add the **MX** records the provider
+  gives you for `brainyclan.com` (name `@`), plus its SPF include. Test by sending a mail to it.
+- **`no-reply@brainyclan.com` (sending)** — the app's emails (account deletion and password reset
+  links) go out through the SMTP provider in `.env.prod` (`MAIL_*`, e.g. Postmark, Mailgun, Amazon
+  SES). In the provider add the domain `brainyclan.com` (or a subdomain it suggests) and create the
+  DNS records it shows:
+  - **SPF**: one `TXT` record on `@`, e.g. `v=spf1 include:<mail provider> include:<smtp provider> ~all`
+    — only **one** SPF record per name: merge the includes of the mailbox provider and the SMTP
+    provider into it.
+  - **DKIM**: the `TXT`/`CNAME` record(s) the SMTP provider gives (e.g. `<selector>._domainkey`).
+    Add the mailbox provider's DKIM too.
+  - **DMARC**: `TXT` on `_dmarc`: start with `v=DMARC1; p=none; rua=mailto:support@brainyclan.com`,
+    move to `p=quarantine` once reports show both providers pass.
+  - Some providers also want a custom **Return-Path / bounce** `CNAME` — add it, it aligns SPF.
+- Check with the provider's "verify domain" button, then send a test: request a password reset
+  for your own account and look at the headers (`spf=pass`, `dkim=pass`, `dmarc=pass`).
 
 ## 5. Code and configuration (server)
 
@@ -75,11 +129,12 @@ nano .env.prod
 
 **Production `.env.prod` checklist** — every `CHANGE_ME` replaced:
 
-- [ ] `API_DOMAIN`, `APP_URL` (`https://api.brainyclan.app`), `ACME_EMAIL`
+- [ ] `API_DOMAIN` (`api.brainyclan.com`), `WEBSITE_HOST` (`brainyclan.com`), `APP_URL` (`https://api.brainyclan.com`), `WEBSITE_URL` (`https://brainyclan.com`), `ACME_EMAIL` (section 4)
 - [ ] `APP_KEY` — generate after the first build: `docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --no-deps --entrypoint php app artisan key:generate --show`
 - [ ] `APP_ENV=production`, `APP_DEBUG=false` (the containers refuse to start with `APP_DEBUG=true`)
 - [ ] `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `REDIS_PASSWORD` — `openssl rand -base64 32` each
-- [ ] Mail (SMTP provider) — needed for account deletion confirmation emails
+- [ ] Mail (SMTP provider) — needed for account deletion and password reset emails; `MAIL_FROM_ADDRESS=no-reply@brainyclan.com` (SPF/DKIM/DMARC: section 4 "Email DNS")
+- [ ] `LEGAL_SUPPORT_EMAIL` / `LEGAL_CONTACT_EMAIL` (`support@brainyclan.com`, shown on the website and the legal pages)
 - [ ] `LEGAL_*` company details; `LEGAL_DRAFT=true` until the lawyer review is done
 - [ ] `SENTRY_LARAVEL_DSN` (section 10)
 - [ ] Google / Facebook / Apple sign-in keys — README "Google and Facebook sign-in — setup" and "Sign in with Apple — setup"
@@ -106,7 +161,7 @@ $C ps                                      # every service "healthy" / "running"
 
 Never run `DatabaseSeeder` or the demo seeders in production (demo users with known passwords).
 
-**Admin user** (Filament at `https://api.brainyclan.app/admin`):
+**Admin user** (Filament at `https://api.brainyclan.com/admin`):
 
 ```sh
 $C exec app php artisan tinker --execute '$u = new App\Modules\Identity\Models\User(["display_name" => "Moe", "email" => "you@example.com", "locale" => "en"]); $u->password = "a-long-unique-password"; $u->is_staff = true; $u->save();'
@@ -115,17 +170,20 @@ $C exec app php artisan tinker --execute '$u = new App\Modules\Identity\Models\U
 **Checks:**
 
 ```sh
-curl -s https://api.brainyclan.app/api/v1/health      # {"data":{"status":"ok",...}}
-curl -sI https://api.brainyclan.app/legal/privacy      # 200, strict security headers
+curl -s https://api.brainyclan.com/api/v1/health      # {"data":{"status":"ok",...}}
+curl -sI https://brainyclan.com/                      # 200, the landing page
+curl -sI https://www.brainyclan.com/                  # 301 → https://brainyclan.com/
+curl -sI https://api.brainyclan.com/privacy           # 301 → https://brainyclan.com/privacy
+curl -sI https://brainyclan.com/privacy               # 200, strict security headers
 $C exec horizon php artisan horizon:status              # "Horizon is running."
 $C exec app php artisan schedule:list                   # goals, reminders, reconciliation
 $C logs --tail=50 caddy app horizon scheduler backup
 ```
 
-Then point the webhooks at the server: RevenueCat → `https://api.brainyclan.app/api/v1/webhooks/revenuecat`,
-AdMob SSV → `https://api.brainyclan.app/api/v1/webhooks/admob-ssv`. Google Play's "account deletion
-URL" is `https://api.brainyclan.app/account/delete`; the store privacy policy URL is
-`https://api.brainyclan.app/legal/privacy`.
+Then point the webhooks at the server: RevenueCat → `https://api.brainyclan.com/api/v1/webhooks/revenuecat`,
+AdMob SSV → `https://api.brainyclan.com/api/v1/webhooks/admob-ssv`. Store listing URLs (website,
+support, privacy policy, Google Play "account deletion URL"): section 4 "Website and hosts" —
+all on `https://brainyclan.com`.
 
 ## 7. Updates and rollbacks (server)
 
@@ -158,8 +216,8 @@ Eloquent write and after each `migrate`; if you ever change those tables with ra
 
 - **Errors:** Sentry (section 10). Personal data is scrubbed before sending (`SentryScrubber`).
 - **Uptime:** a free external monitor (e.g. UptimeRobot or Better Stack) on
-  `https://api.brainyclan.app/api/v1/health` every 5 minutes, alerting by email/SMS.
-- **Queues:** Horizon dashboard `https://api.brainyclan.app/horizon` (staff only).
+  `https://api.brainyclan.com/api/v1/health` (and `https://brainyclan.com/`) every 5 minutes, alerting by email/SMS.
+- **Queues:** Horizon dashboard `https://api.brainyclan.com/horizon` (staff only).
 - **Server:** Hetzner console graphs (CPU, disk, network); `docker stats`; disk alert if `/` > 80 %.
 - **Certificates:** renewed by Caddy automatically; Let's Encrypt mails `ACME_EMAIL` if something fails.
 
@@ -217,7 +275,7 @@ Traces are sampled at 5 % (`SENTRY_TRACES_SAMPLE_RATE`). With an empty DSN Sentr
 | Hetzner CX22 / CPX21 VPS (+ IPv4) | ≈ 6–10 CAD |
 | Hetzner server backups (+20 %) | ≈ 1–2 CAD |
 | Hetzner Storage Box BX11 (1 TB) | ≈ 6 CAD |
-| Domain brainyclan.app (≈ 20 CAD/year) | ≈ 2 CAD |
+| Domain brainyclan.com (≈ 20 CAD/year) | ≈ 2 CAD |
 | SMTP provider (low volume) | 0–15 CAD |
 | Sentry Developer, UptimeRobot free, Let's Encrypt | 0 CAD |
 | **Total** | **≈ 15–35 CAD** — far below the 200 CAD/month budget |

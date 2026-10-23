@@ -18,12 +18,17 @@ return [
     'draft' => (bool) env('LEGAL_DRAFT', true),
 
     /*
+     * Support address shown on the website (/support, footer) and the store listings.
+     */
+    'support_email' => env('LEGAL_SUPPORT_EMAIL', 'support@brainyclan.com'),
+
+    /*
      * Contact shown on the pages (privacy officer / person in charge of personal information,
      * Quebec Law 25). Placeholders until the company details are final.
      */
     'contact' => [
         'company' => env('LEGAL_COMPANY_NAME', '[Company legal name — to be completed]'),
-        'email' => env('LEGAL_CONTACT_EMAIL', 'privacy@brainyclan.app'),
+        'email' => env('LEGAL_CONTACT_EMAIL', 'support@brainyclan.com'),
         'address' => env('LEGAL_POSTAL_ADDRESS', '[Postal address — to be completed]'),
         'privacy_officer' => env('LEGAL_PRIVACY_OFFICER', '[Name and title of the person in charge of personal information — to be completed]'),
     ],

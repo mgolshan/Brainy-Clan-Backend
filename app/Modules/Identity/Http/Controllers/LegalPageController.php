@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * Public HTML pages `/legal/terms` and `/legal/privacy` (`?lang=fr` for French), opened by the app
+ * Public HTML pages `/terms` and `/privacy` on the website (`?lang=fr` for French), opened by the app
  * in a browser view and linked from the store listings. Not part of `/api/v1`.
  */
 class LegalPageController

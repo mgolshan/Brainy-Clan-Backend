@@ -42,11 +42,32 @@ class User extends Authenticatable implements FilamentUser, HasName
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
-     * Fixed set of avatar keys the app can render (see docs/API.md).
+     * Fixed set of avatar keys the app can render: the Clan characters, 22 species × kid, teen,
+     * mom, dad, grandma, grandpa (see docs/API.md "Avatars").
      */
     public const array AVATARS = [
-        'fox', 'owl', 'panda', 'lion', 'koala', 'penguin', 'tiger', 'rabbit',
-        'bear', 'frog', 'cat', 'dog', 'unicorn', 'dragon', 'turtle', 'octopus',
+        'fox', 'fox-teen', 'fox-mom', 'fox-dad', 'fox-grandma', 'fox-grandpa',
+        'owl', 'owl-teen', 'owl-mom', 'owl-dad', 'owl-grandma', 'owl-grandpa',
+        'panda', 'panda-teen', 'panda-mom', 'panda-dad', 'panda-grandma', 'panda-grandpa',
+        'lion', 'lion-teen', 'lion-mom', 'lion-dad', 'lion-grandma', 'lion-grandpa',
+        'koala', 'koala-teen', 'koala-mom', 'koala-dad', 'koala-grandma', 'koala-grandpa',
+        'penguin', 'penguin-teen', 'penguin-mom', 'penguin-dad', 'penguin-grandma', 'penguin-grandpa',
+        'tiger', 'tiger-teen', 'tiger-mom', 'tiger-dad', 'tiger-grandma', 'tiger-grandpa',
+        'rabbit', 'rabbit-teen', 'rabbit-mom', 'rabbit-dad', 'rabbit-grandma', 'rabbit-grandpa',
+        'bear', 'bear-teen', 'bear-mom', 'bear-dad', 'bear-grandma', 'bear-grandpa',
+        'frog', 'frog-teen', 'frog-mom', 'frog-dad', 'frog-grandma', 'frog-grandpa',
+        'cat', 'cat-teen', 'cat-mom', 'cat-dad', 'cat-grandma', 'cat-grandpa',
+        'dog', 'dog-teen', 'dog-mom', 'dog-dad', 'dog-grandma', 'dog-grandpa',
+        'unicorn', 'unicorn-teen', 'unicorn-mom', 'unicorn-dad', 'unicorn-grandma', 'unicorn-grandpa',
+        'dragon', 'dragon-teen', 'dragon-mom', 'dragon-dad', 'dragon-grandma', 'dragon-grandpa',
+        'turtle', 'turtle-teen', 'turtle-mom', 'turtle-dad', 'turtle-grandma', 'turtle-grandpa',
+        'octopus', 'octopus-teen', 'octopus-mom', 'octopus-dad', 'octopus-grandma', 'octopus-grandpa',
+        'elephant', 'elephant-teen', 'elephant-mom', 'elephant-dad', 'elephant-grandma', 'elephant-grandpa',
+        'giraffe', 'giraffe-teen', 'giraffe-mom', 'giraffe-dad', 'giraffe-grandma', 'giraffe-grandpa',
+        'hedgehog', 'hedgehog-teen', 'hedgehog-mom', 'hedgehog-dad', 'hedgehog-grandma', 'hedgehog-grandpa',
+        'otter', 'otter-teen', 'otter-mom', 'otter-dad', 'otter-grandma', 'otter-grandpa',
+        'raccoon', 'raccoon-teen', 'raccoon-mom', 'raccoon-dad', 'raccoon-grandma', 'raccoon-grandpa',
+        'monkey', 'monkey-teen', 'monkey-mom', 'monkey-dad', 'monkey-grandma', 'monkey-grandpa',
     ];
 
     public const array LOCALES = ['en', 'fr'];

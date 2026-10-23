@@ -42,10 +42,12 @@ class SignInCodeController
      *
      * Redeems an admin-issued code on this device and returns a device-bound token, like
      * `/auth/login`. 422 `sign_in_code_invalid` when the code is unknown, used or expired.
+     * 429 `login_locked` (`retry_after` + `Retry-After`) after 5 invalid codes from this IP
+     * (5 min, then 1 h, then 24 h) or 30 failed sign-ins of any kind within 1 h.
      *
      * @unauthenticated
      */
-    #[ApiErrors('sign_in_code_invalid')]
+    #[ApiErrors('sign_in_code_invalid', 'login_locked')]
     public function redeem(SignInWithCodeRequest $request, SignInWithCode $signIn): MeResource
     {
         $result = $signIn->handle(
@@ -53,6 +55,7 @@ class SignInCodeController
             (string) $request->string('device_name'),
             (string) $request->string('platform'),
             $request->appVersion(),
+            $request->ip(),
         );
 
         return MeResource::withToken($result['user'], $result['token']);

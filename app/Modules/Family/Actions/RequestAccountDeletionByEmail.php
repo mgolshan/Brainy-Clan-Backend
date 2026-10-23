@@ -2,6 +2,7 @@
 
 namespace App\Modules\Family\Actions;
 
+use App\Modules\Core\Support\Website;
 use App\Modules\Family\Mail\AccountDeletionConfirmation;
 use App\Modules\Family\Models\AccountDeletionRequest;
 use App\Modules\Identity\Actions\RecordConsent;
@@ -42,7 +43,7 @@ class RequestAccountDeletionByEmail
         });
 
         if ($user !== null && $token !== null) {
-            $url = route('account.delete.confirm', ['token' => $token, ...($locale === 'en' ? [] : ['lang' => $locale])]);
+            $url = Website::route('account.delete.confirm', ['token' => $token, ...($locale === 'en' ? [] : ['lang' => $locale])]);
             Mail::to($email)->queue(new AccountDeletionConfirmation($url, $locale));
         }
     }

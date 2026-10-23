@@ -287,9 +287,16 @@ it('rate-limits password guesses on one email even when they come from many IPs'
 it('rate-limits sign-in code guesses per IP', function () {
     $body = ['code' => 'ABCD2345', 'device_name' => 'Tablet', 'platform' => 'android'];
 
-    foreach (range(1, 10) as $ignored) {
+    foreach (range(1, 4) as $ignored) {
         $this->postJson('/api/v1/auth/code', $body)->assertUnprocessable();
     }
+
+    // The 5th invalid code locks the IP for codes (sign-in lockout, 2026-10-22) …
+    foreach (range(5, 10) as $ignored) {
+        $this->postJson('/api/v1/auth/code', $body)->assertStatus(429)->assertJsonPath('code', 'login_locked');
+    }
+
+    // … and the 10/min throttle still applies on top.
 
     $this->postJson('/api/v1/auth/code', $body)->assertStatus(429)->assertJsonPath('code', 'rate_limited');
 });

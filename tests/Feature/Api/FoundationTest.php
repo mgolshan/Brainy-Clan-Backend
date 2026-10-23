@@ -51,12 +51,13 @@ it('allows the Expo web origin via CORS', function () {
 });
 
 it('rate limits auth endpoints to 10 per minute per IP', function () {
-    foreach (range(1, 10) as $ignored) {
-        $this->postJson('/api/v1/auth/login', ['email' => 'x@example.com', 'password' => 'nope', 'device_name' => 't', 'platform' => 'web'])
+    // Different emails, so the sign-in lockout (5 failures per email + IP) does not kick in first.
+    foreach (range(1, 10) as $i) {
+        $this->postJson('/api/v1/auth/login', ['email' => "x{$i}@example.com", 'password' => 'nope', 'device_name' => 't', 'platform' => 'web'])
             ->assertStatus(401);
     }
 
-    $this->postJson('/api/v1/auth/login', ['email' => 'x@example.com', 'password' => 'nope', 'device_name' => 't', 'platform' => 'web'])
+    $this->postJson('/api/v1/auth/login', ['email' => 'x11@example.com', 'password' => 'nope', 'device_name' => 't', 'platform' => 'web'])
         ->assertStatus(429)
         ->assertJsonPath('code', 'rate_limited');
 });

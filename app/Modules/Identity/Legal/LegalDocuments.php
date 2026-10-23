@@ -2,11 +2,12 @@
 
 namespace App\Modules\Identity\Legal;
 
+use App\Modules\Core\Support\Website;
 use App\Modules\Identity\Models\User;
 
 /**
  * The current legal documents from `config/legal.php`: versions, localized "what changed"
- * summaries and the public page URLs (`/legal/terms`, `/legal/privacy`).
+ * summaries and the public page URLs on the website (`/terms`, `/privacy`).
  */
 final class LegalDocuments
 {
@@ -39,11 +40,11 @@ final class LegalDocuments
     }
 
     /**
-     * Absolute URL of a document's page; French gets `?lang=fr`.
+     * Absolute URL of a document's page on the website host; French gets `?lang=fr`.
      */
     public static function url(string $document, string $locale = 'en'): string
     {
-        return route("legal.{$document}", $locale === 'en' ? [] : ['lang' => $locale]);
+        return Website::route("legal.{$document}", $locale === 'en' ? [] : ['lang' => $locale]);
     }
 
     public static function isDraft(): bool

@@ -8,7 +8,9 @@ use App\Modules\Content\Models\ContentItem;
 use App\Modules\Play\Models\MemberItemHistory;
 use App\Modules\Play\Models\PlaySession;
 use App\Modules\Play\Models\SessionItem;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Appends items to a session: content items (counted as "seen" in the member's item history)
@@ -33,19 +35,21 @@ class AddSessionItems
     ) {}
 
     /**
+     * `$isNew`: the session was just created and has no items yet (skips the lookups).
+     *
      * @return Collection<int, SessionItem>
      */
-    public function handle(PlaySession $session, int $count, bool $redemption = false): Collection
+    public function handle(PlaySession $session, int $count, bool $redemption = false, bool $isNew = false): Collection
     {
         $member = $session->member;
-        $pending = $redemption ? [] : $this->pendingPoints($session);
+        $pending = $redemption || $isNew ? [] : $this->pendingPoints($session);
 
         if ($count <= 0 || (! $redemption && $this->reachable($session, $pending))) {
             return new Collection;
         }
 
-        $existingIds = SessionItem::query()->where('play_session_id', $session->id)->whereNotNull('content_item_id')->pluck('content_item_id')->map(fn ($id) => (int) $id)->all();
-        $hasItems = SessionItem::query()->where('play_session_id', $session->id)->exists();
+        $existingIds = $isNew ? [] : SessionItem::query()->where('play_session_id', $session->id)->whereNotNull('content_item_id')->pluck('content_item_id')->map(fn ($id) => (int) $id)->all();
+        $hasItems = ! $isNew && SessionItem::query()->where('play_session_id', $session->id)->exists();
 
         $contentItems = $this->pick->handle($member, $session->category_id, $count, $existingIds, easier: $redemption, allowRepeats: $hasItems);
 
@@ -63,7 +67,7 @@ class AddSessionItems
 
         $slots = $this->plan($session, $count, $redemption, $contentItems->values()->all(), $specs, $pending);
 
-        return $this->store($session, $slots, $redemption);
+        return $this->store($session, $slots, $redemption, $isNew);
     }
 
     public function topUp(PlaySession $session): void
@@ -129,9 +133,9 @@ class AddSessionItems
      * @param  list<array{content: ContentItem}|array{spec: GeneratorSpec}>  $slots
      * @return array<string, true>
      */
-    private function questionKeys(PlaySession $session, array $slots): array
+    private function questionKeys(PlaySession $session, array $slots, bool $isNew): array
     {
-        $payloads = SessionItem::query()
+        $payloads = $isNew ? [] : SessionItem::query()
             ->where('play_session_id', $session->id)
             ->with('contentItem:id,payload')
             ->get(['id', 'content_item_id', 'payload'])
@@ -213,21 +217,31 @@ class AddSessionItems
     }
 
     /**
+     * Inserts the batch with one query, bumps the member's history of the content items with one
+     * upsert (`times_seen` + 1, `last_seen_at` now; a content item twice in a batch counts twice)
+     * and returns the stored rows.
+     *
      * @param  list<array{content: ContentItem}|array{spec: GeneratorSpec}>  $slots
      * @return Collection<int, SessionItem>
      */
-    private function store(PlaySession $session, array $slots, bool $redemption): Collection
+    private function store(PlaySession $session, array $slots, bool $redemption, bool $isNew): Collection
     {
-        $member = $session->member;
-        $position = (int) SessionItem::query()->where('play_session_id', $session->id)->max('position');
-        $added = new Collection;
-        $seen = $this->questionKeys($session, $slots);
+        if ($slots === []) {
+            return new Collection;
+        }
+
+        $firstPosition = $isNew ? 0 : (int) SessionItem::query()->where('play_session_id', $session->id)->max('position');
+        $position = $firstPosition;
+        $seen = $this->questionKeys($session, $slots, $isNew);
+        $now = now();
+        $rows = [];
+        $history = [];
 
         foreach ($slots as $slot) {
             if (isset($slot['spec'])) {
                 $built = $this->buildUnique($slot['spec'], $session, $redemption, $seen);
 
-                $added->push(SessionItem::query()->create([
+                $rows[] = $this->row([
                     'play_session_id' => $session->id,
                     'content_item_id' => null,
                     'type_key' => $built['type_key'],
@@ -238,29 +252,64 @@ class AddSessionItems
                     'points' => $built['points'],
                     'payload' => $built['payload'],
                     'answer' => $built['answer'],
-                ]));
+                ], $now);
 
                 continue;
             }
 
             $contentItem = $slot['content'];
 
-            $added->push(SessionItem::query()->create([
+            $rows[] = $this->row([
                 'play_session_id' => $session->id,
                 'content_item_id' => $contentItem->id,
                 'type_key' => $contentItem->type_key,
+                'category_id' => null,
+                'seed' => null,
                 'position' => ++$position,
                 'is_redemption' => $redemption,
                 'points' => $this->contentPoints($contentItem),
-            ]));
+                'payload' => null,
+                'answer' => null,
+            ], $now);
 
-            $history = MemberItemHistory::query()->firstOrNew(['member_id' => $member->id, 'content_item_id' => $contentItem->id]);
-            $history->times_seen = ($history->times_seen ?? 0) + 1;
-            $history->last_seen_at = now();
-            $history->save();
+            $history[] = [
+                'member_id' => $session->member_id,
+                'content_item_id' => $contentItem->id,
+                'times_seen' => 1,
+                'last_seen_at' => (new MemberItemHistory)->fromDateTime($now),
+            ];
         }
 
-        return $added;
+        SessionItem::query()->insert($rows);
+
+        if ($history !== []) {
+            MemberItemHistory::query()->upsert(
+                $history,
+                ['member_id', 'content_item_id'],
+                ['times_seen' => DB::raw('times_seen + 1'), 'last_seen_at'],
+            );
+        }
+
+        return SessionItem::query()
+            ->where('play_session_id', $session->id)
+            ->where('position', '>', $firstPosition)
+            ->orderBy('position')
+            ->get();
+    }
+
+    /**
+     * A session_items row with the model's casts applied (JSON columns encoded) and timestamps.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function row(array $attributes, CarbonInterface $now): array
+    {
+        $item = (new SessionItem)->forceFill($attributes);
+        $item->setCreatedAt($now);
+        $item->setUpdatedAt($now);
+
+        return $item->getAttributes();
     }
 
     /**

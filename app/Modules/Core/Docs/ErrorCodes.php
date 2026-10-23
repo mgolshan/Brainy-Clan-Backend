@@ -35,6 +35,7 @@ final class ErrorCodes
         'social_signup_incomplete' => ['status' => 422, 'meaning' => 'New social account: birth year/month needed (adult check)'],
         'app_update_required' => ['status' => 426, 'meaning' => 'App older than `min_app_version`'],
         'rate_limited' => ['status' => 429, 'meaning' => 'Too many requests'],
+        'login_locked' => ['status' => 429, 'meaning' => 'Too many failed sign-in attempts; body has `retry_after` (seconds), also sent as the `Retry-After` header'],
     ];
 
     public static function status(string $code): int

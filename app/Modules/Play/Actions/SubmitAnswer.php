@@ -4,6 +4,7 @@ namespace App\Modules\Play\Actions;
 
 use App\Modules\ChallengeTypes\ChallengeTypeRegistry;
 use App\Modules\Core\Exceptions\ApiException;
+use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Play\Events\AnswerSubmitted;
 use App\Modules\Play\Events\SessionCompleted;
 use App\Modules\Play\Models\MemberItemHistory;
@@ -25,14 +26,19 @@ class SubmitAnswer
     ) {}
 
     /**
+     * Loads the member's own session once (locked; 404 for another member's session) and reuses
+     * the member the caller already has.
+     *
      * @param  array<string, mixed>  $response
      * @return array{is_correct: bool, correct_response: array<string, mixed>, explanation: string|null, points_awarded: int, session: PlaySession}
      */
-    public function handle(PlaySession $session, int $sessionItemId, array $response, ?int $timeMs): array
+    public function handle(FamilyMember $member, int $sessionId, int $sessionItemId, array $response, ?int $timeMs): array
     {
-        return DB::transaction(function () use ($session, $sessionItemId, $response, $timeMs): array {
+        return DB::transaction(function () use ($member, $sessionId, $sessionItemId, $response, $timeMs): array {
             /** @var PlaySession $session */
-            $session = PlaySession::query()->with('member.family', 'member.user')->lockForUpdate()->findOrFail($session->id);
+            $session = PlaySession::query()->where('member_id', $member->id)->lockForUpdate()->findOrFail($sessionId);
+            $member->loadMissing('family', 'user');
+            $session->setRelation('member', $member);
 
             /** @var SessionItem|null $item */
             $item = SessionItem::query()->with('contentItem')->where('play_session_id', $session->id)->find($sessionItemId);

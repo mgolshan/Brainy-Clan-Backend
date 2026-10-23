@@ -26,19 +26,19 @@ describe('GET /legal and the pages', function () {
         $this->getJson('/api/v1/legal')
             ->assertOk()
             ->assertJsonPath('data.terms.version', config('legal.documents.terms.version'))
-            ->assertJsonPath('data.terms.url', url('/legal/terms'))
+            ->assertJsonPath('data.terms.url', url('/terms'))
             ->assertJsonPath('data.terms.summary', 'First version of the Brainy Clan terms of service.')
             ->assertJsonPath('data.privacy.version', config('legal.documents.privacy.version'))
-            ->assertJsonPath('data.privacy.url', url('/legal/privacy'));
+            ->assertJsonPath('data.privacy.url', url('/privacy'));
     });
 
     it('localizes summaries and URLs with ?lang=fr and falls back to English otherwise', function () {
         $this->getJson('/api/v1/legal?lang=fr')
             ->assertOk()
-            ->assertJsonPath('data.privacy.url', url('/legal/privacy?lang=fr'))
+            ->assertJsonPath('data.privacy.url', url('/privacy?lang=fr'))
             ->assertJsonPath('data.privacy.summary', 'Première version de la politique de confidentialité de Brainy Clan.');
 
-        $this->getJson('/api/v1/legal?lang=de')->assertOk()->assertJsonPath('data.terms.url', url('/legal/terms'));
+        $this->getJson('/api/v1/legal?lang=de')->assertOk()->assertJsonPath('data.terms.url', url('/terms'));
     });
 
     it('returns a null summary when none is configured', function () {
@@ -60,16 +60,16 @@ describe('GET /legal and the pages', function () {
         expect($response->headers->get('Content-Security-Policy'))->toContain("default-src 'none'")->toContain("frame-ancestors 'none'")
             ->and($response->headers->getCookies())->toBe([]);
     })->with([
-        ['/legal/terms', 'en', 'Terms of Service'],
-        ['/legal/terms', 'fr', 'Conditions d’utilisation'],
-        ['/legal/privacy', 'en', 'Privacy Policy'],
-        ['/legal/privacy', 'fr', 'Politique de confidentialité'],
+        ['/terms', 'en', 'Terms of Service'],
+        ['/terms', 'fr', 'Conditions d’utilisation'],
+        ['/privacy', 'en', 'Privacy Policy'],
+        ['/privacy', 'fr', 'Politique de confidentialité'],
     ]);
 
     it('hides the draft banner once LEGAL_DRAFT is off', function () {
         config()->set('legal.draft', false);
 
-        $this->get('/legal/privacy')->assertOk()->assertDontSee('Draft — under legal review');
+        $this->get('/privacy')->assertOk()->assertDontSee('Draft — under legal review');
     });
 });
 

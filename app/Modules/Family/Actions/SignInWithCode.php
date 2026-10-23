@@ -6,6 +6,7 @@ use App\Modules\Core\Exceptions\ApiException;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Models\SignInCode;
 use App\Modules\Identity\Actions\IssueDeviceToken;
+use App\Modules\Identity\Lockout\LoginLockout;
 use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -17,12 +18,40 @@ use Illuminate\Support\Facades\DB;
  */
 class SignInWithCode
 {
-    public function __construct(private readonly IssueDeviceToken $issueToken) {}
+    public function __construct(
+        private readonly IssueDeviceToken $issueToken,
+        private readonly LoginLockout $lockout,
+    ) {}
+
+    /**
+     * Lockout (docs/API.md Auth → "Lockout"): a locked IP gets 429 `login_locked` before the code
+     * is looked up; invalid codes count towards the IP's locks, a valid one resets the code count.
+     *
+     * @return array{user: User, token: string}
+     */
+    public function handle(string $code, string $deviceName, string $platform, ?string $appVersion = null, ?string $ipAddress = null): array
+    {
+        $this->lockout->ensureCodeAllowed($ipAddress);
+
+        try {
+            $result = $this->redeem($code, $deviceName, $platform, $appVersion);
+        } catch (ApiException $e) {
+            if ($e->errorCode === 'sign_in_code_invalid' && ($retryAfter = $this->lockout->recordCodeFailure($ipAddress)) > 0) {
+                throw ApiException::loginLocked($retryAfter);
+            }
+
+            throw $e;
+        }
+
+        $this->lockout->recordCodeSuccess($ipAddress);
+
+        return $result;
+    }
 
     /**
      * @return array{user: User, token: string}
      */
-    public function handle(string $code, string $deviceName, string $platform, ?string $appVersion = null): array
+    private function redeem(string $code, string $deviceName, string $platform, ?string $appVersion): array
     {
         return DB::transaction(function () use ($code, $deviceName, $platform, $appVersion): array {
             /** @var SignInCode|null $signInCode */

@@ -22,6 +22,8 @@ and add a line to the changelog at the bottom.
 - Optional header `X-App-Version: 1.0.0`. If lower than `min_app_version` the API answers
   **426** with `code: "app_update_required"` (health endpoint is exempt).
 - Rate limits: `auth/*` 10/min per IP **and** 10/min per email (login), everything else 120/min per token → 429 `rate_limited`.
+- **Sign-in lockout** (on top of the rate limits; see Auth → "Lockout"): 429 `login_locked` with
+  `retry_after` (seconds) in the body and a `Retry-After` header.
 - Request size limits (422 `validation_failed`): login `email`/`password` ≤ 255 chars, `current_password` ≤ 255;
   goals `category_ids` ≤ 200 and `members` ≤ 50; answer `response` ≤ 10 keys, `response.found` ≤ 100,
   `response.grid` ≤ 16 rows.
@@ -52,6 +54,8 @@ and add a line to the changelog at the bottom.
 | `ad_reward_pending` | 409 | Rewarded-ad callback not received yet — retry shortly |
 | `ssv_signature_invalid` | 400 | AdMob SSV callback signature could not be verified |
 | `app_update_required` | 426 | App older than `min_app_version` |
+| `rate_limited` | 429 | Too many requests (rate limit) |
+| `login_locked` | 429 | Too many failed sign-in attempts; body has `retry_after` (seconds) |
 | `not_found` | 404 | |
 
 ## Shared objects
@@ -63,8 +67,14 @@ and add a line to the changelog at the bottom.
 ```
 `email` is `null` for children. Birth data only appears for the user themself and to family admins.
 
-**Avatars** are keys from a fixed set the app renders:
-`fox, owl, panda, lion, koala, penguin, tiger, rabbit, bear, frog, cat, dog, unicorn, dragon, turtle, octopus`.
+**Avatars** are keys from a fixed set the app renders (the "Clan" characters, 2026-10-22):
+`<species>` or `<species>-<variant>`.
+- Species (22): `fox, owl, panda, lion, koala, penguin, tiger, rabbit, bear, frog, cat, dog,
+  unicorn, dragon, turtle, octopus, elephant, giraffe, hedgehog, otter, raccoon, monkey`.
+- Variants: none (the kid character), `teen`, `mom`, `dad`, `grandma`, `grandpa` — e.g. `tiger`,
+  `tiger-teen`, `tiger-mom`, `tiger-dad`, `tiger-grandma`, `tiger-grandpa` (132 keys).
+- Any member may pick any key (no age rule); the app only orders the picker. Old keys stay valid
+  (they are the kid characters). Anything else → 422 `validation_failed`.
 
 ### Family
 ```json
@@ -155,6 +165,31 @@ a `devices` row bound to the new token.
   case-insensitive, dashes/spaces ignored. → 200, 422 `sign_in_code_invalid`. This is how children
   (no email, no password) sign in again after a new phone, a reinstall or a sign-out.
 - `POST /auth/logout` (auth) — revokes the current token and its device. → 204
+- `POST /auth/password/forgot` — Body: `email, locale?` (`en`|`fr`). **Always 202**
+  `{ "data": { "sent": true } }`, whether or not the email exists (no account discovery). When a
+  user with that email exists, the server emails a one-time link to the web page
+  `GET /password/reset?token=…` (website host, en/fr by the user's locale, link valid 60 min, a
+  newer link replaces older ones). The page asks for the new password twice (min 8) and on success:
+  sets the password (also for a social-only adult), signs the user out of **all** devices (all
+  tokens revoked), clears every sign-in lockout for that email, and emails a "password changed"
+  notice. Throttled to 3/hour per email and 10/hour per IP; over the limit the response is still
+  202 and no email is sent (silently dropped, logged without the email).
+- **Lockout** (password and code sign-in; never affects social sign-in or already signed-in devices):
+  - `POST /auth/login`, per **email + IP**: 5 failed attempts in a row → locked 5 min; the next 5
+    failures after that lock → 1 h; after that every 5 failures → 24 h. A successful login resets
+    the count and the escalation; escalation also resets after 24 h without failures.
+  - `POST /auth/login`, per **email** from all IPs: 20 failures within 1 h → locked 15 min (slows
+    guessing spread over many IPs while keeping the owner's worst case short). The account's owner
+    gets at most one "someone tried to sign in" email per 24 h when this lock starts.
+  - Per **IP** across all emails and codes: 30 failures within 1 h → that IP is locked 1 h for
+    `/auth/login`, `/auth/code` and `/auth/join`.
+  - `POST /auth/code` and `POST /auth/join`, per **IP**: 5 invalid codes in a row → 5 min, then
+    1 h, then 24 h (same escalation; a successful code sign-in resets it).
+  - While locked the credentials are not checked at all, and the answer is the same whether the
+    email exists or not: **429** `{ "message": "...", "code": "login_locked", "retry_after": 300 }`
+    + `Retry-After: 300`. The failure that starts a lock (e.g. the 5th wrong password) already
+    answers 429 `login_locked`. The `message` is English; the app translates by `code`. Unlock paths for the owner: wait, reset the password
+    (`/auth/password/forgot`), social sign-in, or a sign-in code from a family admin.
 
 - `POST /auth/social/{provider}` — sign in or sign up with `google` | `facebook` | `apple` (adults only).
   Body: `token` (Google: the **ID token**; Facebook: the **access token**), `device_name, platform`,
@@ -484,10 +519,10 @@ from RevenueCat webhooks and never trusts the app for the tier.
 ### Legal, consent and privacy (B9)
 Drafts of the privacy policy and terms are served by the backend and **must be reviewed by a lawyer
 before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=false`).
-- `GET /legal` (public, `?lang=fr` optional) → `{ "data": { "terms": { "version": "2026-10-16", "url": "https://.../legal/terms",
+- `GET /legal` (public, `?lang=fr` optional) → `{ "data": { "terms": { "version": "2026-10-16", "url": "https://brainyclan.com/terms",
   "summary": "What changed in this version" | null }, "privacy": { ... same } } }`. Versions are opaque
-  strings (currently dates); `summary` is a short localized "what changed" text for re-acceptance. Pages at `/legal/terms`
-  and `/legal/privacy` (HTML, `?lang=fr` for French).
+  strings (currently dates); `summary` is a short localized "what changed" text for re-acceptance. Pages at `/terms`
+  and `/privacy` on the website host (HTML, `?lang=fr` for French; the old `/legal/terms` and `/legal/privacy` redirect there).
 - `POST /auth/register` and adult `POST /auth/social/{provider}` sign-ups require `accept_terms: true`
   (422 on `accept_terms` otherwise); the server records a consent row (user, type `terms`+`privacy`,
   versions, time, IP hash). Joining by invite as an adult with email (`/auth/join` with email) also
@@ -555,3 +590,6 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-17 — Login throttled per email as well as per IP; documented request size limits.
 - 2026-10-17 — `GET /play/sessions/current`; a new session abandons older unfinished ones; idle sessions auto-abandoned after 24 h.
 - 2026-10-17 — Content locale: items in the member's `locale`, English only where no translation exists (no duplicates across languages). No shape change.
+- 2026-10-22 — Sign-in lockout (429 `login_locked` + `retry_after`), `POST /auth/password/forgot` + web page `/password/reset`. Production hosts: website `https://brainyclan.com` (legal pages, support, account deletion, password reset), API `https://api.brainyclan.com/api/v1`; support email `support@brainyclan.com`.
+- 2026-10-22 — Avatars: the Clan set, 22 species × (kid, teen, mom, dad, grandma, grandpa) = 132 keys (`tiger`, `tiger-mom`, …); existing keys unchanged.
+- 2026-10-22 — Legal pages moved to `/terms` and `/privacy` on the website host; `GET /legal` URLs point there (`https://brainyclan.com/terms`), the old `/legal/terms` and `/legal/privacy` answer 301. No shape change.

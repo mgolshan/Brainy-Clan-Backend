@@ -8,6 +8,7 @@ use Dedoc\Scramble\Support\Generator\Reference;
 use Dedoc\Scramble\Support\Generator\Response;
 use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\Generator\Types\ArrayType;
+use Dedoc\Scramble\Support\Generator\Types\IntegerType;
 use Dedoc\Scramble\Support\Generator\Types\ObjectType;
 use Dedoc\Scramble\Support\Generator\Types\StringType;
 use Dedoc\Scramble\Support\RouteInfo;
@@ -24,6 +25,7 @@ use ReflectionMethod;
  * - path ids (`{member}`, `{session}`, …) → 404 `not_found`;
  * - a Form Request / a 422 Scramble inferred → 422 `validation_failed`;
  * - the controller method's `#[ApiErrors(...)]` attribute (domain errors thrown by Actions).
+ * `login_locked` adds `retry_after` to the 429 body.
  */
 class ErrorResponsesExtension extends OperationExtension
 {
@@ -100,6 +102,10 @@ class ErrorResponsesExtension extends OperationExtension
         $body = new ObjectType;
         $body->addProperty('message', (new StringType)->setDescription('Human readable, safe to show.'));
         $body->addProperty('code', (new StringType)->enum($codes)->setDescription('Machine-readable error code.'));
+
+        if (in_array('login_locked', $codes, true)) {
+            $body->addProperty('retry_after', (new IntegerType)->setDescription('`login_locked` only: seconds until sign-in is possible again (also the `Retry-After` header).'));
+        }
 
         if ($status === 422) {
             $messages = (new ArrayType)->setItems(new StringType);

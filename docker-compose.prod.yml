@@ -42,6 +42,7 @@ services:
             - "443:443/udp"
         environment:
             API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env.prod}
+            WEBSITE_HOST: ${WEBSITE_HOST:?set WEBSITE_HOST in .env.prod}
             ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env.prod}
         volumes:
             - caddy-data:/data

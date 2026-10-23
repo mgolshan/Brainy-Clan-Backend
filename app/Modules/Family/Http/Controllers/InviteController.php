@@ -88,9 +88,11 @@ class InviteController
      * Creates the user from the invite and the membership, and a device-bound token.
      * `email`/`password` only for bands that may self-register (adults); with an email,
      * `accept_terms: true` is required (422 on `accept_terms`). Codes are
-     * case-insensitive. 422 `invite_invalid`.
+     * case-insensitive. 422 `invite_invalid`. 429 `login_locked` (`retry_after` + `Retry-After`)
+     * after 5 invalid codes from this IP (5 min, then 1 h, then 24 h) or 30 failed sign-ins of
+     * any kind within 1 h.
      */
-    #[ApiErrors('invite_invalid')]
+    #[ApiErrors('invite_invalid', 'login_locked')]
     public function join(JoinRequest $request, JoinFamilyWithInvite $join): JsonResponse
     {
         $email = $request->input('email');

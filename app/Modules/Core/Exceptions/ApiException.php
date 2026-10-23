@@ -13,12 +13,16 @@ class ApiException extends RuntimeException
 {
     /**
      * @param  array<string, list<string>>|null  $errors
+     * @param  array<string, int|string>  $extra  additional body fields (e.g. `retry_after`)
+     * @param  array<string, string>  $headers
      */
     public function __construct(
         public readonly string $errorCode,
         string $message,
         public readonly int $status,
         public readonly ?array $errors = null,
+        public readonly array $extra = [],
+        public readonly array $headers = [],
     ) {
         parent::__construct($message);
     }
@@ -61,6 +65,22 @@ class ApiException extends RuntimeException
     public static function invalidCredentials(): self
     {
         return new self('invalid_credentials', 'The email or password is incorrect.', 401);
+    }
+
+    /**
+     * Sign-in lockout (docs/API.md Auth → "Lockout"): same answer whether or not the email exists.
+     */
+    public static function loginLocked(int $retryAfter): self
+    {
+        $retryAfter = max(1, $retryAfter);
+
+        return new self(
+            'login_locked',
+            'Too many failed sign-in attempts. Please try again later or reset your password.',
+            429,
+            extra: ['retry_after' => $retryAfter],
+            headers: ['Retry-After' => (string) $retryAfter],
+        );
     }
 
     public static function socialTokenInvalid(string $message = 'The sign-in token could not be verified. Please sign in again.'): self
@@ -145,12 +165,12 @@ class ApiException extends RuntimeException
 
     public function render(): JsonResponse
     {
-        $body = ['message' => $this->getMessage(), 'code' => $this->errorCode];
+        $body = ['message' => $this->getMessage(), 'code' => $this->errorCode, ...$this->extra];
 
         if ($this->errors !== null) {
             $body['errors'] = $this->errors;
         }
 
-        return new JsonResponse($body, $this->status);
+        return new JsonResponse($body, $this->status, $this->headers);
     }
 }

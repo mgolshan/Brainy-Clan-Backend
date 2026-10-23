@@ -2,6 +2,7 @@
 
 use App\Modules\Core\Http\Middleware\EnsureAppVersion;
 use App\Modules\Core\Http\Middleware\EnsureHasFamily;
+use App\Modules\Core\Http\Middleware\RouteByHost;
 use App\Modules\Core\Http\Middleware\TouchDevice;
 use App\Modules\Core\Support\ApiErrorRenderer;
 use Illuminate\Foundation\Application;
@@ -21,6 +22,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Production host routing (WEBSITE_HOST): www → website host, API/admin paths on the
+        // website host → API host. A no-op in local dev (docs/DEPLOY.md "Website and hosts").
+        $middleware->append(RouteByHost::class);
+
         // Global so it answers 426 before auth; it only acts on api/* requests.
         $middleware->append(EnsureAppVersion::class);
 

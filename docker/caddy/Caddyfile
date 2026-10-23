@@ -1,11 +1,18 @@
-# Brainy Clan - Caddy in front of php-fpm (docker-compose.prod.yml).
-# Automatic HTTPS (Let's Encrypt) for API_DOMAIN; the admin (/admin) and Horizon (/horizon)
-# live on the same host. ACME_EMAIL gets certificate expiry notices.
+# Brainy Clan - Caddy in front of php-fpm (docker-compose.prod.yml, docs/DEPLOY.md "Website and hosts").
+# Automatic HTTPS (Let's Encrypt) for every host below. ACME_EMAIL gets certificate expiry notices.
+#
+#   API_DOMAIN        (api.brainyclan.com)  /api/v1, the admin (/admin), Horizon (/horizon), /docs/api
+#   WEBSITE_HOST      (brainyclan.com)      landing page, /support, /privacy, /terms, /account/delete, /password/reset
+#   www.WEBSITE_HOST  (www.brainyclan.com)  301 to https://WEBSITE_HOST, same path
+#
+# Both hosts reach the same Laravel app; the app itself sends website paths requested on the API
+# host to the website host and API/admin paths requested on the website host to the API host
+# (App\Modules\Core\Http\Middleware\RouteByHost, WEBSITE_HOST in .env.prod).
 {
 	email {$ACME_EMAIL}
 }
 
-{$API_DOMAIN} {
+(laravel) {
 	root * /var/www/html/public
 	encode zstd gzip
 
@@ -27,4 +34,16 @@
 		output stdout
 		format console
 	}
+}
+
+{$API_DOMAIN} {
+	import laravel
+}
+
+{$WEBSITE_HOST} {
+	import laravel
+}
+
+www.{$WEBSITE_HOST} {
+	redir https://{$WEBSITE_HOST}{uri} permanent
 }

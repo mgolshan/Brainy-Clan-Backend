@@ -85,8 +85,12 @@ class SessionController
         $response = (array) $request->input('response', []);
         $timeMs = $request->input('time_ms');
 
+        $member = $this->currentMember($request);
+        $member->setRelation('user', $this->currentUser($request));
+
         $result = $submit->handle(
-            $this->ownSession($request, $session),
+            $member,
+            $session,
             $request->integer('session_item_id'),
             $response,
             is_numeric($timeMs) ? (int) $timeMs : null,

@@ -114,4 +114,70 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Sign-in lockout (docs/API.md Auth → "Lockout")
+    |--------------------------------------------------------------------------
+    |
+    | On top of the 10/min `auth` rate limits. Counters and locks live in the cache store (Redis),
+    | under HMAC-SHA256 keys of the normalized email / IP (never the raw values). Durations and
+    | windows are in seconds. `durations` escalate: the first lock uses the first entry, the second
+    | lock the second, every later lock the last one; the escalation resets after `reset_after`
+    | seconds without a failure and after a successful sign-in. Unlock by hand: `auth:unlock`.
+    |
+    */
+
+    'lockout' => [
+        'store' => env('AUTH_LOCKOUT_STORE'),
+
+        // POST /auth/login per email + IP: every 5 failures → 5 min, then 1 h, then 24 h.
+        'email_ip' => [
+            'attempts' => 5,
+            'durations' => [300, 3600, 86400],
+            'reset_after' => 86400,
+        ],
+
+        // POST /auth/login per email from all IPs: 20 failures within 1 h → 15 min; the owner gets
+        // at most one "someone tried to sign in" email per `notify_every` seconds.
+        'email' => [
+            'attempts' => 20,
+            'window' => 3600,
+            'duration' => 900,
+            'notify_every' => 86400,
+        ],
+
+        // Per IP across login, sign-in codes and invite codes: 30 failures within 1 h → 1 h.
+        'ip' => [
+            'attempts' => 30,
+            'window' => 3600,
+            'duration' => 3600,
+        ],
+
+        // POST /auth/code and POST /auth/join per IP: every 5 invalid codes → 5 min, 1 h, 24 h.
+        'codes' => [
+            'attempts' => 5,
+            'durations' => [300, 3600, 86400],
+            'reset_after' => 86400,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Forgotten password (POST /auth/password/forgot, /password/reset)
+    |--------------------------------------------------------------------------
+    |
+    | The one-time link uses the `password_reset_tokens` table (SHA-256 of the token, one row per
+    | email so a newer link replaces older ones) and expires after `passwords.users.expire`
+    | minutes. Over a limit the API still answers 202 and no email is sent.
+    |
+    */
+
+    'password_forgot' => [
+        'per_email' => 3,
+        'per_ip' => 10,
+        'decay' => 3600,
+        // POST /password/reset (the web form), per IP.
+        'reset_per_ip' => 10,
+    ],
+
 ];

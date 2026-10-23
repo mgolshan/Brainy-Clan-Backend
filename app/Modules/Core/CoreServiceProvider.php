@@ -52,6 +52,9 @@ class CoreServiceProvider extends ModuleServiceProvider
         // Public account deletion page: 5 form posts per hour per IP.
         RateLimiter::for('account-deletion', fn (Request $request) => Limit::perHour(5)->by('account-deletion|'.$request->ip()));
 
+        // Password reset web form (/password/reset): 10 posts per hour per IP.
+        RateLimiter::for('password-reset', fn (Request $request) => Limit::perHour((int) config('auth.password_forgot.reset_per_ip', 10))->by('password-reset|'.$request->ip()));
+
         // A migration may change reference rows with raw SQL: start from fresh reference caches.
         Event::listen(MigrationsEnded::class, fn () => ReferenceCache::flush(...ReferenceCache::ALL));
 

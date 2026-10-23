@@ -9,7 +9,9 @@ REST API and admin panel for **Brainy Clan**, a family learning and quiz mobile 
 
 Project rules and architecture notes for AI assistants and developers: [CLAUDE.md](CLAUDE.md).
 
-**Production:** step-by-step deploy guide (Hetzner, Docker, HTTPS, backups, Sentry): [docs/DEPLOY.md](docs/DEPLOY.md).
+**Production:** website `https://brainyclan.com`, API and admin `https://api.brainyclan.com`, support
+`support@brainyclan.com`. Step-by-step deploy guide (Hetzner, Docker, DNS, HTTPS, email DNS, backups, Sentry):
+[docs/DEPLOY.md](docs/DEPLOY.md).
 
 **Project docs:** [docs/PLAN.md](docs/PLAN.md) (milestones and decisions), [docs/PROGRESS.md](docs/PROGRESS.md)
 (status, next steps, session log), [docs/API.md](docs/API.md) (the app ↔ API contract).
@@ -149,11 +151,24 @@ docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=1G    # Lara
 | Mailpit (caught e-mails) | http://localhost:8026 | - |
 | MySQL from the host | `127.0.0.1:3307`, database `brainy_clan` | `brainy` / `secret` (root: `root`) |
 | Redis from the host | `127.0.0.1:6380` | - |
-| Terms / privacy (drafts) | http://localhost:8080/legal/terms, http://localhost:8080/legal/privacy (`?lang=fr`) | public |
+| Website (landing page, support) | http://localhost:8080/, http://localhost:8080/support (`?lang=fr`; default from the browser language) | public |
+| Terms / privacy (drafts) | http://localhost:8080/terms, http://localhost:8080/privacy (`?lang=fr`; the old `/legal/...` URLs redirect) | public |
 | Account deletion page | http://localhost:8080/account/delete (`?lang=fr`; confirmation mail in Mailpit) | public |
 
 Inside the containers the services are reached by name: `mysql:3306`, `redis:6379`,
 `mailpit:1025`. That is what `.env` uses.
+
+## Website
+
+This app also serves the public website (in production `https://brainyclan.com`; the API and admin
+stay on `https://api.brainyclan.com`): landing page `/`, `/support`, `/privacy`, `/terms`,
+`/account/delete`, `/password/reset`, `robots.txt`, `sitemap.xml`. Plain Blade pages in
+`resources/views/website/` (and `legal/`, `account/`): English and French (`?lang=fr`, otherwise the
+browser's language), light/dark, inline CSS, no JavaScript, no cookies, no analytics, no external
+fonts or CDNs. The owl mascot is `public/images/owl.svg` (copied from the app repo's
+`assets/brand/owl.svg`). Plan limits on the landing page come from the same policy settings as the
+app. Routes: `routes/web.php`; host routing: `WEBSITE_URL` / `WEBSITE_HOST` (empty locally, so every
+page works on `http://localhost:8080`; production setup in [docs/DEPLOY.md](docs/DEPLOY.md) section 4).
 
 ## API documentation
 
@@ -417,8 +432,8 @@ Skip this if Apple sign-in is iOS-only. For sign-in on the web (or Android via t
 1. **Identifiers** → **+** → **Services IDs** → Continue. Description *Brainy Clan Web*, Identifier
    e.g. `app.brainyclan.web` (must differ from the bundle ID) → Register.
 2. Open it → tick **Sign in with Apple** → **Configure**: Primary App ID = the App ID from Step 2;
-   **Domains and Subdomains** = your web domain (e.g. `brainyclan.app`, no `https://`);
-   **Return URLs** = the exact HTTPS URL Apple posts back to (e.g. `https://brainyclan.app/auth/apple/callback`).
+   **Domains and Subdomains** = your web domain (e.g. `brainyclan.com`, no `https://`);
+   **Return URLs** = the exact HTTPS URL Apple posts back to (e.g. `https://brainyclan.com/auth/apple/callback`).
    Apple does not accept `localhost` or plain HTTP. → Next → Done → Continue → Save.
 
 The **Services ID** is the `aud` of identity tokens from the web flow.
@@ -742,6 +757,31 @@ curl -H "Authorization: Bearer <Mom's token>" http://localhost:8080/api/v1/me/ex
   otherwise), secure + httpOnly + SameSite=lax session cookies (secure by default when
   `APP_ENV=production`), encrypted sessions, and `CORS_ALLOWED_ORIGINS` empty unless a web build
   needs it (in production there is no localhost default).
+
+## Sign-in lockout and password reset
+
+**Lockout** (on top of the 10/min `auth` throttle; full rules in `docs/API.md` Auth → "Lockout"):
+password sign-in (`/auth/login`) per email + IP: 5 failures → 5 min, the next 5 → 1 h, then 24 h
+(reset by a successful sign-in or 24 h without failures); per email from all IPs: 20 failures in
+1 h → 15 min, and the owner gets at most one "someone tried to sign in" email per 24 h; per IP:
+30 failures in 1 h (login, sign-in codes, invite codes) → 1 h; `/auth/code` and `/auth/join` per
+IP: 5 invalid codes → 5 min / 1 h / 24 h. A locked request gets 429 `login_locked` with
+`retry_after` and a `Retry-After` header, the same for existing and unknown emails. Counters live
+in Redis under HMAC-SHA256 keys (no raw emails or IPs). Thresholds: `config/auth.php` → `lockout`.
+
+**Unlock someone by hand** (e.g. a support request):
+
+```sh
+docker compose exec app php artisan auth:unlock mom@example.com                 # email (all IPs)
+docker compose exec app php artisan auth:unlock mom@example.com --ip=203.0.113.7 # also that IP
+```
+
+**Forgotten password:** the app calls `POST /api/v1/auth/password/forgot` (always 202). When the
+email has an account, a one-time link to `WEBSITE_URL/password/reset?token=…` is emailed (valid
+60 min, newest link wins, 3/h per email and 10/h per IP). The page (en/fr) sets the new password,
+signs the user out of every device, clears all lockouts of that email and emails a "password
+changed" notice. Locally the emails land in Mailpit (http://localhost:8025). Expired tokens are
+removed daily (`auth:clear-resets`, scheduled).
 
 ## Error monitoring (Sentry)
 

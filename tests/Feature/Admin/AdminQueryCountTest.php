@@ -1,5 +1,7 @@
 <?php
 
+use App\Filament\Resources\AccountDeletionRequests\AccountDeletionRequestResource;
+use App\Filament\Resources\AccountDeletionRequests\Pages\ListAccountDeletionRequests;
 use App\Filament\Resources\Families\Pages\ViewFamily;
 use App\Filament\Resources\Families\RelationManagers\AllMembersRelationManager;
 use App\Filament\Resources\Families\RelationManagers\InvitesRelationManager;
@@ -10,9 +12,11 @@ use App\Filament\Resources\WebhookEvents\WebhookEventResource;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Models\WebhookEvent;
 use App\Modules\Content\Models\Category;
+use App\Modules\Content\Models\ChallengeType;
 use App\Modules\Content\Models\ContentBatch;
 use App\Modules\Content\Models\ContentItem;
 use App\Modules\Content\Models\Tag;
+use App\Modules\Family\Models\AccountDeletionRequest;
 use App\Modules\Family\Models\Family;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Models\Invite;
@@ -22,6 +26,8 @@ use App\Modules\Goals\Models\GoalPlan;
 use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\SocialAccount;
 use App\Modules\Identity\Models\User;
+use App\Modules\Policy\Models\AgeBand;
+use App\Modules\Policy\Models\Setting;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -52,6 +58,13 @@ function adminFamily(int $members): FamilyMember
         }
 
         Invite::factory()->create(['family_id' => $owner->family_id]);
+        AccountDeletionRequest::query()->create([
+            'email_hash' => hash('sha256', 'deletion-'.$member->id),
+            'user_id' => $member->user_id,
+            'status' => $i % 2 === 0 ? AccountDeletionRequest::STATUS_PENDING : AccountDeletionRequest::STATUS_COMPLETED,
+            'expires_at' => now()->addHour(),
+            'confirmed_at' => $i % 2 === 0 ? null : now(),
+        ]);
         SignInCode::factory()->create(['member_id' => $member->id]);
         ContentItem::factory()->create(['category_id' => $category->id, 'content_batch_id' => $batch->id])->tags()->attach($tag);
     }
@@ -117,6 +130,7 @@ it('renders every admin list page with several rows', function (string $url) {
     '/admin/challenge-types',
     '/admin/activities',
     '/admin/webhook-events',
+    '/admin/account-deletion-requests',
 ]);
 
 it('keeps the busiest admin tables at a constant number of queries', function (string $url) {
@@ -135,6 +149,7 @@ it('keeps the busiest admin tables at a constant number of queries', function (s
     '/admin/tags',
     '/admin/activities',
     '/admin/webhook-events',
+    '/admin/account-deletion-requests',
 ]);
 
 it('shows members with email login and devices, and invites, on the family page', function () {
@@ -284,4 +299,60 @@ it('keeps the family, goal plan and content batch view pages at a constant numbe
     $large = array_map(adminQueries(...), $urls(adminFamily(6)));
 
     expect($large)->toBe($small);
+});
+
+it('keeps the admin config tables at a constant number of queries', function (string $url) {
+    $addRows = function (int $count): void {
+        for ($i = 0; $i < $count; $i++) {
+            $n = AgeBand::query()->count() + ChallengeType::query()->count() + $i;
+            AgeBand::factory()->create(['min_age' => 70 + $n, 'max_age' => 70 + $n]);
+            Setting::factory()->create(['scope' => Setting::SCOPE_TIER, 'scope_id' => 'family', 'key' => "test.extra_{$n}", 'value' => $n]);
+            ChallengeType::query()->create(['key' => "extra_type_{$n}", 'name' => "Extra {$n}", 'handler_class' => 'App\Extra\Handler'.$n, 'is_active' => false]);
+        }
+    };
+
+    $addRows(2);
+    $small = adminQueries($url);
+
+    $addRows(6);
+
+    expect(adminQueries($url))->toBe($small);
+})->with([
+    '/admin/age-bands',
+    '/admin/settings',
+    '/admin/challenge-types',
+]);
+
+it('lists account deletion requests read-only with a status filter, masked emails and constant queries', function () {
+    adminFamily(2);
+    $pending = AccountDeletionRequest::query()->where('status', AccountDeletionRequest::STATUS_PENDING)->get();
+    $completed = AccountDeletionRequest::query()->where('status', AccountDeletionRequest::STATUS_COMPLETED)->get();
+    $noAccount = AccountDeletionRequest::query()->create([
+        'email_hash' => hash('sha256', 'nobody'),
+        'status' => AccountDeletionRequest::STATUS_NO_ACCOUNT,
+        'expires_at' => now()->addHour(),
+    ]);
+
+    $adult = $completed->firstOrFail()->user()->firstOrFail();
+    $adult->forceFill(['email' => 'grandpa@example.com', 'display_name' => 'Grandpa Joe'])->save();
+
+    Livewire::test(ListAccountDeletionRequests::class)
+        ->assertCanSeeTableRecords($pending->merge($completed)->push($noAccount))
+        ->assertSee("#{$adult->id} · Grandpa Joe · g***@example.com")
+        ->assertDontSee('grandpa@example.com')
+        ->assertSee('No account')
+        ->filterTable('status', AccountDeletionRequest::STATUS_PENDING)
+        ->assertCanSeeTableRecords($pending)
+        ->assertCanNotSeeTableRecords($completed->push($noAccount));
+
+    $request = $completed->firstOrFail();
+    $this->get(AccountDeletionRequestResource::getUrl('view', ['record' => $request]))->assertOk()
+        ->assertSee('Grandpa Joe')
+        ->assertSee('completed')
+        ->assertDontSee('grandpa@example.com');
+
+    expect(AccountDeletionRequestResource::canCreate())->toBeFalse()
+        ->and(AccountDeletionRequestResource::canEdit($request))->toBeFalse()
+        ->and(AccountDeletionRequestResource::canDelete($request))->toBeFalse()
+        ->and(AccountDeletionRequestResource::maskEmail(null))->toBeNull();
 });

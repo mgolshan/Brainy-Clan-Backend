@@ -61,6 +61,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Public website (docs/DEPLOY.md "Website and hosts")
+    |--------------------------------------------------------------------------
+    |
+    | The public website (landing page, support, terms, privacy, account deletion, password
+    | reset) is served by this app. In production it lives on its own host (WEBSITE_URL =
+    | https://brainyclan.com, WEBSITE_HOST = brainyclan.com) while the API, the admin and Horizon
+    | stay on APP_URL (https://api.brainyclan.com). WEBSITE_HOST empty (local dev) = no host
+    | routing: every page answers on any host (e.g. http://localhost:8080/support).
+    |
+    */
+
+    'website_url' => env('WEBSITE_URL', env('APP_URL')),
+
+    'website_host' => env('WEBSITE_HOST') ?: null,
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

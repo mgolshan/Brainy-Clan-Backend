@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Resources\AccountDeletionRequests\AccountDeletionRequestResource;
 use App\Filament\Resources\WebhookEvents\WebhookEventResource;
 use App\Filament\Support\DashboardMetrics;
 use App\Filament\Widgets\ActivityStats;
@@ -275,7 +276,8 @@ it('computes the system health figures', function () {
         ->assertSee('1 in the last 24 hours')
         ->assertSee('67% of 3 devices · 1 failed push jobs')
         ->assertSee('1 blocked in 7 days')
-        ->assertSee(WebhookEventResource::getUrl('index', ['filters' => ['outcome' => ['value' => WebhookEvent::OUTCOME_FAILED]]]));
+        ->assertSee(WebhookEventResource::getUrl('index', ['filters' => ['outcome' => ['value' => WebhookEvent::OUTCOME_FAILED]]]))
+        ->assertSee(AccountDeletionRequestResource::getUrl('index', ['filters' => ['status' => ['value' => AccountDeletionRequest::STATUS_PENDING]]]));
 });
 
 it('lists recent families, batches to review and webhook errors', function () {
