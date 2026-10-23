@@ -125,6 +125,11 @@ as written there; if something must change, update `docs/API.md` first and note 
     locked-out or forgetful adult can always get back in. Replaces the "per-email throttle"
     trade-off question.
   - **Devices:** iPhone and iPad (app milestone; layouts get a max content width on tablets).
+- **Theme worlds (2026-10-23, Moe):** theme keys gain `jungle`, `space`, `neon` (app-side design
+  in the frontend PLAN); member `accessibility.sound_effects` (null|bool) with policy default
+  `accessibility_defaults.sound_effects` (child true, others false; editable per age band in the
+  admin). Phase 2: world unlocks by streak/points and 2–3 Family-plan-only worlds, decided by the
+  server (contract to be written then).
 - **Launch question bank and French content (2026-10-17):** while the AI generator waits for an API key, the
   launch bank is hand-written as seed data in `database/seeders/data/questions/*.php` (one file per area, stable
   `id` per entry, English plus an optional French version; language-specific items such as spelling or idioms may

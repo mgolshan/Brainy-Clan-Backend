@@ -19,7 +19,7 @@ use Spatie\Activitylog\Support\LogOptions;
  *
  * `policy` keys: ui_theme, is_child, ads_allowed, purchases_allowed, collect_email, email_login_allowed,
  * redemption_allowed, difficulty {min, max, default}, accessibility_defaults
- * {text_scale, reduced_motion, calm_timers}, data_rules {...}.
+ * {text_scale, reduced_motion, calm_timers, sound_effects}, data_rules {...}.
  *
  * @property int $id
  * @property string $code
@@ -37,7 +37,19 @@ class AgeBand extends Model implements InvalidatesReferenceCache
     /** @use HasFactory<AgeBandFactory> */
     use HasFactory, LogsActivity;
 
-    public const array THEMES = ['playful', 'sleek', 'modern', 'classic'];
+    /** Theme keys ("worlds", docs/API.md Member). Any member may pick any world. */
+    public const array THEMES = ['playful', 'sleek', 'modern', 'classic', 'jungle', 'space', 'neon'];
+
+    /** Readable names for the admin (the app shows the same names). */
+    public const array THEME_LABELS = [
+        'playful' => 'Candy Land',
+        'sleek' => 'Glass',
+        'modern' => 'Modern',
+        'classic' => 'Classic',
+        'jungle' => 'Jungle Adventure',
+        'space' => 'Space Explorers',
+        'neon' => 'Neon Arcade',
+    ];
 
     /** AdMob max ad content ratings, strictest first. */
     public const array AD_CONTENT_RATINGS = ['G', 'PG', 'T', 'MA'];

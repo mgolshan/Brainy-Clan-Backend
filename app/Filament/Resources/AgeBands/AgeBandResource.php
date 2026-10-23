@@ -48,7 +48,7 @@ class AgeBandResource extends Resource
                 TextInput::make('country_code')->length(2)->helperText('Empty = every country'),
             ]),
             Section::make('Rules')->columns(3)->schema([
-                Select::make('policy.ui_theme')->label('Default UI theme')->options(array_combine(AgeBand::THEMES, AgeBand::THEMES))->required(),
+                Select::make('policy.ui_theme')->label('Default UI theme')->options(AgeBand::THEME_LABELS)->required(),
                 Toggle::make('policy.is_child')->label('Child (under the digital-consent threshold)'),
                 Toggle::make('policy.collect_email')->label('May self-register with email / password'),
                 Toggle::make('policy.email_login_allowed')->label('Admins may give an email login')
@@ -70,10 +70,12 @@ class AgeBandResource extends Resource
                 TextInput::make('policy.difficulty.max')->label('Max')->numeric()->minValue(1)->maxValue(10)->required(),
                 TextInput::make('policy.difficulty.default')->label('Default')->numeric()->minValue(1)->maxValue(10)->required(),
             ]),
-            Section::make('Accessibility defaults')->columns(3)->schema([
+            Section::make('Accessibility defaults')->columns(4)->schema([
                 TextInput::make('policy.accessibility_defaults.text_scale')->label('Text scale')->numeric()->minValue(0.8)->maxValue(1.6)->step(0.1)->default(1.0),
                 Toggle::make('policy.accessibility_defaults.reduced_motion')->label('Reduced motion'),
                 Toggle::make('policy.accessibility_defaults.calm_timers')->label('Calm timers'),
+                Toggle::make('policy.accessibility_defaults.sound_effects')->label('Sound effects')
+                    ->helperText('Default for members who have not chosen (app sound effects on or off).'),
             ]),
             Section::make('Data rules')->schema([
                 Grid::make(3)->schema([
@@ -94,7 +96,7 @@ class AgeBandResource extends Resource
                 TextColumn::make('name'),
                 TextColumn::make('min_age')->label('Ages')->formatStateUsing(fn (AgeBand $record) => $record->min_age.'–'.($record->max_age ?? '∞')),
                 TextColumn::make('country_code')->placeholder('All'),
-                TextColumn::make('policy.ui_theme')->label('Theme'),
+                TextColumn::make('policy.ui_theme')->label('Theme')->formatStateUsing(fn (?string $state): string => AgeBand::THEME_LABELS[(string) $state] ?? (string) $state),
                 IconColumn::make('policy.is_child')->label('Child')->boolean(),
                 IconColumn::make('policy.ads_allowed')->label('Ads')->boolean(),
                 IconColumn::make('policy.collect_email')->label('Self sign-up')->boolean(),

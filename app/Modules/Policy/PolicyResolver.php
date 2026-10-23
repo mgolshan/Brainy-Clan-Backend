@@ -39,7 +39,7 @@ class PolicyResolver
         'feature_flags' => [],
     ];
 
-    private const array DEFAULT_ACCESSIBILITY = ['text_scale' => 1.0, 'reduced_motion' => false, 'calm_timers' => false];
+    private const array DEFAULT_ACCESSIBILITY = ['text_scale' => 1.0, 'reduced_motion' => false, 'calm_timers' => false, 'sound_effects' => false];
 
     /** @var array{bands: Collection<int, AgeBand>, settings: array<string, mixed>}|null */
     private ?array $snapshot = null;
@@ -400,7 +400,7 @@ class PolicyResolver
     }
 
     /**
-     * @return array{text_scale: float, reduced_motion: bool, calm_timers: bool}
+     * @return array{text_scale: float, reduced_motion: bool, calm_timers: bool, sound_effects: bool}
      */
     private function accessibilityDefaults(?AgeBand $band): array
     {
@@ -410,6 +410,7 @@ class PolicyResolver
             'text_scale' => (float) $defaults['text_scale'],
             'reduced_motion' => (bool) $defaults['reduced_motion'],
             'calm_timers' => (bool) $defaults['calm_timers'],
+            'sound_effects' => (bool) $defaults['sound_effects'],
         ];
     }
 

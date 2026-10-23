@@ -87,7 +87,7 @@ and add a line to the changelog at the bottom.
 { "id": 7, "user_id": 3, "nickname": "Sam", "avatar": "fox", "role": "member",
   "age_band": "child", "is_child": true, "birth_year": 2017, "birth_month": 3,
   "difficulty_override": null,
-  "accessibility": { "text_scale": 1.0, "reduced_motion": false, "calm_timers": false, "theme": null },
+  "accessibility": { "text_scale": 1.0, "reduced_motion": false, "calm_timers": false, "theme": null, "sound_effects": null },
   "default_ui_theme": "playful", "status": "active", "joined_at": "2026-10-10T14:00:00Z",
   "email": null, "has_password": false, "email_login_allowed": false, "has_own_login": false }
 ```
@@ -95,7 +95,13 @@ and add a line to the changelog at the bottom.
 - `age_band`: `child` | `teen` | `adult` | `senior` (codes come from the `age_bands` table).
 - `default_ui_theme`: the theme the member's age band policy gives (what "Automatic" resolves to). Lets an admin preview another member's look.
 - `accessibility.theme`: `null` (use the policy default) or a theme key (see Policy). Lets a member
-  pick another look; it never changes rules.
+  pick another look; it never changes rules. **Theme keys ("worlds", 2026-10-23):** `playful`
+  (shown as "Candy Land"), `sleek` (shown as "Glass"), `modern`, `classic`, `jungle`, `space`,
+  `neon`. Any member may pick any world (no age rule); in phase 1 all worlds are available to
+  everyone (unlocks and Family-plan-only worlds come later, decided by the server). Unknown key →
+  422 `validation_failed`.
+- `accessibility.sound_effects`: `null` (use the policy default
+  `accessibility_defaults.sound_effects`; seeded child `true`, teen/adult/senior `false`) or a bool.
 - `birth_year` / `birth_month` only for the member themself and for admins.
 - `has_own_login`: the member can sign in without the family (email login or a linked
   Google/Apple/Facebook account) — members without one are erased with the family.
@@ -118,7 +124,7 @@ and add a line to the changelog at the bottom.
   "second_chance": { "free_per_day": 0, "free_used_today": 0, "ad_allowed": false, "redemption_allowed": true },
   "ad_request": { "non_personalized": true, "under_age_of_consent": false, "max_ad_content_rating": "G" },
   "limits": { "max_members": 2, "max_categories": 3, "max_active_goals": 1 },
-  "accessibility_defaults": { "text_scale": 1.0, "reduced_motion": false, "calm_timers": false },
+  "accessibility_defaults": { "text_scale": 1.0, "reduced_motion": false, "calm_timers": false, "sound_effects": true },
   "feature_flags": {}
 }
 ```
@@ -223,7 +229,7 @@ members use their invite code (`/auth/join`). No shared passwords, no parent ema
 - `GET /me` (auth) → `{ "data": { "user", "member" | null, "family" | null, "policy" } }`. The app calls it on launch.
 - `PATCH /me` (auth) — Body (all optional): `display_name, avatar, locale`. → `{ data: User }`
 - `PATCH /me/accessibility` (auth, needs family) — Body (all optional): `text_scale (0.8–1.6),
-  reduced_motion, calm_timers, theme (null | playful | sleek | modern | classic)`. → `{ data: Member }`
+  reduced_motion, calm_timers, theme (null | a theme key), sound_effects (null | bool)`. → `{ data: Member }`
 - `GET /me/social-accounts` (auth) → `{ data: [ { "provider": "google", "email": "mom@gmail.com", "linked_at": "..." } ] }`
 - `POST /me/social-accounts/{provider}` (auth) — Body: `token`, `nonce?` (Apple). Links Google/Facebook to the
   signed-in adult (e.g. after joining by invite). → **201** `{ data: SocialAccount }`, 409 `social_account_taken`.
@@ -593,3 +599,4 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-22 — Sign-in lockout (429 `login_locked` + `retry_after`), `POST /auth/password/forgot` + web page `/password/reset`. Production hosts: website `https://brainyclan.com` (legal pages, support, account deletion, password reset), API `https://api.brainyclan.com/api/v1`; support email `support@brainyclan.com`.
 - 2026-10-22 — Avatars: the Clan set, 22 species × (kid, teen, mom, dad, grandma, grandpa) = 132 keys (`tiger`, `tiger-mom`, …); existing keys unchanged.
 - 2026-10-22 — Legal pages moved to `/terms` and `/privacy` on the website host; `GET /legal` URLs point there (`https://brainyclan.com/terms`), the old `/legal/terms` and `/legal/privacy` answer 301. No shape change.
+- 2026-10-23 — Theme "worlds": new theme keys `jungle`, `space`, `neon`; member `accessibility.sound_effects` (null | bool) and policy `accessibility_defaults.sound_effects` (child true, others false).

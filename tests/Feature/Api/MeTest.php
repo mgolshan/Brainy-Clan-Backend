@@ -81,7 +81,7 @@ it('updates accessibility settings and resets the theme with null', function () 
         ->assertJsonPath('data.accessibility.theme', null)
         ->assertJsonPath('data.accessibility.text_scale', 1.4);
 
-    $this->patchJson('/api/v1/me/accessibility', ['text_scale' => 3, 'theme' => 'neon'])
+    $this->patchJson('/api/v1/me/accessibility', ['text_scale' => 3, 'theme' => 'volcano'])
         ->assertStatus(422)
         ->assertJsonValidationErrors(['text_scale', 'theme']);
 });

@@ -31,7 +31,7 @@ class AgeBandFactory extends Factory
                 'collect_email' => true,
                 'redemption_allowed' => true,
                 'difficulty' => ['min' => 1, 'max' => 10, 'default' => 5],
-                'accessibility_defaults' => ['text_scale' => 1.0, 'reduced_motion' => false, 'calm_timers' => false],
+                'accessibility_defaults' => ['text_scale' => 1.0, 'reduced_motion' => false, 'calm_timers' => false, 'sound_effects' => false],
             ],
         ];
     }

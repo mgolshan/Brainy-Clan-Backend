@@ -6,7 +6,7 @@ use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Support\Accessibility;
 
 /**
- * A member changes their own accessibility settings (text size, motion, timers, theme).
+ * A member changes their own accessibility settings (text size, motion, timers, theme, sound effects).
  */
 class UpdateAccessibility
 {

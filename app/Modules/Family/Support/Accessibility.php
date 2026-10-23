@@ -8,12 +8,13 @@ use Illuminate\Validation\Rule;
 
 /**
  * A member's accessibility settings: stored values on top of the age band's defaults.
- * `theme: null` means "use the policy's ui_theme".
+ * `theme: null` means "use the policy's ui_theme"; `sound_effects: null` means "use the policy's
+ * accessibility_defaults.sound_effects" (both are returned as stored, the app resolves them).
  */
 final class Accessibility
 {
     /**
-     * @return array{text_scale: float, reduced_motion: bool, calm_timers: bool, theme: string|null}
+     * @return array{text_scale: float, reduced_motion: bool, calm_timers: bool, theme: string|null, sound_effects: bool|null}
      */
     public static function forMember(FamilyMember $member, ?AgeBand $band): array
     {
@@ -25,6 +26,7 @@ final class Accessibility
             'reduced_motion' => (bool) ($stored['reduced_motion'] ?? $defaults['reduced_motion'] ?? false),
             'calm_timers' => (bool) ($stored['calm_timers'] ?? $defaults['calm_timers'] ?? false),
             'theme' => isset($stored['theme']) && is_string($stored['theme']) ? $stored['theme'] : null,
+            'sound_effects' => isset($stored['sound_effects']) ? (bool) $stored['sound_effects'] : null,
         ];
     }
 
@@ -40,6 +42,7 @@ final class Accessibility
             $prefix.'reduced_motion' => ['sometimes', 'boolean'],
             $prefix.'calm_timers' => ['sometimes', 'boolean'],
             $prefix.'theme' => ['sometimes', 'nullable', 'string', Rule::in(AgeBand::THEMES)],
+            $prefix.'sound_effects' => ['sometimes', 'nullable', 'boolean'],
         ];
     }
 
@@ -51,12 +54,16 @@ final class Accessibility
      */
     public static function merge(?array $stored, array $changes): array
     {
-        $allowed = array_intersect_key($changes, array_flip(['text_scale', 'reduced_motion', 'calm_timers', 'theme']));
+        $allowed = array_intersect_key($changes, array_flip(['text_scale', 'reduced_motion', 'calm_timers', 'theme', 'sound_effects']));
 
         foreach (['reduced_motion', 'calm_timers'] as $flag) {
             if (array_key_exists($flag, $allowed)) {
                 $allowed[$flag] = (bool) $allowed[$flag];
             }
+        }
+
+        if (array_key_exists('sound_effects', $allowed) && $allowed['sound_effects'] !== null) {
+            $allowed['sound_effects'] = (bool) $allowed['sound_effects'];
         }
 
         if (array_key_exists('text_scale', $allowed)) {

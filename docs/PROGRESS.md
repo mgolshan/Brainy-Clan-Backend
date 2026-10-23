@@ -377,6 +377,19 @@ curl http://localhost:8080/api/v1/health
 
 ## Log
 
+### 2026-10-23 theme worlds + sound setting
+- **Theme worlds** (PLAN "Theme worlds (2026-10-23, Moe)"): `AgeBand::THEMES` adds `jungle`, `space`,
+  `neon`; `AgeBand::THEME_LABELS` gives the admin names (Candy Land, Glass, Modern, Classic, Jungle
+  Adventure, Space Explorers, Neon Arcade) for the age band select and table. Band defaults unchanged.
+  Content preview phone has palettes for the new worlds.
+- **Sound effects**: member `accessibility.sound_effects` (null | bool, stored in the
+  `family_members.accessibility` JSON, returned as stored; null = policy default) via
+  `PATCH /me/accessibility` and the admin member PATCH; included in `/me/export`. Policy
+  `accessibility_defaults.sound_effects` (PolicyResolver, fallback false), editable in the age band
+  form. Seeder: child true, others false; data migration `2026_10_23_100000_...` backfills existing
+  bands (keeps a value already set). PolicySeeder not re-run on dev (it overwrites admin policy edits).
+- Tests: `tests/Feature/Api/ThemeWorldsTest.php`; `MeTest` uses `volcano` as the unknown theme.
+
 ### 2026-10-22 lockout, password reset, play perf
 - **Sign-in lockout** (API.md Auth → "Lockout"): `Identity\Lockout\LoginLockout` (Redis via the
   cache, atomic counters, HMAC-SHA256 keys of email / IP), wired into `LoginWithPassword`,

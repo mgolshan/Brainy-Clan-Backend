@@ -51,8 +51,9 @@ class MemberController
     /**
      * Update my accessibility settings.
      *
-     * Text scale, reduced motion, calm timers and theme (`null` = the band's default). Never
-     * changes rules.
+     * Text scale, reduced motion, calm timers, theme (`null` = the band's default; keys `playful`,
+     * `sleek`, `modern`, `classic`, `jungle`, `space`, `neon`) and sound effects (`null` = the
+     * band's `accessibility_defaults.sound_effects`). Never changes rules.
      */
     public function updateAccessibility(UpdateAccessibilityRequest $request, UpdateAccessibility $update): MemberResource
     {

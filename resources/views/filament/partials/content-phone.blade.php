@@ -9,10 +9,13 @@
         'sleek' => ['bg' => '#0F172A', 'card' => '#1E293B', 'accent' => '#38BDF8', 'font' => '1rem', 'radius' => '12px'],
         'modern' => ['bg' => '#F4F4F8', 'card' => '#FFFFFF', 'accent' => '#4F46E5', 'font' => '1rem', 'radius' => '16px'],
         'classic' => ['bg' => '#FBF8F1', 'card' => '#FFFFFF', 'accent' => '#1E3A5F', 'font' => '1.2rem', 'radius' => '8px'],
+        'jungle' => ['bg' => '#ECF7E4', 'card' => '#FFFFFF', 'accent' => '#2F855A', 'font' => '1.1rem', 'radius' => '20px'],
+        'space' => ['bg' => '#0B1026', 'card' => '#1A2147', 'accent' => '#A78BFA', 'font' => '1rem', 'radius' => '16px'],
+        'neon' => ['bg' => '#0A0A0F', 'card' => '#17171F', 'accent' => '#22D3EE', 'font' => '1rem', 'radius' => '10px'],
     ];
     $compact ??= false;
     $t = $themes[$preview['ui_theme']] ?? $themes['modern'];
-    $dark = $preview['ui_theme'] === 'sleek';
+    $dark = in_array($preview['ui_theme'], ['sleek', 'space', 'neon'], true);
 @endphp
 <div style="background:{{ $t['bg'] }}; color:{{ $dark ? '#E2E8F0' : '#111827' }}; border-radius:{{ $compact ? '16px' : '28px' }}; padding:{{ $compact ? '.75rem' : '1.25rem' }}; border:{{ $compact ? '3px' : '8px' }} solid #111827; min-height:{{ $compact ? '0' : '520px' }}; font-size:{{ $compact ? '.9rem' : $t['font'] }};">
     <div style="font-size:.75rem; opacity:.7; margin-bottom:.75rem;">

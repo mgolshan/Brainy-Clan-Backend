@@ -34,7 +34,7 @@ class PolicySeeder extends Seeder
      */
     private function ageBands(): array
     {
-        $accessibility = ['text_scale' => 1.0, 'reduced_motion' => false, 'calm_timers' => false];
+        $accessibility = ['text_scale' => 1.0, 'reduced_motion' => false, 'calm_timers' => false, 'sound_effects' => false];
 
         return [
             [
@@ -49,7 +49,7 @@ class PolicySeeder extends Seeder
                     'redemption_allowed' => true,
                     'ad_request' => ['non_personalized' => true, 'under_age_of_consent' => false, 'max_ad_content_rating' => 'G'],
                     'difficulty' => ['min' => 1, 'max' => 4, 'default' => 2],
-                    'accessibility_defaults' => $accessibility,
+                    'accessibility_defaults' => [...$accessibility, 'sound_effects' => true],
                     'data_rules' => ['analytics' => false, 'personalized_ads' => false, 'real_name' => false],
                 ],
             ],
@@ -97,7 +97,7 @@ class PolicySeeder extends Seeder
                     'redemption_allowed' => true,
                     'ad_request' => ['non_personalized' => true, 'under_age_of_consent' => false, 'max_ad_content_rating' => 'G'],
                     'difficulty' => ['min' => 1, 'max' => 8, 'default' => 4],
-                    'accessibility_defaults' => ['text_scale' => 1.0, 'reduced_motion' => false, 'calm_timers' => true],
+                    'accessibility_defaults' => ['text_scale' => 1.0, 'reduced_motion' => false, 'calm_timers' => true, 'sound_effects' => false],
                     'data_rules' => ['analytics' => true, 'personalized_ads' => false, 'real_name' => true],
                 ],
             ],
