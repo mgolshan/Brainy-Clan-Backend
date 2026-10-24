@@ -13,7 +13,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Message (docs/API.md "Family chat"). `body` is the stored plain text, returned verbatim (JSON
  * encoding is the only transformation); null when deleted. An author who is no longer an active
  * member of the family shows as "Former member" (localized for the viewer) with `member_id` and
- * `avatar` null. Needs `author.user` eager-loaded.
+ * `avatar` null. Needs `author.user` eager-loaded. `reported` is true only when the actions loaded
+ * `withExists('reports as reported')` — they do so for family admins only.
  *
  * @property ChatMessage $resource
  */
@@ -43,6 +44,9 @@ class ChatMessageResource extends JsonResource
             'body' => $message->isDeleted() ? null : $message->body,
             'deleted' => $message->isDeleted(),
             'client_id' => $message->client_id,
+            // Loaded (withExists) only when the viewer is an admin of the family; everyone else
+            // always sees false.
+            'reported' => array_key_exists('reported', $message->getAttributes()) && (bool) $message->getAttribute('reported'),
             'created_at' => Iso::format($message->created_at),
         ];
     }

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property string $client_id
  * @property Carbon|null $deleted_at
  * @property Carbon|null $created_at
+ * @property bool|null $reported `withExists('reports as reported')`, loaded for admin viewers only
  * @property-read FamilyMember|null $author
  * @property-read Family $family
  */
@@ -67,6 +69,16 @@ class ChatMessage extends Model
     public function family(): BelongsTo
     {
         return $this->belongsTo(Family::class);
+    }
+
+    /**
+     * Reports by members to the family's admins (deleted with the message, FK cascade).
+     *
+     * @return HasMany<ChatMessageReport, $this>
+     */
+    public function reports(): HasMany
+    {
+        return $this->hasMany(ChatMessageReport::class);
     }
 
     public function isDeleted(): bool

@@ -10,6 +10,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::get('family/chat/messages', [ChatController::class, 'index'])->name('api.v1.family.chat.messages.index');
     Route::post('family/chat/messages', [ChatController::class, 'store'])->middleware('throttle:chat-post')->name('api.v1.family.chat.messages.store');
     Route::delete('family/chat/messages/{message}', [ChatController::class, 'destroy'])->whereNumber('message')->name('api.v1.family.chat.messages.destroy');
+    Route::post('family/chat/messages/{message}/report', [ChatController::class, 'report'])->whereNumber('message')->middleware('throttle:chat-report')->name('api.v1.family.chat.messages.report');
     Route::post('family/chat/read', [ChatController::class, 'read'])->name('api.v1.family.chat.read');
     Route::get('family/chat/unread', [ChatController::class, 'unread'])->name('api.v1.family.chat.unread');
 });

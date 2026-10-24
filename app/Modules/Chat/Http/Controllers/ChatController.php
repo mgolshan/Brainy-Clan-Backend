@@ -7,6 +7,7 @@ use App\Modules\Chat\Actions\DeleteChatMessage;
 use App\Modules\Chat\Actions\ListChatMessages;
 use App\Modules\Chat\Actions\MarkChatRead;
 use App\Modules\Chat\Actions\PostChatMessage;
+use App\Modules\Chat\Actions\ReportChatMessage;
 use App\Modules\Chat\Actions\ResolveChatMember;
 use App\Modules\Chat\Http\Requests\ListChatMessagesRequest;
 use App\Modules\Chat\Http\Requests\MarkChatReadRequest;
@@ -81,6 +82,22 @@ class ChatController
     public function destroy(Request $request, int $message, DeleteChatMessage $delete): Response
     {
         $delete->handle($this->chatMember($request), $message);
+
+        return response()->noContent();
+    }
+
+    /**
+     * Report a chat message.
+     *
+     * Reports another member's message to the family's admins only (never to staff): they get a
+     * `family_chat_report` push without the text and see `reported: true`. Idempotent per reporter
+     * and message (204 again); own message → 422; another family's id → 404. 10 reports per hour
+     * per member (429 `rate_limited`).
+     */
+    #[ApiErrors('chat_disabled', 'validation_failed')]
+    public function report(Request $request, int $message, ReportChatMessage $report): Response
+    {
+        $report->handle($this->chatMember($request), $message);
 
         return response()->noContent();
     }

@@ -35,10 +35,12 @@ class HealthStats extends StatsOverviewWidget
                 ->color($health['failed_jobs_day'] > 0 ? 'danger' : 'success')
                 // Horizon is for admins only (it can retry and delete jobs).
                 ->url(StaffAccess::isAdmin() ? url(config('horizon.path', 'horizon').'/failed') : null),
+            // Paddle signature rejections are never stored as events (no payload kept), so they are
+            // only counted here; a burst means a wrong webhook secret or someone probing the endpoint.
             Stat::make('Webhook errors', number_format($health['webhook_errors_week']))
                 ->icon(Heroicon::OutlinedBolt)
-                ->description('Failed RevenueCat events in 7 days')
-                ->color($health['webhook_errors_week'] > 0 ? 'danger' : 'success')
+                ->description('Failed RevenueCat/Paddle events · '.number_format($health['paddle_signature_rejections_week']).' Paddle bad signatures · 7 days')
+                ->color($health['webhook_errors_week'] > 0 || $health['paddle_signature_rejections_week'] > 0 ? 'danger' : 'success')
                 ->url(WebhookEventResource::getUrl('index', ['filters' => ['outcome' => ['value' => WebhookEvent::OUTCOME_FAILED]]])),
             Stat::make('AdMob SSV rejections', number_format($health['admob_ssv_rejections_week']))
                 ->icon(Heroicon::OutlinedShieldExclamation)

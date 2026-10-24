@@ -2,6 +2,7 @@
 
 use App\Modules\Chat\Actions\PruneChatMessages;
 use App\Modules\Chat\Models\ChatMessage;
+use App\Modules\Chat\Models\ChatMessageReport;
 use App\Modules\Chat\Support\ChatText;
 use App\Modules\Core\Support\SentryScrubber;
 use App\Modules\Family\Actions\DeleteFamily;
@@ -15,15 +16,18 @@ use App\Modules\Notifications\Jobs\DeliverPushNotification;
 use App\Modules\Notifications\Listeners\NotifyFamilyChat;
 use App\Modules\Notifications\Models\NotificationPreference;
 use App\Modules\Policy\Models\Setting;
+use Filament\Facades\Filament;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Sentry\Event;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Symfony\Component\Finder\SplFileInfo;
 
 /**
  * Family chat (docs/API.md "Family chat", 2026-10-23): only the family's active members see it,
@@ -221,6 +225,7 @@ it('requires authentication on every chat route', function (string $method, stri
     ['GET', CHAT_URL],
     ['POST', CHAT_URL],
     ['DELETE', CHAT_URL.'/1'],
+    ['POST', CHAT_URL.'/1/report'],
     ['POST', '/api/v1/family/chat/read'],
     ['GET', '/api/v1/family/chat/unread'],
 ]);
@@ -244,10 +249,12 @@ it('answers 404 to users without an active membership, staff included', function
     $this->getJson(CHAT_URL)->assertNotFound();
     chatPost('hi')->assertNotFound();
     $this->deleteJson(CHAT_URL."/{$message->id}")->assertNotFound();
+    $this->postJson(CHAT_URL."/{$message->id}/report")->assertNotFound();
     $this->postJson('/api/v1/family/chat/read', ['last_read_id' => $message->id])->assertNotFound();
     $this->getJson('/api/v1/family/chat/unread')->assertNotFound();
 
-    expect(ChatMessage::query()->sole()->isDeleted())->toBeFalse();
+    expect(ChatMessage::query()->sole()->isDeleted())->toBeFalse()
+        ->and(ChatMessageReport::query()->count())->toBe(0);
 })->with(['staff', 'no family', 'removed member']);
 
 it('never shows, deletes or counts another family\'s messages', function () {
@@ -582,7 +589,12 @@ it('lists 50 messages with the same number of queries as 2 (no N+1)', function (
         $removed->forceFill(['status' => FamilyMember::STATUS_REMOVED])->save();
 
         for ($i = 0; $i < $messages; $i++) {
-            ChatMessage::factory()->by($authors[$i % 3])->create();
+            $message = ChatMessage::factory()->by($authors[$i % 3])->create();
+
+            // Every other message is reported: the owner (admin) sees `reported` without extra queries.
+            if ($i % 2 === 0) {
+                ChatMessageReport::factory()->of($message, $authors[($i + 1) % 3])->create();
+            }
         }
 
         chatAs($owner);
@@ -598,4 +610,226 @@ it('lists 50 messages with the same number of queries as 2 (no N+1)', function (
     };
 
     expect($count(50))->toBe($count(2));
+});
+
+// ---------------------------------------------------------------------------------------------
+// Reports (Apple guideline 1.2): to the family's admins only, never staff, never the text
+// ---------------------------------------------------------------------------------------------
+
+function chatReport(int $messageId): TestResponse
+{
+    return test()->postJson(CHAT_URL."/{$messageId}/report");
+}
+
+it('lets a member report another member\'s message once (idempotent 204)', function () {
+    Bus::fake([DeliverPushNotification::class]);
+    $this->travelTo(now()->setTimezone('America/Toronto')->setTime(12, 0));
+    [$owner, $teen] = chatFamily();
+    $sibling = addMember($owner->family, 16);
+    $message = ChatMessage::factory()->by($sibling)->create(['body' => 'mean words']);
+
+    chatAs($teen);
+    chatReport($message->id)->assertNoContent();
+    chatReport($message->id)->assertNoContent();
+
+    $report = ChatMessageReport::query()->sole();
+    expect($report->chat_message_id)->toBe($message->id)
+        ->and($report->reporter_member_id)->toBe($teen->id)
+        ->and($report->created_at)->not->toBeNull();
+
+    // Only the first report notifies.
+    Bus::assertDispatchedTimes(DeliverPushNotification::class, 1);
+
+    // A second reporter adds a second report.
+    chatAs($owner);
+    chatReport($message->id)->assertNoContent();
+    expect(ChatMessageReport::query()->count())->toBe(2);
+});
+
+it('rejects reporting your own message (422), another family\'s (404) and past retention (404)', function () {
+    [$owner, $teen] = chatFamily();
+    [, $otherTeen] = chatFamily();
+    $own = ChatMessage::factory()->by($teen)->create();
+    $foreign = ChatMessage::factory()->by($otherTeen)->create();
+    $expired = ChatMessage::factory()->by($owner)->create(['created_at' => now()->subDays(8)]);
+
+    chatAs($teen);
+    chatReport($own->id)->assertUnprocessable()->assertJsonPath('code', 'validation_failed');
+    chatReport($foreign->id)->assertNotFound()->assertJsonPath('code', 'not_found');
+    chatReport($expired->id)->assertNotFound();
+    chatReport($foreign->id + 1000)->assertNotFound();
+    $this->postJson(CHAT_URL.'/abc/report')->assertNotFound();
+
+    expect(ChatMessageReport::query()->count())->toBe(0);
+});
+
+it('answers 403 chat_disabled to a member with chat off', function () {
+    [$owner, $teen] = chatFamily();
+    $message = ChatMessage::factory()->by($owner)->create();
+    $teen->forceFill(['chat_enabled' => false])->save();
+
+    chatAs($teen);
+    chatReport($message->id)->assertForbidden()->assertJsonPath('code', 'chat_disabled');
+    expect(ChatMessageReport::query()->count())->toBe(0);
+});
+
+it('treats reporting a deleted message as a no-op', function () {
+    Bus::fake([DeliverPushNotification::class]);
+    [$owner, $teen] = chatFamily();
+    $message = ChatMessage::factory()->by($owner)->deleted()->create();
+
+    chatAs($teen);
+    chatReport($message->id)->assertNoContent();
+
+    expect(ChatMessageReport::query()->count())->toBe(0);
+    Bus::assertNotDispatched(DeliverPushNotification::class);
+});
+
+it('shows reported: true only to the family\'s admins', function () {
+    [$owner, $teen] = chatFamily();
+    $sibling = addMember($owner->family, 16);
+    $reported = ChatMessage::factory()->by($sibling)->create();
+    $clean = ChatMessage::factory()->by($sibling)->create();
+    $ownerMessage = ChatMessage::factory()->by($owner)->create();
+
+    chatAs($teen);
+    chatReport($reported->id)->assertNoContent();
+    chatReport($ownerMessage->id)->assertNoContent();
+
+    $flags = fn (): array => collect($this->getJson(CHAT_URL)->assertOk()->json('data'))->pluck('reported', 'id')->all();
+
+    // Members, the reporter included, always see false.
+    expect($flags())->toBe([$ownerMessage->id => false, $clean->id => false, $reported->id => false]);
+    chatAs($sibling);
+    expect($flags())->toBe([$ownerMessage->id => false, $clean->id => false, $reported->id => false]);
+
+    // Admins see which messages were reported (their own too), on every page shape.
+    chatAs($owner);
+    expect($flags())->toBe([$ownerMessage->id => true, $clean->id => false, $reported->id => true]);
+    $this->getJson(CHAT_URL.'?after=0')->assertJsonPath('data.0.reported', true)->assertJsonPath('data.1.reported', false);
+    chatPost('again', $ownerMessage->client_id)->assertOk()->assertJsonPath('data.reported', true);
+    chatPost('new one')->assertCreated()->assertJsonPath('data.reported', false);
+
+    // Deleting a reported message clears its reports (nothing left to report on a tombstone).
+    $this->deleteJson(CHAT_URL."/{$reported->id}")->assertNoContent();
+    expect(ChatMessageReport::query()->where('chat_message_id', $reported->id)->exists())->toBeFalse();
+    $tombstone = collect($this->getJson(CHAT_URL)->json('data'))->firstWhere('id', $reported->id);
+    expect($tombstone)->toMatchArray(['deleted' => true, 'reported' => false]);
+});
+
+it('pushes family_chat_report to the other admins with chat and the preference on, without the text', function () {
+    Bus::fake([DeliverPushNotification::class]);
+    $this->travelTo(now()->setTimezone('America/Toronto')->setTime(12, 0));
+
+    [$owner, $teen] = chatFamily();
+    $frenchAdmin = addMember($owner->family, 40, FamilyMember::ROLE_ADMIN);
+    $frenchAdmin->user->forceFill(['locale' => 'fr'])->save();
+    $mutedAdmin = addMember($owner->family, 41, FamilyMember::ROLE_ADMIN);
+    $chatOffAdmin = addMember($owner->family, 42, FamilyMember::ROLE_ADMIN);
+    $chatOffAdmin->forceFill(['chat_enabled' => false])->save();
+    $removedAdmin = addMember($owner->family, 43, FamilyMember::ROLE_ADMIN);
+    $removedAdmin->forceFill(['status' => FamilyMember::STATUS_REMOVED])->save();
+    $sibling = addMember($owner->family, 16);
+    NotificationPreference::query()->create(['family_member_id' => $mutedAdmin->id, 'types' => ['family_chat_report' => false], 'quiet_from' => null, 'quiet_to' => null, 'reminder_time' => '17:00']);
+    [$otherOwner] = chatFamily();
+    $message = ChatMessage::factory()->by($sibling)->create(['body' => 'the secret code is 1234']);
+
+    chatAs($teen);
+    chatReport($message->id)->assertNoContent();
+
+    $jobs = Bus::dispatched(DeliverPushNotification::class);
+    $recipients = $jobs->flatMap(fn (DeliverPushNotification $job) => $job->memberIds)->sort()->values()->all();
+
+    // Admins only: not the author, not members, not muted / chat-off / removed admins, not other families.
+    expect($recipients)->toBe(collect([$owner->id, $frenchAdmin->id])->sort()->values()->all())
+        ->and($recipients)->not->toContain($otherOwner->id);
+
+    foreach ($jobs as $job) {
+        expect($job->title)->toBe('Brainy Clan')
+            ->and($job->data)->toBe(['type' => 'family_chat_report', 'message_id' => $message->id])
+            ->and(json_encode([$job->title, $job->body, $job->data]))->not->toContain('secret')->not->toContain('1234');
+    }
+
+    $bodies = $jobs->mapWithKeys(fn (DeliverPushNotification $job) => [$job->memberIds[0] => $job->body]);
+    expect($bodies[$owner->id])->toBe("{$teen->nickname} reported a message in the family chat")
+        ->and($bodies[$frenchAdmin->id])->toBe("{$teen->nickname} a signalé un message dans la discussion familiale");
+});
+
+it('does not push the report to an admin who reported it themselves', function () {
+    Bus::fake([DeliverPushNotification::class]);
+    $this->travelTo(now()->setTimezone('America/Toronto')->setTime(12, 0));
+    [$owner, $teen] = chatFamily();
+    $coAdmin = addMember($owner->family, 38, FamilyMember::ROLE_ADMIN);
+    $message = ChatMessage::factory()->by($teen)->create();
+
+    chatAs($owner);
+    chatReport($message->id)->assertNoContent();
+
+    expect(Bus::dispatched(DeliverPushNotification::class)->flatMap(fn (DeliverPushNotification $job) => $job->memberIds)->all())->toBe([$coAdmin->id]);
+});
+
+it('offers family_chat_report as a notification preference, on by default', function () {
+    [$owner] = chatFamily();
+    chatAs($owner);
+
+    $this->getJson('/api/v1/me/notification-preferences')->assertJsonPath('data.types.family_chat_report', true);
+    $this->patchJson('/api/v1/me/notification-preferences', ['types' => ['family_chat_report' => false]])->assertOk()
+        ->assertJsonPath('data.types.family_chat_report', false)
+        ->assertJsonPath('data.types.family_chat', true);
+});
+
+it('rate-limits reports to 10 per hour per member', function () {
+    [$owner, $teen] = chatFamily();
+    $messages = ChatMessage::factory()->by($owner)->count(11)->create();
+    chatAs($teen);
+
+    foreach ($messages->take(10) as $message) {
+        chatReport($message->id)->assertNoContent();
+    }
+
+    chatReport($messages->last()->id)->assertStatus(429)->assertJsonPath('code', 'rate_limited');
+    expect(ChatMessageReport::query()->count())->toBe(10);
+
+    $this->travel(61)->minutes();
+    chatReport($messages->last()->id)->assertNoContent();
+});
+
+it('deletes reports with their message: retention, account erasure, family deletion', function () {
+    [$owner, $teen] = chatFamily();
+    $adult = addMember($owner->family, 35);
+    $old = ChatMessage::factory()->by($owner)->create(['created_at' => now()->subDays(8)]);
+    $byAdult = ChatMessage::factory()->by($adult)->create();
+    $byOwner = ChatMessage::factory()->by($owner)->create();
+    ChatMessageReport::factory()->of($old, $teen)->create();
+    ChatMessageReport::factory()->of($byAdult, $teen)->create();
+    $reportByAdult = ChatMessageReport::factory()->of($byOwner, $adult)->create();
+    $kept = ChatMessageReport::factory()->of($byOwner, $teen)->create();
+
+    // Retention: the message and its reports go.
+    app(PruneChatMessages::class)->handle();
+    expect(ChatMessageReport::query()->where('chat_message_id', $old->id)->exists())->toBeFalse();
+
+    // Erasure: the adult's messages (with their reports) and the reports the adult made go.
+    app(EraseUser::class)->handle($adult->user);
+    expect(ChatMessageReport::query()->pluck('id')->all())->toBe([$kept->id])
+        ->and($reportByAdult->fresh())->toBeNull();
+
+    // Family deletion: everything goes.
+    app(DeleteFamily::class)->handle($owner->family, false);
+    expect(ChatMessageReport::query()->count())->toBe(0);
+});
+
+it('never exposes reports to staff: no Filament resource, no activity log', function () {
+    $models = collect(Filament::getPanel('admin')->getResources())->map(fn (string $resource) => $resource::getModel());
+
+    expect($models)->not->toContain(ChatMessage::class)->not->toContain(ChatMessageReport::class)
+        ->and(class_uses_recursive(ChatMessageReport::class))->not->toHaveKey(LogsActivity::class);
+
+    $filamentSources = collect(File::allFiles(app_path('Filament')))->map(fn (SplFileInfo $file) => $file->getContents())->implode("\n");
+    expect($filamentSources)->not->toContain('ChatMessage')->not->toContain('chat_message');
+
+    [$owner, $teen] = chatFamily();
+    chatAs($teen);
+    chatReport(ChatMessage::factory()->by($owner)->create()->id)->assertNoContent();
+    expect(DB::table('activity_log')->where('subject_type', (new ChatMessageReport)->getMorphClass())->count())->toBe(0);
 });

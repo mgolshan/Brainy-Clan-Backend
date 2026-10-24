@@ -66,6 +66,7 @@ class PostChatMessage
             ->where('family_id', $member->family_id)
             ->where('client_id', $clientId)
             ->with(['author' => fn ($query) => $query->select(['id', 'family_id', 'user_id', 'nickname', 'status'])->with('user:id,avatar')])
+            ->when($member->isAdmin(), fn ($query) => $query->withExists('reports as reported'))
             ->first();
     }
 }

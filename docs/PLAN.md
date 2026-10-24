@@ -125,6 +125,18 @@ as written there; if something must change, update `docs/API.md` first and note 
     locked-out or forgetful adult can always get back in. Replaces the "per-email throttle"
     trade-off question.
   - **Devices:** iPhone and iPad (app milestone; layouts get a max content width on tablets).
+- **"How to play" help center (2026-10-24, Moe):** a parents' guide at `https://brainyclan.com/help`
+  (en/fr), served by the website like the other pages: short, well-sectioned articles with real app
+  screenshots, a sticky table of contents and an instant search box (small script under the
+  existing CSP with a nonce; without JavaScript the page still works with the contents list and
+  anchors; plus a server-side `?q=` search fallback). Sections: getting started (create a family,
+  invite kids with a code, sign in on a new device), playing (categories, question types, brain
+  games, second chances, lives/blunders, points), goals and rewards, worlds and unlocks, Clan
+  characters, family chat and reports, parent controls (difficulty, chat off, notifications,
+  quiet hours, accessibility), plans and payments, privacy and safety, troubleshooting (lockout,
+  forgot password, offline). Each article: 2–6 short steps, one screenshot at most, collapsed
+  details. The app links to it from Profile → "How to play" and from empty/help states (deep
+  links to a section anchor). Content must stay true to the product; updated with each feature.
 - **Family chat (2026-10-23, Moe):** one group chat per family, emoji text only, safe against
   XSS/script injection (plain text end to end: validated + normalized on the server, rendered as
   plain text in the app; no HTML/Markdown/links/attachments), retention free 7 days / Family plan

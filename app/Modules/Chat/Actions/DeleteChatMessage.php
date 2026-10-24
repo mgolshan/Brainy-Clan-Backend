@@ -3,13 +3,15 @@
 namespace App\Modules\Chat\Actions;
 
 use App\Modules\Chat\Models\ChatMessage;
+use App\Modules\Chat\Models\ChatMessageReport;
 use App\Modules\Core\Exceptions\ApiException;
 use App\Modules\Family\Models\FamilyMember;
 
 /**
  * `DELETE /family/chat/messages/{id}`: the author or a family admin deletes a message of their own
  * family (another family's id → 404, someone else's message as a non-admin → 403). The text is
- * erased (body null) and the row stays as a tombstone ("Message deleted"). Deleting twice is a no-op.
+ * erased (body null) and the row stays as a tombstone ("Message deleted"); its reports are deleted
+ * (no longer `reported`). Deleting twice is a no-op.
  */
 class DeleteChatMessage
 {
@@ -33,5 +35,8 @@ class DeleteChatMessage
         }
 
         $message->forceFill(['body' => null, 'deleted_at' => now()])->save();
+
+        // The reports are handled: nothing is left to report on a tombstone.
+        ChatMessageReport::query()->where('chat_message_id', $message->id)->delete();
     }
 }

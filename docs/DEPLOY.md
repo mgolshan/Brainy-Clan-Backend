@@ -167,7 +167,8 @@ Never run `DatabaseSeeder` or the demo seeders in production (demo users with kn
 **Admin user** (Filament at `https://api.brainyclan.com/admin`):
 
 ```sh
-$C exec app php artisan tinker --execute '$u = new App\Modules\Identity\Models\User(["display_name" => "Moe", "email" => "you@example.com", "locale" => "en"]); $u->password = "a-long-unique-password"; $u->is_staff = true; $u->save();'
+$C exec app php artisan tinker --execute '$u = new App\Modules\Identity\Models\User(["display_name" => "Moe", "email" => "you@example.com", "locale" => "en"]); $u->password = "a-long-unique-password"; $u->save();'
+$C exec app php artisan staff:role you@example.com admin   # staff roles: admin | support | none
 ```
 
 **Checks:**
@@ -218,10 +219,12 @@ Eloquent write and after each `migrate`; if you ever change those tables with ra
 ## 8. Monitoring
 
 - **Errors:** Sentry (section 10). Personal data is scrubbed before sending (`SentryScrubber`).
-- **Uptime (deep check):** a free external monitor (UptimeRobot or Better Stack) every 5 minutes on
+- **Uptime (deep check):** an external monitor every 5 minutes on
   `https://api.brainyclan.com/api/v1/health/deep` with the request header
-  `X-Health-Token: <HEALTH_DEEP_TOKEN>` (UptimeRobot: HTTP(s) monitor → *Custom HTTP Headers*; Better
-  Stack: *Request headers*). Alert when the status is not 200: 503 means MySQL, Redis, the scheduler
+  `X-Health-Token: <HEALTH_DEEP_TOKEN>`. The monitor must support custom request headers: in
+  UptimeRobot that is a paid feature (*Custom HTTP Headers*); check your plan or use another
+  monitor whose plan includes request headers (e.g. Better Stack — verify on its current free
+  plan). A free plan without headers can still watch the shallow `/api/v1/health`. Alert when the status is not 200: 503 means MySQL, Redis, the scheduler
   (heartbeat older than 3 minutes) or Horizon failed — the JSON body says which check
   (docs/API.md "Health"). Set `HEALTH_DEEP_TOKEN` in `.env.prod` first (`openssl rand -hex 32`),
   then `$C up -d`; without it the URL answers 404. Alert contacts: Moe (email + SMS) and the
@@ -286,6 +289,9 @@ only. Never: request bodies, cookies, `Authorization`, names, nicknames, birth d
 Traces are sampled at 5 % (`SENTRY_TRACES_SAMPLE_RATE`). With an empty DSN Sentry is off.
 
 ## 11. Costs (estimate, October 2026)
+
+> Hetzner raised prices and changed its server line-up in 2026; the table below is out of date.
+> Use the researched, dated figures and the scaling stages in `docs/DEPLOYMENT_GUIDE.md`.
 
 | Item | Monthly |
 | --- | --- |

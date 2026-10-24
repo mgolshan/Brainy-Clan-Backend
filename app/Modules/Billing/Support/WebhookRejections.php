@@ -14,7 +14,10 @@ class WebhookRejections
 {
     public const string PROVIDER_ADMOB = 'admob';
 
-    /** AdMob SSV: missing or invalid ECDSA signature (answered 400 `ssv_signature_invalid`). */
+    /** Paddle webhook (`POST /webhooks/paddle`); only `signature_invalid` (answered 401). */
+    public const string PROVIDER_PADDLE = 'paddle';
+
+    /** Missing or invalid signature: AdMob SSV ECDSA (answered 400 `ssv_signature_invalid`) or `Paddle-Signature` (401). */
     public const string REASON_SIGNATURE_INVALID = 'signature_invalid';
 
     /** AdMob SSV: signed, but custom data, member or play session unusable (answered 200 `ignored`). */

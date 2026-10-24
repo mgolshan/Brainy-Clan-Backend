@@ -379,6 +379,44 @@ curl http://localhost:8080/api/v1/health
 
 ## Log
 
+### 2026-10-24 deployment guide
+- `docs/DEPLOYMENT_GUIDE.md` (copy in the parent folder for convenience): what runs where, Hetzner scaling
+  stages 0–2 with October 2026 prices and triggers, pre-Stage-1 code/config checklist, deploy/secrets/env per
+  service, iOS/Android/web publishing, OTA and versioning, launch cost table, launch day and who does what.
+  Docs only, no code changed. Gaps found: DEPLOY.md §6 admin command still uses the dropped `is_staff`
+  (use `staff:role`), UptimeRobot custom headers are paid, DEPLOY.md cost table predates the 2026 Hetzner
+  prices, no `public/app-ads.txt`.
+
+### 2026-10-24 chat report + Paddle rejections tile
+- **Chat report** (`docs/API.md` "Family chat", Apple guideline 1.2): migration
+  `2026_10_24_900200_create_chat_message_reports_table` (`chat_message_id`, `reporter_member_id`, `created_at`;
+  unique pair; both FKs cascade; dev DB migrated, no fresh). `ChatMessageReport` model + factory (ids only, no
+  text, no activity log, no Filament resource). `ReportChatMessage` action, `POST /family/chat/messages/{id}/report`
+  (throttle `chat-report` 10/hour per member; 204 idempotent incl. racing retries via the unique index; own message
+  422; another family / past retention 404; deleted message 204 no-op; 403 `chat_disabled` / 404 non-members like
+  the other chat routes). Only a new report fires `MessageReported` (ids only) → queued
+  `NotifyFamilyChatReport`: push `family_chat_report` to the family's active admins with chat on, except the
+  reporter; en "Sam reported a message in the family chat" / fr "Sam a signalé un message dans la discussion
+  familiale"; data `{ type, message_id }`; no text; preferences + quiet hours as usual.
+- **Message `reported`:** `withExists('reports as reported')` added to the list/replay query **only for admins**
+  (an EXISTS subquery in the same select — the constant-query test now also seeds reports and stays green); members
+  always get `false`. Deleting a message (tombstone) deletes its reports.
+- **Preferences:** `types.family_chat_report` (default on) in `NotificationDefaults` + resource (every member sees
+  the key; only admins receive it).
+- **Erasure/retention:** messages deleted by retention, erasure or family deletion take their reports (FK cascade);
+  `EraseUser` also deletes the reports the erased user made.
+- **Dashboard:** `WebhookRejections::PROVIDER_PADDLE`; the health query now reads AdMob and Paddle rejections in one
+  query; the "Webhook errors" card shows "Failed RevenueCat/Paddle events · N Paddle bad signatures · 7 days" (red
+  when either is > 0). Query counts unchanged (dashboard constant-query test seeds Paddle rows too).
+- Docs: API.md changelog clarifications + `reported`/`family_chat_report` in the examples; OPERATIONS_HANDBOOK §5.4,
+  §5.5 (Paddle row), §6.1, §9.1 FAQ (reports), M8, §14.1 item 5 (Apple 1.2 report mechanism exists), §14.2.
+- Tests: `FamilyChatTest` +11 report tests (idempotency, 422/404/403, deleted no-op, `reported` admin-only, push
+  recipients/payload/fr, reporter-admin excluded, preference, rate limit, cascade on retention/erasure/family
+  deletion, no Filament/activity log) and report routes added to the auth/404 tests; `DashboardTest`, `RouteSecurityTest` (report route on `throttle:chat-report`) and
+  `NotificationsTest` updated.
+- Open: the privacy policy does not mention reports yet (they stay inside the family; lawyer to decide whether to
+  add a line — no version bump done). `/me/export` does not include the reports a user made (ids only).
+
 ### 2026-10-24 B10 Paddle, pricing, affiliates (backend)
 - **Contract** (`docs/API.md` B10) implemented as written; clarifications added to its changelog (no shape change).
   Paddle Billing API v1 over plain `Http` (no SDK, no new composer dependency): `PaddleClient` (create

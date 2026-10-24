@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Collection;
  * `GET /family/chat/messages` (docs/API.md "Family chat"): one page of the member's family chat by
  * id cursor — newest first without a cursor or with `before`, oldest first with `after` (polling).
  * Only the member's own family; messages past retention are hidden. A fixed number of queries for
- * any page size: messages, authors, their users (avatars) and the unread count.
+ * any page size: messages (with `reported` as an EXISTS subquery for admins), authors, their users
+ * (avatars) and the unread count.
  */
 class ListChatMessages
 {
@@ -37,6 +38,8 @@ class ListChatMessages
             ->when($after !== null, fn ($query) => $query->where('id', '>', $after)->orderBy('id'))
             ->when($after === null, fn ($query) => $query->when($before !== null, fn ($query) => $query->where('id', '<', $before))->orderByDesc('id'))
             ->with(['author' => fn ($query) => $query->select(['id', 'family_id', 'user_id', 'nickname', 'status'])->with('user:id,avatar')])
+            // `reported` only for admins: an EXISTS subquery in the same select (no extra query).
+            ->when($member->isAdmin(), fn ($query) => $query->withExists('reports as reported'))
             ->limit($limit + 1)
             ->get();
 

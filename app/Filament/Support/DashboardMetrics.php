@@ -204,11 +204,13 @@ class DashboardMetrics
     }
 
     /**
-     * Failed jobs, webhook errors, AdMob SSV rejections, push readiness and account-deletion requests.
+     * Failed jobs, webhook errors (incl. Paddle signature rejections), AdMob SSV rejections, push
+     * readiness and account-deletion requests.
      *
      * @return array{
      *     failed_jobs: int, failed_jobs_day: int, failed_push_jobs: int,
-     *     webhook_errors_week: int, admob_ssv_rejections_week: int, admob_ssv_signature_invalid_week: int,
+     *     webhook_errors_week: int, paddle_signature_rejections_week: int,
+     *     admob_ssv_rejections_week: int, admob_ssv_signature_invalid_week: int,
      *     devices: int, devices_with_push: int,
      *     deletion_requests_pending: int, deletion_requests_blocked_week: int
      * }
@@ -226,11 +228,14 @@ class DashboardMetrics
                 ->selectRaw('COALESCE(SUM(CASE WHEN payload LIKE ? THEN 1 ELSE 0 END), 0) AS push', ['%'.class_basename(DeliverPushNotification::class).'%'])
                 ->first();
 
-            $ssvRejections = DB::table('webhook_rejections')
-                ->where('provider', WebhookRejections::PROVIDER_ADMOB)
+            // One query for both providers: AdMob SSV (all reasons + bad signatures) and Paddle
+            // webhook signature rejections.
+            $rejections = DB::table('webhook_rejections')
+                ->whereIn('provider', [WebhookRejections::PROVIDER_ADMOB, WebhookRejections::PROVIDER_PADDLE])
                 ->where('day', '>=', $weekStart->toDateString())
-                ->selectRaw('COALESCE(SUM(hits), 0) AS total')
-                ->selectRaw('COALESCE(SUM(CASE WHEN reason = ? THEN hits ELSE 0 END), 0) AS signature_invalid', [WebhookRejections::REASON_SIGNATURE_INVALID])
+                ->selectRaw('COALESCE(SUM(CASE WHEN provider = ? THEN hits ELSE 0 END), 0) AS admob_total', [WebhookRejections::PROVIDER_ADMOB])
+                ->selectRaw('COALESCE(SUM(CASE WHEN provider = ? AND reason = ? THEN hits ELSE 0 END), 0) AS admob_signature_invalid', [WebhookRejections::PROVIDER_ADMOB, WebhookRejections::REASON_SIGNATURE_INVALID])
+                ->selectRaw('COALESCE(SUM(CASE WHEN provider = ? AND reason = ? THEN hits ELSE 0 END), 0) AS paddle_signature_invalid', [WebhookRejections::PROVIDER_PADDLE, WebhookRejections::REASON_SIGNATURE_INVALID])
                 ->first();
 
             $devices = DB::table('devices')
@@ -252,8 +257,9 @@ class DashboardMetrics
                     ->where('outcome', WebhookEvent::OUTCOME_FAILED)
                     ->where('created_at', '>=', $weekStart)
                     ->count(),
-                'admob_ssv_rejections_week' => (int) $ssvRejections?->total,
-                'admob_ssv_signature_invalid_week' => (int) $ssvRejections?->signature_invalid,
+                'paddle_signature_rejections_week' => (int) $rejections?->paddle_signature_invalid,
+                'admob_ssv_rejections_week' => (int) $rejections?->admob_total,
+                'admob_ssv_signature_invalid_week' => (int) $rejections?->admob_signature_invalid,
                 'devices' => (int) $devices?->total,
                 'devices_with_push' => (int) $devices?->with_push,
                 'deletion_requests_pending' => (int) $deletions?->pending,

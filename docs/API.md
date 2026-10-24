@@ -653,7 +653,7 @@ server from RevenueCat and Paddle revenue events (admin-only reports; no public 
 - `PUT /me/push-token` (auth) — Body: `token` (Expo push token `ExponentPushToken[...]`), `platform`.
   Stored on the current device (and removed from any other device that had it). → 204; 422 when the token has no device. `DELETE /me/push-token` → 204 (also cleared on logout).
 - `GET /me/notification-preferences` (auth, needs family) → `{ "data": { "types": { "goal_reached": true,
-  "period_closed": true, "family_activity": true, "daily_reminder": false, "family_chat": true }, "quiet_from": "20:00",
+  "period_closed": true, "family_activity": true, "daily_reminder": false, "family_chat": true, "family_chat_report": true }, "quiet_from": "20:00",
   "quiet_to": "07:30", "reminder_time": "17:00" } }` (times in the family timezone; children default
   to quiet hours 19:30–07:30, everyone else 21:30–07:00; `quiet_from`/`quiet_to` both `null` = no quiet
   hours, only one of them → 422). `PATCH /me/notification-preferences` — same shape, all optional.
@@ -674,7 +674,7 @@ signed-in user without an active family membership gets **404 `not_found`** here
 **Message**
 ```json
 { "id": 812, "member_id": 7, "nickname": "Sam", "avatar": "fox", "body": "We won! 🎉",
-  "deleted": false, "client_id": "6f1c…", "created_at": "2026-10-23T18:02:11Z" }
+  "deleted": false, "client_id": "6f1c…", "created_at": "2026-10-23T18:02:11Z", "reported": false }
 ```
 - `body` is `null` when `deleted` is true (the app shows "Message deleted"). `nickname`/`avatar`
   are the author's current values; an author who left the family shows as "Former member"
@@ -700,6 +700,14 @@ signed-in user without an active family membership gets **404 `not_found`** here
 - `DELETE /family/chat/messages/{id}` — the author, or a family admin, deletes a message (it stays
   as a tombstone). → 204. Others → 403 `forbidden`; another family's id → 404.
 - `POST /family/chat/read` — Body `{ last_read_id }` (only moves forward; capped at the family's newest message id). → 204.
+- `POST /family/chat/messages/{id}/report` (2026-10-24; Apple guideline 1.2) — any member with chat
+  enabled reports another member's message → 204 (idempotent per reporter and message; own messages
+  → 422; another family's id → 404). The report goes **only to the family's admins** (never to staff
+  — chats stay family-only): a push `family_chat_report` ("Sam reported a message in the family
+  chat", no message text; `data { type, message_id }`; normal preference and quiet-hours rules,
+  preference key `family_chat_report`, default on, admins only) and the
+  message gains `"reported": true` for admins (other members always see `false`). Admins then delete
+  the message or turn chat off for that member (existing tools). Rate limit 10 reports/hour per member.
 - `GET /family/chat/unread` → `{ "data": { "unread": 3 } }` (cheap; the app polls it for the tab badge).
 - The app polls `after` every ~4 s while the chat screen is open and the unread count every ~60 s
   otherwise (plus a push). Real-time sockets may replace polling later without changing these shapes.
@@ -808,3 +816,5 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-24 — B10: `GET /pricing`, website subscribe flow with Paddle (merchant of record), `GET /family/web-checkout/availability`, Paddle webhook, `store: paddle`, `POST /family/subscription/manage-link`, referral codes (`POST /family/referral-code`, `/r/{code}`, offer codes), new error codes.
 - 2026-10-24 — B11 (additive, monitoring only): `GET /health/deep` with `X-Health-Token` (MySQL, Redis, scheduler heartbeat, Horizon, failed jobs last hour; 200/503). `GET /health` unchanged.
 - 2026-10-24 — B10 clarifications (backend built, no shape change): `POST /family/subscription/manage-link` → 404 `not_found` when the family has no subscription, 503 `web_checkout_unavailable` when Paddle isn't configured or reachable (portal links are temporary — open right away); `GET /family/web-checkout/availability` → 422 for a `storefront` that isn't 3 letters, `link_allowed: false` without one; `POST /family/referral-code` → a malformed code is also 422 `referral_code_invalid`; `GET /family/subscription` shows the entitled plan (store or web) first. Website: the emailed checkout link creates one Paddle transaction — opening it again within 30 min returns to the same checkout; without a Paddle hosted checkout the link goes to `/subscribe/pay` (Paddle.js). Terms and privacy versions bumped to `2026-10-24` (re-acceptance).
+- 2026-10-24 — Chat report: `POST /family/chat/messages/{id}/report` (to family admins only), Message `reported` (admins), push/preference `family_chat_report`.
+- 2026-10-24 — Chat report clarifications (backend built, no shape change): reporting an already deleted message → 204 no-op; a message past retention → 404; own message → 422 `validation_failed` (`errors.message`); the push goes to active admins with chat on, except the reporter; deleting a message (tombstone) clears its reports (`reported` false); reports are deleted with the message (retention, erasure, family deletion) and with the reporter's account; `types.family_chat_report` is in every member's preferences (only admins receive it). Message examples show `reported`.

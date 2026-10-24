@@ -166,6 +166,9 @@ function dashboardDataset(): array
     DB::table('webhook_rejections')->insert([
         ['provider' => WebhookRejections::PROVIDER_ADMOB, 'reason' => WebhookRejections::REASON_INVALID_PAYLOAD, 'day' => $now->subDays(3)->toDateString(), 'hits' => 1, 'created_at' => $now, 'updated_at' => $now],
         ['provider' => WebhookRejections::PROVIDER_ADMOB, 'reason' => WebhookRejections::REASON_SIGNATURE_INVALID, 'day' => $now->subDays(10)->toDateString(), 'hits' => 5, 'created_at' => $now, 'updated_at' => $now],
+        // Paddle webhook signature rejections: 4 today, 9 older (kept apart from AdMob).
+        ['provider' => WebhookRejections::PROVIDER_PADDLE, 'reason' => WebhookRejections::REASON_SIGNATURE_INVALID, 'day' => $now->toDateString(), 'hits' => 4, 'created_at' => $now, 'updated_at' => $now],
+        ['provider' => WebhookRejections::PROVIDER_PADDLE, 'reason' => WebhookRejections::REASON_SIGNATURE_INVALID, 'day' => $now->subDays(12)->toDateString(), 'hits' => 9, 'created_at' => $now, 'updated_at' => $now],
     ]);
 
     Device::factory()->create(['user_id' => $alpha->user_id, 'push_token' => 'ExponentPushToken[a]']);
@@ -276,6 +279,7 @@ it('computes the system health figures', function () {
         'failed_jobs_day' => 1,
         'failed_push_jobs' => 1,
         'webhook_errors_week' => 1,
+        'paddle_signature_rejections_week' => 4,
         'admob_ssv_rejections_week' => 3,
         'admob_ssv_signature_invalid_week' => 2,
         'devices' => 3,
@@ -290,6 +294,7 @@ it('computes the system health figures', function () {
         ->assertSee('1 blocked in 7 days')
         ->assertSee('AdMob SSV rejections')
         ->assertSee('2 bad signatures · 7 days')
+        ->assertSee('Failed RevenueCat/Paddle events · 4 Paddle bad signatures · 7 days')
         ->assertSee('/horizon/failed')
         ->assertSee(WebhookEventResource::getUrl('index', ['filters' => ['outcome' => ['value' => WebhookEvent::OUTCOME_FAILED]]]))
         ->assertSee(AccountDeletionRequestResource::getUrl('index', ['filters' => ['status' => ['value' => AccountDeletionRequest::STATUS_PENDING]]]));
@@ -363,6 +368,7 @@ it('runs the same number of queries whatever the number of families and sessions
         ContentBatch::factory()->create(['category_id' => $category->id, 'status' => ContentBatch::STATUS_REVIEW]);
         WebhookEvent::factory()->create(['outcome' => WebhookEvent::OUTCOME_FAILED, 'family_id' => $owner->family_id]);
         DB::table('webhook_rejections')->insert(['provider' => WebhookRejections::PROVIDER_ADMOB, 'reason' => WebhookRejections::REASON_SIGNATURE_INVALID, 'day' => CarbonImmutable::now()->subDays($i)->toDateString(), 'hits' => $i, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('webhook_rejections')->insert(['provider' => WebhookRejections::PROVIDER_PADDLE, 'reason' => WebhookRejections::REASON_SIGNATURE_INVALID, 'day' => CarbonImmutable::now()->subDays($i)->toDateString(), 'hits' => $i, 'created_at' => now(), 'updated_at' => now()]);
     }
 
     expect($count())->toBe($small)

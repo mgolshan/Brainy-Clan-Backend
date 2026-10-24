@@ -3,6 +3,7 @@
 namespace App\Modules\Identity\Actions;
 
 use App\Modules\Chat\Models\ChatMessage;
+use App\Modules\Chat\Models\ChatMessageReport;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Models\Invite;
 use App\Modules\Family\Models\SignInCode;
@@ -77,8 +78,10 @@ class EraseUser
                     ->whereNull('voided_at')
                     ->update(['voided_at' => now()]);
                 NotificationPreference::query()->whereIn('family_member_id', $memberIds)->delete();
-                // Family chat: the user's messages go for good, in every family they were in.
+                // Family chat: the user's messages go for good, in every family they were in (their
+                // reports with them, FK cascade), and so do the reports they made.
                 ChatMessage::query()->whereIn('family_member_id', $memberIds)->delete();
+                ChatMessageReport::query()->whereIn('reporter_member_id', $memberIds)->delete();
             }
 
             Invite::query()

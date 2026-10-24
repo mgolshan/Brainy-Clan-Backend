@@ -502,7 +502,7 @@ Note: `/api/v1/health` is a liveness check for the app — it does **not** test 
 Horizon. `/api/v1/health/deep` (token in `X-Health-Token`, docs/API.md "Health") checks MySQL,
 Redis, the scheduler heartbeat (< 3 min), Horizon (running) and failed jobs in the last hour; the
 uptime monitor calls it every 5 minutes. Admin dashboard (`/admin`) "System health" cards: failed
-jobs (total, last 24 h), webhook errors (failed RevenueCat events, 7 days), AdMob SSV rejections
+jobs (total, last 24 h), webhook errors (failed RevenueCat/Paddle events + Paddle bad signatures, 7 days), AdMob SSV rejections
 (bad signatures / unusable data, 7 days), push-ready devices + failed push jobs, pending account
 deletions.
 
@@ -520,7 +520,7 @@ Always: open an incident note (time, symptom, severity), take no destructive act
 | **Redis down** | `$C ps redis`, `$C exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping'` | `$C restart redis`, then `$C restart app horizon scheduler`. Effects while down: no queues, no cache, lockout counters reset. |
 | **TLS / Caddy renewal failure** | Let's Encrypt mail to `ACME_EMAIL`; `$C logs --tail=300 caddy`; `curl -vI https://api.brainyclan.com 2>&1 \| grep -i expire`; ports 80/443 open? DNS correct? | `$C restart caddy`. DNS or firewall changes [Moe]. |
 | **RevenueCat webhook failures** | Admin → Billing → Webhook events (filter outcome `failed`); dashboard "Webhook errors"; RevenueCat dashboard delivery log | Wrong secret (401) → `REVENUECAT_WEBHOOK_SECRET` mismatch [Moe]. Affected family: the admin taps Restore purchases / the app calls `POST /family/subscription/sync`; hourly reconciliation catches expiries. Manual tier change on the family's *Edit* page [Moe]. |
-| **Paddle webhook failures** | Admin → Billing → Webhook events (provider `paddle`); bad signatures are counted in `webhook_rejections` (`paddle` / `signature_invalid`) — dashboard tile **(not built yet)** | any rejection streak → check `PADDLE_WEBHOOK_SECRET` |
+| **Paddle webhook failures** | Admin → Billing → Webhook events (provider `paddle`); bad signatures (401) are counted per day in `webhook_rejections` (`paddle` / `signature_invalid`) and shown on the dashboard "Webhook errors" card ("N Paddle bad signatures · 7 days"); Paddle dashboard → Notifications delivery log | Any rejection streak → check `PADDLE_WEBHOOK_SECRET` matches the Paddle notification destination's secret [Moe]; a few scattered rejections with no failed deliveries in Paddle = someone probing the endpoint (no action). |
 | **AdMob SSV failures** | Dashboard "AdMob SSV rejections" (7 days; bad signatures vs. unusable custom data, counted per day in `webhook_rejections`); users report "We couldn't confirm your reward yet"; `$C logs caddy \| grep admob-ssv` (400 = `ssv_signature_invalid`) | Check the ad unit's SSV URL `https://api.brainyclan.com/api/v1/webhooks/admob-ssv` (Verify URL in AdMob); Google key fetch needs outbound HTTPS. Users still have the redemption round; no compensation needed. |
 | **Push failures** | Dashboard "failed push jobs"; Horizon failed jobs `DeliverPushNotification`; Expo status page | Expo receipts clear invalid tokens automatically. All iOS or all Android failing → APNs key / FCM V1 credentials in EAS (App release agent). `EXPO_ACCESS_TOKEN` only if Enhanced push security is on. |
 | **AI generator failures** | Batch status `failed` with the error on the AI batch page; Horizon `ai` queue | Missing/invalid `ANTHROPIC_API_KEY` or spend limit reached [Moe]; JSON/length error → smaller batch (count) or `CONTENT_AI_MAX_TOKENS` [Moe]; then **Retry** once. |
@@ -592,7 +592,7 @@ Flag: any line 20% over expected, Sentry quota > 70%, AI spend > 70% of the limi
 | Errors (backend + app) | Sentry | any new issue → triage within 24 h | one issue > 50 events/hour, or a crash-free rate drop after a release → P1/P2 |
 | Horizon wait time | "Long wait detected" mail to `OPS_ALERT_EMAIL`, `/horizon` (admin) | `default` > 30 s | `default` > 60 s or `ai` > 900 s (config thresholds, mailed) → P2 |
 | Failed jobs | "Queued job failed" mail (one per job class per 15 min), dashboard "Failed jobs", `queue:failed` | > 0 in 24 h | > 10 in 24 h → P2 |
-| Webhook errors | dashboard "Webhook errors" (failed RevenueCat events, 7 days), Billing → Webhook events | > 0 | > 5 in a day, or any 401 (secret mismatch) → P1 |
+| Webhook errors | dashboard "Webhook errors" (failed RevenueCat/Paddle events + Paddle bad signatures, 7 days), Billing → Webhook events | > 0 | > 5 in a day, or any 401 (secret mismatch; Paddle bad signatures rising day over day) → P1 |
 | AdMob SSV rejections | dashboard "AdMob SSV rejections" (7 days) | unusable custom data > 0 | bad signatures rising day over day (wrong SSV URL / key fetch failing) → P2 |
 | Push health | dashboard "Push-ready devices", failed push jobs | failed push jobs > 0 | all push failing → P2 |
 | Pending deletions | dashboard "Pending deletions" | "blocked in 7 days" > 0 → Support follow-up | — |
@@ -781,6 +781,7 @@ children's details. Never confirm whether an email has an account.
 | **Subscription: manage, cancel, refund** | The Family plan is bought in the app through the **App Store or Google Play**; manage or cancel in your store account's subscription settings (renews automatically unless cancelled at least 24 h before the end of the period). Refunds for store purchases are decided by Apple / Google: Apple at reportaproblem.apple.com, Google in the Play Store order history. One purchase covers the whole family (up to 7 members). Didn't unlock? Open Family → Plan → **Restore purchases**; it can take up to ~30 seconds. **Web purchase (Paddle):** built but not launched; once live, web plans are managed in the Paddle customer portal (app: Subscription → Manage, or the link in Paddle's receipt) and refunds go through Paddle within 14 days (terms §6). |
 | **What does the Family plan add?** | Up to 7 members (free: 2), all categories (free: 3), unlimited goals (free: 1), 3 free second chances per member per day, no ads, chat history kept 1 year (free: 7 days), special worlds. Prices: show what the store shows; do not quote planned prices. |
 | **Chat: who can see it, how long is it kept?** | Only your family's members — not other families and not our staff. Text and emoji only. Messages are deleted after **7 days** on the free plan and **1 year** on the Family plan; after a downgrade the shorter period applies. Parents can turn chat off for any member and delete any message. We cannot recover, read or send you chat messages. |
+| **Chat: how do I report a message? / Someone reported a message — what now? / Can you look at a reported message?** | Open the menu of another member's message in the chat (long-press) → **Report**. The report goes **only to the family's parents/admins** (a push "Sam reported a message in the family chat", without the message text) and the message shows as reported to them. It never comes to us: our staff cannot see chat messages or reports. The admin then deletes the message and/or turns chat off for that member (the member's settings in the family screen). Reporting the same message twice changes nothing; you cannot report your own message. Reports disappear with the message (deletion, the 7-day / 1-year retention, account deletion). A real safety concern about a child → M10 (escalate, never ask for the chat text). |
 | **Why is a world locked? / How do I unlock it?** | Some worlds are free, some unlock with lifetime points or a daily streak, three come with the Family plan. Seeded values: free Candy Land, Glass, Modern, Classic; points Jungle 50, Sticker 100, Space 150, Nature 200; streak Sea 3 days, Lo-fi 7 days; Family plan Dino, Neon, Midnight (live values: Admin → Policy → Theme worlds). Earned worlds stay unlocked; Family-plan worlds lock again when the plan ends. |
 | **Why does my child never see the video option?** | Children never see ads. Teens/adults on the free plan can choose a short video for a second chance; the Family plan has no ads. |
 | **"Time for an update"** | The app version is too old for the service; update from the App Store / Google Play. |
@@ -799,7 +800,7 @@ children's details. Never confirm whether an email has an account.
 - **M6 Subscription not active:** Restore purchases + 30 s wait; if still free → escalate with
   family id (from the admin, not from the user) and store (Apple/Google), no personal data in the note.
 - **M7 Refund:** store-specific refund links; "We can't issue refunds for store purchases ourselves."
-- **M8 Chat privacy:** FAQ chat answer.
+- **M8 Chat privacy:** FAQ chat answer (reports: FAQ "how do I report a message" answer).
 - **M9 Content error reported:** "Thank you! We've checked the question and removed it while we fix it." (after archiving, §8.5)
 - **M10 Safety concern about a child** → no macro: escalate to Moe immediately (P1).
 
@@ -1049,9 +1050,11 @@ Found while writing this handbook (2026-10-24). Until fixed, follow the safer re
 ### 14.1 Open
 
 1. **Restore drill frequency:** DEPLOY.md says every 3 months; this handbook sets monthly.
-2. **Preview/development EAS profiles** have no `env` in `eas.json`: their API URL comes only from
-   EAS environment variables; if `EXPO_PUBLIC_API_URL` is missing there the app falls back to
-   `http://localhost:8080`.
+2. ~~**Preview/development EAS profiles** have no `env` in `eas.json`~~ — **fixed 2026-10-24
+   (app):** `development` sets `EXPO_PUBLIC_API_URL` to a LAN dev-server placeholder (fill in
+   before building) and `preview` to `https://api.brainyclan.com` (+ website/support/legal URLs);
+   no build falls back to `http://localhost:8080` (app README "Backend URL in EAS builds", app
+   OPERATIONS_HANDBOOK §3).
 3. **External AI ops team:** support emails contain personal data; whether the ops AI provider may
    process them must be decided with the lawyer and listed in the privacy policy [Moe].
 4. **Android push config:** `app.json` has no `android.googleServicesFile` yet; Android push
@@ -1059,9 +1062,13 @@ Found while writing this handbook (2026-10-24). Until fixed, follow the safer re
    Native change → new build [Moe provides the Firebase project].
 5. **Store answers to verify live:** STORE.md now declares the family chat, but the Apple age
    rating (expected 4+, may be raised by "Messaging and chat"), Apple's data type for messages
-   ("Other User Content" vs "Emails or Text Messages") and a possible Guideline 1.2 request for an
-   in-app report/block button must be checked in App Store Connect; the lawyer re-checks the
-   privacy answers and policy wording for the chat [Moe].
+   ("Other User Content" vs "Emails or Text Messages") must be checked in App Store Connect; the
+   lawyer re-checks the privacy answers and policy wording for the chat (incl. that reports go to
+   the family's admins only) [Moe]. **Guideline 1.2 (user-generated content):** the report
+   mechanism exists since 2026-10-24 (backend: `POST /family/chat/messages/{id}/report` → push to
+   the family's admins, `reported` flag for them; admins delete the message or turn chat off for
+   the member = the "block" tool; no strangers can reach the chat). Mention it in the App Review
+   notes; if Apple still asks for a developer-side contact, reply via Moe — staff never read chats.
 
 ### 14.2 Fixed (2026-10-24, B11 ops hardening, code)
 
@@ -1070,7 +1077,10 @@ Found while writing this handbook (2026-10-24). Until fixed, follow the safer re
   scheduled every 5 minutes, scheduler heartbeat `ops:heartbeat` every minute.
 - **Health:** `/api/v1/health/deep` (token-protected) checks MySQL, Redis, scheduler heartbeat,
   Horizon and failed jobs; the shallow `/api/v1/health` is unchanged.
-- **Dashboard:** "AdMob SSV rejections" card next to "Webhook errors" (counts per day, no payloads).
+- **Dashboard:** "AdMob SSV rejections" card next to "Webhook errors" (counts per day, no payloads);
+  Paddle bad webhook signatures added to the "Webhook errors" card (2026-10-24).
+- **Chat report (Apple 1.2):** members report a message to their family's admins (push without
+  text, `reported` flag for admins only); never visible to staff (2026-10-24).
 - **Admin access:** staff roles `admin` / `support` (read-only) replace `is_staff`; Horizon is
   admin-only; staff "Start data export" / "Delete child account" actions for verified parent requests.
 

@@ -24,7 +24,7 @@ class PaddleWebhookRequest extends FormRequest
         );
 
         if (! $valid) {
-            app(WebhookRejections::class)->record('paddle', 'signature_invalid');
+            app(WebhookRejections::class)->record(WebhookRejections::PROVIDER_PADDLE, WebhookRejections::REASON_SIGNATURE_INVALID);
         }
 
         return $valid;
