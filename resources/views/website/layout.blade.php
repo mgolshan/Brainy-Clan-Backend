@@ -85,12 +85,17 @@
         footer.site { border-top: 1px solid var(--border); padding: 28px 0 40px; font-size: 0.95rem; color: var(--muted); }
         footer.site nav { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 12px; }
         @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+        .to-top { position: fixed; right: 16px; bottom: 16px; z-index: 5; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--brand); color: #1b2a4a; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); text-decoration: none; }
+        .to-top:hover { filter: brightness(1.05); }
+        .to-top svg { width: 22px; height: 22px; }
+        @media print { .to-top { display: none; } }
     </style>
     @hasSection('styles')
         <style>@yield('styles')</style>
     @endif
 </head>
 <body>
+<span id="top"></span>
 <a class="skip" href="#main">{{ $fr ? 'Aller au contenu' : 'Skip to content' }}</a>
 <header class="site">
     <div class="wrap">
@@ -122,6 +127,9 @@
         <p>© {{ now()->year }} Brainy Clan</p>
     </div>
 </footer>
+@hasSection('backToTop')
+<a class="to-top" href="#top" aria-label="{{ $fr ? 'Retour en haut de la page' : 'Back to top' }}" title="{{ $fr ? 'Retour en haut' : 'Back to top' }}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5l-7 7 1.4 1.4L11 8.8V20h2V8.8l4.6 4.6L19 12z" fill="currentColor"/></svg></a>
+@endif
 @yield('scripts')
 </body>
 </html>

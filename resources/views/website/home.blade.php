@@ -129,6 +129,7 @@
 @endphp
 @extends('website.layout')
 
+@section('backToTop', '1')
 @section('title', $fr ? 'Brainy Clan — Des défis d’apprentissage en famille' : 'Brainy Clan — Family learning challenges')
 @section('description', $fr
     ? 'Brainy Clan est une application de quiz et d’apprentissage pour toute la famille : de courts défis adaptés à chaque âge, des objectifs à atteindre ensemble et un espace sûr pour les enfants.'
@@ -354,7 +355,7 @@
                             ? ($fr ? 'entrez ce code dans l’application (« Avez-vous un code ? ») ou utilisez l’offre de l’App Store / Google Play.' : 'enter it in the app (“Have a code?”) or redeem the App Store / Google Play offer.')
                             : ($fr ? 'entrez ce code dans l’application (« Avez-vous un code ? »).' : 'enter it in the app (“Have a code?”).') }}
                         @if ($referral['subscribe_url'] !== null)
-                            <a href="{{ $referral['subscribe_url'] }}">{{ $fr ? 'Ou abonnez-vous sur le Web' : 'Or subscribe on the web' }}</a>
+                            <a href="{{ $referral['subscribe_url'] }}">{{ $fr ? 'Ou abonnez-vous sur le Web (carte ou PayPal)' : 'Or subscribe on the web (card or PayPal)' }}</a>
                         @endif
                     </p>
                 @endif
@@ -702,6 +703,10 @@
                     <p class="note">{{ $fr
                         ? 'Un abonnement acheté par un adulte dans l’application couvre toute la famille.'
                         : 'One subscription, bought by an adult in the app, covers the whole family.' }}</p>
+                    @if ($webCheckout ?? false)
+                        <p class="note">{{ $fr ? 'Aussi offert sur le Web :' : 'Also available on the web:' }}
+                            <a href="{{ route('website.subscribe', $lang) }}">{{ $fr ? 'payez par carte ou PayPal' : 'pay by card or PayPal' }}</a>.</p>
+                    @endif
                 </div>
             </div>
         </div>

@@ -466,10 +466,11 @@ return [
                     'Onglet **Famille** → **Abonnement** → **Voir le forfait Famille**.',
                     'Choisissez une formule et touchez **S’abonner**. Si un essai gratuit est offert, l’application l’affiche.',
                     'Le paiement passe par votre compte App Store ou Google Play.',
+                    'Ou abonnez-vous sur le Web à **{web_checkout}** et payez par carte ou avec PayPal (traité par Paddle).',
                     'Toute la famille, enfants compris, profite du forfait Famille.',
                 ],
                 'tip' => 'Seul un administrateur adulte de la famille peut acheter le forfait. Les enfants ne voient jamais d’écran d’achat ni d’incitation à s’abonner : les mondes et catégories du forfait Famille portent seulement la mention neutre « fait partie du forfait Famille ».',
-                'keywords' => ['s’abonner', 'acheter', 'achat', 'payer', 'essai', 'app store', 'google play'],
+                'keywords' => ['s’abonner', 'acheter', 'achat', 'payer', 'essai', 'app store', 'google play', 'paypal', 'carte', 'web'],
             ],
             [
                 'id' => 'restore',

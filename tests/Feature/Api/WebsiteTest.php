@@ -711,3 +711,25 @@ it('serves app-ads.txt only when the AdMob publisher id is configured', function
     expect($response->headers->get('Content-Type'))->toContain('text/plain')
         ->and($response->getContent())->toBe("google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0\n");
 });
+
+it('shows a back-to-top link on long website and legal pages', function (string $path) {
+    $html = $this->get($path)->assertOk()->getContent();
+
+    expect($html)->toContain('class="to-top" href="#top"')
+        ->and($html)->toMatch('/id="top"/')
+        ->and($html)->not->toContain('onclick');
+})->with(['/', '/help', '/partners', '/support', '/terms', '/privacy', '/help?lang=fr']);
+
+it('mentions PayPal only when web checkout is configured', function () {
+    $this->get('/')->assertOk()->assertDontSee('pay by card or PayPal');
+    $this->get('/help')->assertOk()->assertDontSee('pay by card or PayPal (handled by Paddle)');
+
+    config([
+        'billing.paddle.api_key' => 'test_key',
+        'billing.paddle.webhook_secret' => 'whsec',
+        'billing.paddle.price_ids' => ['monthly' => 'pri_1', 'semiannual' => 'pri_2', 'annual' => 'pri_3'],
+    ]);
+
+    $this->get('/')->assertOk()->assertSee('pay by card or PayPal');
+    $this->get('/help')->assertOk()->assertSee('pay by card or PayPal (handled by Paddle)', false);
+});

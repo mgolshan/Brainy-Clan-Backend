@@ -651,6 +651,10 @@ web link (none by default).
    default payment link: **Checkout → Checkout settings → Default payment link**
    `https://brainyclan.com/subscribe/pay` and create a **client-side token** (Developer tools →
    Authentication) for `PADDLE_CLIENT_TOKEN`.
+   **Payment methods:** **Checkout → Checkout configuration → Payment methods** — turn on
+   **PayPal** (supported for subscriptions in all countries and in USD/CAD; cards are on by
+   default; Apple Pay / Google Pay optional). The website says "pay by card or PayPal", so keep
+   PayPal on (sandbox testing needs a separate PayPal sandbox account).
 6. **Developer tools → Notifications → New destination**: URL
    `https://api.brainyclan.com/api/v1/webhooks/paddle` (local testing: a tunnel such as
    `cloudflared tunnel --url http://localhost:8080`), events: `subscription.created`,

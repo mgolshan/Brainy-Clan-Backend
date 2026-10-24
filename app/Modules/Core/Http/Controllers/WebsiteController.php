@@ -46,6 +46,7 @@ class WebsiteController
                 'family' => $this->plan($policy, 'family'),
             ],
             'worlds' => $worlds->all(),
+            'webCheckout' => PaddleConfig::webCheckoutAvailable(),
             'referral' => null,
         ];
     }

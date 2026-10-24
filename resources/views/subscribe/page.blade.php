@@ -142,8 +142,8 @@
             @endif
 
             <p class="note">{{ $fr
-                ? 'Le paiement est traité par Paddle.com, notre revendeur officiel (« merchant of record »), qui perçoit les taxes de vente applicables. Des taxes peuvent s’ajouter au paiement selon votre lieu de résidence. Le forfait se renouvelle automatiquement jusqu’à son annulation. Les achats sur le Web sont régis par les conditions d’achat de Paddle, en plus de nos'
-                : 'Payment is handled by Paddle.com, our authorized reseller (merchant of record), which collects any applicable sales tax. Sales tax may be added at checkout depending on where you live. The plan renews automatically until cancelled. Web purchases are governed by Paddle’s buyer terms in addition to our' }}
+                ? 'Payez par carte ou avec PayPal. Le paiement est traité par Paddle.com, notre revendeur officiel (« merchant of record »), qui perçoit les taxes de vente applicables. Des taxes peuvent s’ajouter au paiement selon votre lieu de résidence. Le forfait se renouvelle automatiquement jusqu’à son annulation. Les achats sur le Web sont régis par les conditions d’achat de Paddle, en plus de nos'
+                : 'Pay by card or with PayPal. Payment is handled by Paddle.com, our authorized reseller (merchant of record), which collects any applicable sales tax. Sales tax may be added at checkout depending on where you live. The plan renews automatically until cancelled. Web purchases are governed by Paddle’s buyer terms in addition to our' }}
                 <a href="{{ route('legal.terms', $lang) }}">{{ $fr ? 'conditions d’utilisation' : 'terms of service' }}</a>.</p>
         @elseif ($state === 'sent')
             <h1>{{ $fr ? 'Vérifiez vos courriels' : 'Check your email' }}</h1>

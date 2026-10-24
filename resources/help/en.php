@@ -472,10 +472,11 @@ return [
                     '**Family** tab → **Plan** → **See the Family plan**.',
                     'Choose a plan and tap **Subscribe**. If a free trial is offered, the app shows it.',
                     'Payment goes through your App Store or Google Play account.',
+                    'Or subscribe on the web at **{web_checkout}** and pay by card or PayPal (handled by Paddle).',
                     'Everyone in the family, children included, gets the Family plan.',
                 ],
                 'tip' => 'Only an adult family admin can buy the plan. Children never see purchase screens or upgrade prompts: Family plan worlds and categories only show a neutral “comes with the Family plan” label.',
-                'keywords' => ['subscribe', 'buy', 'purchase', 'pay', 'trial', 'app store', 'google play'],
+                'keywords' => ['subscribe', 'buy', 'purchase', 'pay', 'trial', 'app store', 'google play', 'paypal', 'card', 'web'],
             ],
             [
                 'id' => 'restore',

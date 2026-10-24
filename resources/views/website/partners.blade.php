@@ -32,6 +32,7 @@
 @endphp
 @extends('website.layout')
 
+@section('backToTop', '1')
 @section('title', $fr ? 'Partenaires — Brainy Clan' : 'Partners — Brainy Clan')
 @section('description', $fr
     ? 'Le programme partenaires de Brainy Clan pour les parents et les créateurs qui partagent notre mission : fonctionnement, commission, règles, trousse de marque et comment postuler.'

@@ -6,6 +6,7 @@
 @endphp
 @extends('website.layout')
 
+@section('backToTop', '1')
 @section('title', $fr ? 'Aide — Brainy Clan' : 'Support — Brainy Clan')
 @section('description', $fr
     ? 'Aide pour Brainy Clan : connexion d’un enfant sur un nouvel appareil, mot de passe oublié, suppression de compte et contact.'

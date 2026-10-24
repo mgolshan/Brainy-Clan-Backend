@@ -24,6 +24,7 @@
 @endphp
 @extends('website.layout')
 
+@section('backToTop', '1')
 @section('title', $fr ? 'Comment jouer — Brainy Clan' : 'How to play — Brainy Clan')
 @section('description', $fr
     ? 'Le guide des parents pour Brainy Clan : créer la famille, inviter les enfants, jouer, objectifs, mondes, discussion familiale, contrôles parentaux et forfaits.'

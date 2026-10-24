@@ -35,9 +35,14 @@
         .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
         .notice { border-left: 4px solid var(--accent); padding: 8px 12px; margin: 16px 0; }
         .error { color: #c81e1e; }
+        html { scroll-behavior: auto; }
+        @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+        .to-top { position: fixed; right: 16px; bottom: 16px; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--accent); color: var(--bg); box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+        .to-top svg { width: 22px; height: 22px; }
+        @media print { .to-top { display: none; } }
     </style>
 </head>
-<body>
+<body id="top">
 <main>
     @if ($draft ?? false)
         <div class="banner" role="note">{{ $locale === 'fr' ? 'Ébauche — en cours de révision juridique. Ce texte n’est pas encore définitif.' : 'Draft — under legal review. This text is not final yet.' }}</div>
@@ -54,5 +59,8 @@
     @endisset
     @yield('content')
 </main>
+@isset($otherDocumentUrl)
+<a class="to-top" href="#top" aria-label="{{ $locale === 'fr' ? 'Retour en haut de la page' : 'Back to top' }}" title="{{ $locale === 'fr' ? 'Retour en haut' : 'Back to top' }}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5l-7 7 1.4 1.4L11 8.8V20h2V8.8l4.6 4.6L19 12z" fill="currentColor"/></svg></a>
+@endisset
 </body>
 </html>
