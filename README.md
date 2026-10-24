@@ -9,6 +9,8 @@ REST API and admin panel for **Brainy Clan**, a family learning and quiz mobile 
 
 Project rules and architecture notes for AI assistants and developers: [CLAUDE.md](CLAUDE.md).
 
+**Operations (deploys, monitoring, releases, support, content, marketing):** [docs/OPERATIONS_HANDBOOK.md](docs/OPERATIONS_HANDBOOK.md).
+
 **Production:** website `https://brainyclan.com`, API and admin `https://api.brainyclan.com`, support
 `support@brainyclan.com`. Step-by-step deploy guide (Hetzner, Docker, DNS, HTTPS, email DNS, backups, Sentry):
 [docs/DEPLOY.md](docs/DEPLOY.md).
@@ -534,8 +536,10 @@ need real accounts only to try it on a device.
    project* "Brainy Clan". Add the apps: *App Store* (bundle ID `app.brainyclan`, plus the App Store
    Connect in-app purchase key) and *Play Store* (package name, plus the Google Play service account
    JSON). Follow RevenueCat's own wizard for the store credentials.
-2. **Products:** create the subscriptions in App Store Connect and Google Play Console first (e.g.
-   `brainy_family_monthly`, `brainy_family_yearly`), then *Product catalog → Products → Import*.
+2. **Products:** create the subscriptions in App Store Connect and Google Play Console first, with
+   the same product IDs in both stores: `brainyclan_family_monthly`, `brainyclan_family_6months` and
+   `brainyclan_family_annual` (B10 plans: monthly, 6 months, annual), then *Product catalog →
+   Products → Import*.
 3. **Entitlement:** *Product catalog → Entitlements → New* with identifier **`family`** (must match
    `REVENUECAT_ENTITLEMENT`) and attach every Family product. Create an *Offering* (`default`) with
    the packages the paywall shows.
@@ -780,7 +784,7 @@ docker compose exec app php artisan auth:unlock mom@example.com --ip=203.0.113.7
 email has an account, a one-time link to `WEBSITE_URL/password/reset?token=…` is emailed (valid
 60 min, newest link wins, 3/h per email and 10/h per IP). The page (en/fr) sets the new password,
 signs the user out of every device, clears all lockouts of that email and emails a "password
-changed" notice. Locally the emails land in Mailpit (http://localhost:8025). Expired tokens are
+changed" notice. Locally the emails land in Mailpit (http://localhost:8026). Expired tokens are
 removed daily (`auth:clear-resets`, scheduled).
 
 ## Error monitoring (Sentry)

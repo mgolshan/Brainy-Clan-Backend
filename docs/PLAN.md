@@ -291,17 +291,85 @@ as written there; if something must change, update `docs/API.md` first and note 
 - Privacy policy, terms and parental consent support in the API per `docs/API.md` "Legal, consent
   and privacy (B9)" — drafts must be reviewed by a lawyer before store submission.
 
+### B10 — Pricing, affiliates and web checkout (Paddle) (planned 2026-10-24, Moe)
+Decisions (Moe, 2026-10-24):
+- **Pricing (Family plan, per family up to 7 members):** monthly US$6.99 / CA$8.99; 6 months
+  US$29.99 / CA$39.99; annual US$49.99 / CA$64.99 (highlighted). 7-day free trial on 6-month and
+  annual. Launch offer "founding families": 50% off the first year (store offer codes / Paddle
+  discount). Store fee assumption: 15% (Google subscriptions; Apple Small Business Program). Prices
+  live in the stores, in Paddle and in RevenueCat offerings — never hard-coded in the app; the
+  website reads display prices from config.
+- **Store product IDs (2026-10-24, docs fix):** the same IDs in App Store Connect and Google Play:
+  `brainyclan_family_monthly`, `brainyclan_family_6months`, `brainyclan_family_annual`; all
+  attached to the RevenueCat entitlement `family` (READMEs and the app's `docs/STORE.md` use these).
+- **Web checkout = Paddle (merchant of record), not plain Stripe:** Moe does not want to handle
+  sales tax; Paddle is the legal seller and collects/remits GST/HST/QST, US sales tax and VAT
+  (fee ≈ 5% + 50¢). Same prices as the stores at launch. Rules: the website, emails and social
+  posts may promote web checkout everywhere; inside the app, link to web checkout only where the
+  store rules allow it (currently the US storefronts) — re-check Apple 3.1.1/3.1.3 and Google
+  Play payments policy right before building; elsewhere the app only offers store purchases, and a
+  plan bought on the web unlocks the app (multiplatform rule: the same plan is also sold in-app).
+- **Affiliate program (in-house, commission-based):** influencer codes + links, commission on
+  net revenue, monthly manual payouts; no third-party tracking/fingerprinting SDKs (kids app,
+  Families Policy, ATT). Influencers promote to parents, with #ad disclosure.
+Scope (backend):
+1. **Billing sources:** the family's tier keeps one source of truth on our server. Add Paddle
+   Billing: checkout created server-side for an adult admin (`POST /family/web-checkout` → Paddle
+   checkout URL with `custom_data { family_id, affiliate_code? }`), Paddle webhooks
+   (`/api/v1/webhooks/paddle`, signature-verified, idempotent like RevenueCat) for
+   subscription.created/updated/canceled/past_due and transaction.completed/refunded, mapped to
+   the same subscription states (active/trial/grace/expired) and `ApplyFamilyTier`. A family
+   can't hold two active plans: block web checkout when a store plan is active and vice versa
+   (paywall shows "managed in the App Store / Google Play / on the web"). If RevenueCat's Paddle
+   integration is mature at build time, prefer routing Paddle through RevenueCat (one entitlement
+   source); decide then and record it.
+2. **Customer portal:** `GET /family/web-subscription/manage` → Paddle customer portal link
+   (cancel, card update, invoices). Refunds/cancellations handled by Paddle.
+3. **Affiliates:** tables `affiliates` (name, contact, payout method note, commission_rate default
+   25%, commission_months default 12, status), `affiliate_codes` (code unique, case-insensitive,
+   affiliate_id, optional store offer-code ids and Paddle discount id, active), `family_attributions`
+   (family_id unique, code, source link|code|offer_code|web_checkout, first-touch, locked at the
+   first paid transaction, editable only by staff), `commission_entries` (append-only ledger like
+   points: family, affiliate, source event id unique, gross, store/Paddle fee, tax, net,
+   commission, currency, status pending → payable after a 30-day refund window → paid; refunds and
+   chargebacks add negative entries). Sources: RevenueCat webhooks (store purchases incl.
+   `offer_code`) and Paddle webhooks. Endpoints: `POST /family/referral-code` (admin, once, before
+   the first paid transaction), website `/r/{code}` landing variant (code banner + passes the code to
+   web checkout; no cookies/fingerprinting). Filament: affiliates, codes, attributions, monthly
+   payout report + CSV, "mark paid". Optional later: read-only influencer stats page via magic link
+   (counts and amounts only, never family identities).
+4. Privacy/legal: privacy policy + terms drafts mention Paddle as seller for web purchases and the
+   referral code; Paddle seller onboarding needs the website, pricing, terms, refund policy and
+   support email live.
+Contract to be written in `docs/API.md` before building (coordinator).
+
+### B11 — Ops hardening (from the operations handbook review, 2026-10-24)
+- Horizon: route long-wait/failed-job notifications (mail to support@ or a webhook), schedule
+  `horizon:snapshot` (metrics graphs), and add a scheduler heartbeat (a cache timestamp written every
+  minute and checked by health).
+- `/api/v1/health` deep mode for monitoring (MySQL, Redis, queue/scheduler freshness), still cheap,
+  no secrets; the app keeps using the shallow check.
+- Dashboard: count AdMob SSV rejections (and later Paddle webhook failures) next to RevenueCat
+  webhook errors.
+- Staff roles: a read-only "support" role in Filament (no edits, no chat — chat is never visible
+  anyway) and a staff action to start a child's data export/deletion on a parent's verified request.
+- App: `env` for EAS `preview`/`development` profiles so builds never fall back to localhost.
+
 ## Open questions
 - **Answered by Moe (2026-10-22)** — see "Decisions (2026-10-22)" above: iPhone + iPad; Play
   target audience includes children (Families Policy); website `brainyclan.com`, support
   `support@brainyclan.com`; teens on the free tier see rewarded ads (age-appropriate only); login
   lockout designed by Claude; UMP message set up by Moe with the AdMob account.
 - **Still waiting for Moe:**
-  1. Norton: turn off HTTPS scanning or add the Norton root cert to `docker/php/extra-ca/` (steps
-     given 2026-10-22; Claude recommends the certificate).
+  1. ~~Norton~~ — done 2026-10-22 (root cert in `docker/php/extra-ca/`, container rebuilt, outbound HTTPS OK).
   2. Lawyer review of the legal drafts, company details (`LEGAL_*`), then `LEGAL_DRAFT=false`.
   3. Accounts (Moe, a weekend): Hetzner, Apple Developer, Google Play Console, RevenueCat, AdMob
      (+ UMP message), Sentry, SMTP provider, Anthropic API key; production review account.
-  4. Approve or replace the owl mascot "Ollie".
+  4. ~~Mascot~~ — answered 2026-10-22: the Clan characters with Ollie the owl as leader and app icon.
+  5. External AI agent team (Grok Bot) at launch: if it reads support emails or user data, that is
+     personal-data processing by a third party — decide with the lawyer (DPA, privacy policy
+     mention, what data it may see); the handbook already forbids sending personal data to
+     external AI services until this is decided.
+  6. Paddle seller account (web checkout, B10) once the website, terms and refund policy are live.
 - Production hosting: same Docker images on Hetzner (default) or Forge without Docker.
 - CIPO and USPTO trademark search for "Brainy Clan".

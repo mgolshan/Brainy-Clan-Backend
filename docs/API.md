@@ -53,6 +53,10 @@ and add a line to the changelog at the bottom.
 | `goal_limit_reached` | 403 | Tier limit on active goal plans reached |
 | `world_locked` | 403 | That theme world isn't unlocked for this member (see `GET /me/worlds`) |
 | `chat_disabled` | 403 | A family admin turned off chat for this member |
+| `subscription_exists` | 409 | The family already has an active plan (store or web) |
+| `web_checkout_unavailable` | 503 | Web checkout (Paddle) is not configured |
+| `referral_code_invalid` | 422 | Unknown or inactive referral code |
+| `referral_code_locked` | 409 | The family's referral code is already set or it already paid |
 | `ad_reward_pending` | 409 | Rewarded-ad callback not received yet — retry shortly |
 | `ssv_signature_invalid` | 400 | AdMob SSV callback signature could not be verified |
 | `app_update_required` | 426 | App older than `min_app_version` |
@@ -562,6 +566,54 @@ from RevenueCat webhooks and never trusts the app for the tier.
 - Family members over the free limits keep their data when a subscription ends; limits apply to
   new members/goals/categories only.
 
+**Web checkout (Paddle) and pricing (B10, 2026-10-24)** — Paddle is the merchant of record (it
+sells, collects and remits sales tax/VAT). A family has at most one active plan from one source.
+- Plans: `monthly`, `semiannual`, `annual` (Family plan). `GET /pricing` (public; for the website)
+  → `{ "data": { "currency": "USD", "plans": [ { "id": "annual", "price": "49.99", "per_month": "4.17",
+  "saving_percent": 40, "trial_days": 7, "highlighted": true }, … ] } }` (`?currency=CAD` for CAD;
+  values from server config, mirroring the store/Paddle prices). The app shows store prices from the
+  RevenueCat offering instead.
+- **Website subscribe flow (no password on the web):** `POST /web/subscribe` (website form, CSRF,
+  throttled 5/h per IP and 3/h per email) with `email, plan, code?` → always the same "check your
+  email" page. If the email belongs to an adult admin of a family with purchases allowed, no active
+  store plan and no active Paddle plan, the server emails a one-time link (signed token, 30 min)
+  to `GET /subscribe/checkout?token=…`, which creates the Paddle transaction (`custom_data`:
+  `family_id`, `affiliate_code` if any) and redirects to Paddle's hosted checkout; after paying,
+  Paddle returns to `/subscribe/thanks`. Otherwise the email explains why (e.g. "your plan is
+  managed in the App Store"). Without Paddle keys configured the form shows "coming soon".
+- **In-app link (only where the server allows it):** `GET /family/web-checkout/availability?storefront=USA`
+  (admin) → `{ "data": { "link_allowed": false, "url": null } }`. `storefront` is the store
+  country the app reads from StoreKit / Play Billing (ISO 3166-1 alpha-3). `link_allowed` is true
+  only for storefronts in the server config `billing.web_checkout.link_storefronts` (**empty by
+  default**; Moe enables e.g. `USA` after re-checking the store rules) and when the family could
+  buy; `url` then points to `https://brainyclan.com/subscribe?plan=annual&src=app`. The app shows
+  no web prices or links when `link_allowed` is false.
+- `POST /api/v1/webhooks/paddle` (public; `Paddle-Signature` HMAC verified with
+  `PADDLE_WEBHOOK_SECRET`, 5-minute timestamp tolerance) — idempotent by `event_id`
+  (`webhook_events`); handles `subscription.created|activated|updated|past_due|paused|resumed|canceled`,
+  `transaction.completed`, `adjustment.created|updated` (refunds/chargebacks). Maps to the same
+  subscription states and family tier as RevenueCat (`past_due` → grace). → 200 `{ data: { event_id,
+  outcome } }`; 401 bad signature.
+- `GET /family/subscription` gains `"store": "paddle"`; `POST /family/subscription/manage-link`
+  (admin) → `{ "data": { "url": "…" } }` — a Paddle customer-portal link for `paddle` plans,
+  the store's subscription page URL for store plans (the app opens it).
+- Errors: 409 `subscription_exists` (trying to buy a second plan), 503 `web_checkout_unavailable`
+  (Paddle not configured).
+
+**Referral / affiliate codes (B10)** — influencers get codes; commissions are computed on the
+server from RevenueCat and Paddle revenue events (admin-only reports; no public API).
+- `POST /family/referral-code` (admin) — Body `{ code }` (case-insensitive, letters/digits/dash,
+  ≤ 20). Sets the family's referral code once, before its first paid transaction. → 200
+  `{ "data": { "code": "MAYA", "source": "code" } }`; 422 `referral_code_invalid` (unknown or
+  inactive), 409 `referral_code_locked` (already set, or the family already paid).
+- `GET /family` (admin view) gains `"referral_code": "MAYA" | null`.
+- Website `/r/{code}`: the landing page with a "Code MAYA" banner, store badges (and the store
+  offer-code hint if the code has one) and the subscribe form pre-filled with the code; unknown
+  codes show the normal page. No cookies, no fingerprinting.
+- Store offer codes (Apple Offer Codes, Google Play promo codes) mapped to an affiliate code in the
+  admin: a RevenueCat event carrying that offer code attributes the family (`source: offer_code`) if
+  it has no code yet. Paddle checkouts carry `affiliate_code` (`source: web_checkout`).
+
 **Rewarded ads:** (free tier, only when `policy.second_chance.ad_allowed`; never for children)
 - The app generates a random `reward_ref` (UUID v4) before showing the rewarded ad and passes it to
   AdMob as server-side-verification custom data: `custom_data = "<reward_ref>:<session_id>"`, `user_id`
@@ -733,3 +785,4 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-23 — Brain games: types `memory_match`, `pattern_sequence`, `nonogram`, `spot_difference` (server-generated), category `brain-games` (icon `sparkles`).
 - 2026-10-23 — Family chat: `/family/chat/*` endpoints, Message object, Member `chat_enabled`, Policy `chat.retention_days` (free 7 / Family 365), push type `family_chat` (no message text), error `chat_disabled`.
 - 2026-10-24 — Family chat clarifications (backend built): callers without an active membership get 404 on `/family/chat/*` (not 409); body length counted in Unicode code points; CRLF → LF; "Former member" `nickname` localized with `avatar` null; `before`+`after` or `limit` > 100 → 422; read marker capped at the newest id; notification preferences `types.family_chat`; `/me/export` gains `chat_messages`; Member `chat_enabled` and Policy `chat` in the shared-object examples. Privacy policy version bumped to `2026-10-23` (re-acceptance).
+- 2026-10-24 — B10: `GET /pricing`, website subscribe flow with Paddle (merchant of record), `GET /family/web-checkout/availability`, Paddle webhook, `store: paddle`, `POST /family/subscription/manage-link`, referral codes (`POST /family/referral-code`, `/r/{code}`, offer codes), new error codes.

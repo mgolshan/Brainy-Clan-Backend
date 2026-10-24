@@ -68,7 +68,7 @@ Milestones are defined in `docs/PLAN.md`.
    Then the items of session 14 below (Moe: server, lawyer, Norton cert, content).
    Previous: **State at last stop (session 14, 2026-10-16):** **B9 done locally** (see log). Dev DB: `migrate` (2 migrations:
    `consents`, `account_deletion_requests`) + `AdminUserSeeder` and `DemoFamilySeeder` re-run (demo consents). **Next:**
-   a. Moe: follow `docs/DEPLOY.md` on a Hetzner server (DNS for api.brainyclan.app, `.env.prod`, Storage Box, Sentry DSN,
+   a. Moe: follow `docs/DEPLOY.md` on a Hetzner server (DNS for api.brainyclan.com, `.env.prod`, Storage Box, Sentry DSN,
       SMTP provider for the deletion emails), run the restore drill there.
    b. Lawyer review of `resources/views/legal/{en,fr}/*` (items marked "[DRAFT FOR LAWYER REVIEW]" / "[Lawyer review: …]",
       company details via `LEGAL_*`), then `LEGAL_DRAFT=false`; confirm the server location in the privacy policy.
@@ -376,6 +376,14 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-10-24 operations handbook
+- New `docs/OPERATIONS_HANDBOOK.md` (canonical, for the external AI ops team): product, system map
+  (services, scheduled jobs read from the code, secrets by name), roles + approval policy, hard
+  rules, runbooks (deploy, rollback, health checks, incidents, privacy requests, monthly restore
+  drill, costs), monitoring thresholds + weekly report template, app releases, content ops,
+  support FAQ/macros, marketing claims, affiliate program (planned), launch status, glossary,
+  known doc inconsistencies (§14). README links it. Docs only, no code changes.
 
 ### 2026-10-24 landing: brain games + family chat
 - Landing page: new sections **Brain games** (`#brain-games`: Memory Match, Pattern & Sequence,
