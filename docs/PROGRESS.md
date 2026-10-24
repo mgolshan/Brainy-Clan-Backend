@@ -28,7 +28,7 @@ Milestones are defined in `docs/PLAN.md`.
 
 ## Next up
 
-**Start of next session (2026-10-24 wrap-up):** run the full backend suite first — the last full run was cut shortwhen Docker stopped. One possibly order-dependent failure to check: `WebCheckoutTest` "answers the same for everyemail…" failed once when run right after `WebsiteTest` but passes on its own. Moe's open items: content auditdecisions (docs/CONTENT_AUDIT_2026-10-24.md, 36 items), lawyer review (terms/privacy 2026-10-24, partneragreement), server region, accounts weekend, when /partners goes public.
+**Start of next session (2026-10-24 wrap-up):** run the full backend suite first — the last full run was cut short when Docker stopped. One possibly order-dependent failure to check: `WebCheckoutTest` "answers the same for every email…" failed once when run right after `WebsiteTest` but passes on its own. Moe's open items: content audit decisions (docs/CONTENT_AUDIT_2026-10-24.md, 36 items), lawyer review (terms/privacy 2026-10-24, partner agreement), server region, accounts weekend, when /partners goes public.
 0. **State at last stop (session 17, 2026-10-17, launch question bank + French content):** done (see log). Dev DB:
    `migrate` (1 migration, `add_translation_fields_to_content_items`) + `ContentSeeder` and `WordPuzzleSeeder` re-run
    (idempotent via `source_ref`; no fresh). Expo receipts check done. **Next:**
