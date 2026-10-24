@@ -88,6 +88,8 @@ return [
 
     'admob' => [
         'verifier_keys_url' => env('ADMOB_SSV_KEYS_URL', 'https://www.gstatic.com/admob/reward/verifier-keys.json'),
+        // AdMob publisher id (pub-…) for https://brainyclan.com/app-ads.txt; empty = the file answers 404.
+        'publisher_id' => env('ADMOB_PUBLISHER_ID'),
     ],
 
     'slack' => [

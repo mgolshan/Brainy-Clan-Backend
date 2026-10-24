@@ -379,6 +379,38 @@ curl http://localhost:8080/api/v1/health
 
 ## Log
 
+### 2026-10-24 How to play help center
+
+- **Page** `GET /help` (`website.help`, en/fr, one page with anchors; PLAN "How to play" help center):
+  hero with a big search box + popular-topic chips, 10 section cards (Clan/category art), sticky
+  contents on desktop (active section marked), 41 articles as collapsed `<details>` (id = anchor,
+  title + 1-line summary, 2–6 numbered steps, optional tip, links, at most one screenshot). Linked
+  from the website header and footer and from `/support`; in the sitemap (12 URLs).
+- **Content** as data: `resources/help/{en,fr}.php` (plain text, escaped; `**label**` → `<strong>`
+  after escaping) + `resources/help/images.php`. `App\Modules\Core\Support\HelpCenter` fills
+  `{placeholders}` from the live settings/config/catalog (invite days, code minutes, target, lives,
+  redemption items, plan limits, chat retention, world unlock lists, lockout steps, reset-link
+  minutes); a step whose value is empty (e.g. no streak worlds) is dropped. App labels quoted as in
+  the app's en.json/fr.json.
+- **Search:** server `?q=` fallback (works without JS: matching articles open, others `hidden`,
+  result count, no-results box → /support) and `public/js/help-search.js` (instant filter,
+  highlights, `#article` deep links open their `<details>`, Escape clears, URL keeps `?q=`). Same
+  folding (NFD accents removed, stop words en/fr, plural "s"), AND of terms with an OR fallback.
+- **CSP:** `SecurityHeaders:script` adds a per-request nonce (`script-src 'nonce-…'`, `form-action
+  'self'`) for `/help` only; other pages keep their script-free CSP. Page is `Cache-Control:
+  private` (nonce). No cookies, no external hosts.
+- **Images** `public/images/site/help/` (10 WebP, 6–24 KB, ~181 KB): captures of the demo family on
+  the app's web build (headless Chrome 390×844 @2x, GD WebP q78): create family, invite code, sign-in
+  code, member settings, difficulty, notifications, chat report dialog, Family tab, lockout, plus a
+  Clan character strip; 7 landing screens reused. Capture side effects cleaned up (temp account
+  deleted via `DELETE /me`, invite cancelled, 2 chat messages deleted (tombstones), Mom's capture
+  token logged out, lockout cleared with `auth:unlock`); Mom accepted the 2026-10-24 legal versions.
+- **Tests** (WebsiteTest "help center", 10 tests): en/fr render, every section/article anchor, en/fr
+  parity (ids, images), 2–6 steps, live numbers, `?q=` search + escaping + no results, images exist
+  with alt/size/lazy, ≤ 60 KB each and ≤ 1.5 MB total, nonce CSP + single same-origin script,
+  header/footer/support/sitemap links. Sitemap count 10 → 12. Screenshots
+  `docs/screenshots/help-desktop.png`, `help-phone.png`.
+
 ### 2026-10-24 deployment guide
 - `docs/DEPLOYMENT_GUIDE.md` (copy in the parent folder for convenience): what runs where, Hetzner scaling
   stages 0–2 with October 2026 prices and triggers, pre-Stage-1 code/config checklist, deploy/secrets/env per

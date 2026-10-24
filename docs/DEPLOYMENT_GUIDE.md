@@ -410,9 +410,8 @@ Any `.env.prod` change is **[Moe]**; apply with `$C up -d`.
 All in [DEPLOY.md §4](DEPLOY.md): A/AAAA for `@`, `www`, `api`; MX for the support mailbox; one
 merged SPF; DKIM for both mail providers; DMARC `p=none` → `p=quarantine`. Add later:
 - **`app-ads.txt`** at `https://brainyclan.com/app-ads.txt` — AdMob uses it to verify the app's
-  developer website (the store listings' website). **Not in the repo yet** (`public/` has no such
-  file and no route): add the line AdMob shows (`google.com, pub-…, DIRECT, f08c47fec0942fa0`) as
-  `public/app-ads.txt` before launch **(not built yet)** [Moe].
+  developer website. Built (2026-10-24): set `ADMOB_PUBLISHER_ID=pub-…` in `.env.prod` and the site
+  serves `google.com, pub-…, DIRECT, f08c47fec0942fa0` (404 until set) [Moe: set the id].
 
 ---
 
@@ -622,7 +621,7 @@ and STORE.md §10. On launch day:
    custom headers are UptimeRobot Pro.
 3. `docs/DEPLOY.md` §11 now points here for costs; §1 and handbook §5.8: CX22 / ≈ €5 and the 15–35 CAD total predate the 2026
    Hetzner prices; US locations offer only CPX/CCX (CPX11 €17.49, CPX21 €31.99, CCX13 €43.49).
-4. No `public/app-ads.txt` for AdMob.
+4. ~~No `app-ads.txt` for AdMob~~ — built 2026-10-24 (`ADMOB_PUBLISHER_ID`).
 5. `google-services.json` / `android.googleServicesFile` still missing in the app (known, handbook
    §14.1 #4).
 

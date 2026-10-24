@@ -4,6 +4,8 @@ namespace App\Modules\Core\Http\Controllers;
 
 use App\Modules\Billing\Models\AffiliateCode;
 use App\Modules\Billing\Support\PaddleConfig;
+use App\Modules\Core\Http\Middleware\SecurityHeaders;
+use App\Modules\Core\Support\HelpCenter;
 use App\Modules\Core\Support\Website;
 use App\Modules\Policy\PolicyResolver;
 use App\Modules\Policy\Support\ThemeWorldCatalog;
@@ -13,15 +15,16 @@ use Illuminate\Http\Response;
 
 /**
  * The public website (brainyclan.com in production; docs/DEPLOY.md "Website and hosts"): landing
- * page, support page, robots.txt and sitemap.xml. Static HTML, no cookies, no scripts, no
- * third-party requests. Language: `?lang=en|fr`, else the browser's Accept-Language. Images are
- * static files in `public/images/site/` (screens: WebP captures of the demo family; art and clan:
+ * page, support page, the "How to play" help center, robots.txt and sitemap.xml. Static HTML, no
+ * cookies, no third-party requests; the only script is the help center's same-origin search.
+ * Language: `?lang=en|fr`, else the browser's Accept-Language. Images are static files in
+ * `public/images/site/` (screens and help: WebP captures of the demo family; art and clan:
  * SVGs exported from the app).
  */
 class WebsiteController
 {
     /** Pages listed in the sitemap (route names), each in English and French. */
-    private const array SITEMAP_ROUTES = ['website.home', 'website.support', 'legal.privacy', 'legal.terms', 'account.delete'];
+    private const array SITEMAP_ROUTES = ['website.home', 'website.help', 'website.support', 'legal.privacy', 'legal.terms', 'account.delete'];
 
     /**
      * The landing page. Plan limits and the world unlock catalog come from the same data the
@@ -78,6 +81,29 @@ class WebsiteController
     }
 
     /**
+     * The "How to play" help center (docs/PLAN.md, 2026-10-24): every section and article on one
+     * page (collapsed `<details>`, anchors = article ids). `?q=` filters on the server so search
+     * works without JavaScript; public/js/help-search.js does the same instantly while typing.
+     * Cached privately only: the page carries a per-request CSP nonce.
+     */
+    public function help(Request $request, HelpCenter $help): Response
+    {
+        $locale = Website::locale($request);
+        $sections = $help->sections($locale);
+        $query = $request->query('q');
+        $query = is_string($query) ? trim(mb_substr($query, 0, HelpCenter::MAX_QUERY_LENGTH)) : '';
+        $matches = HelpCenter::terms($query, $locale) !== [] ? $help->search($sections, $query, $locale) : null;
+
+        return $this->page($request, 'website.help', [
+            'sections' => $sections,
+            'query' => $query,
+            'matches' => $matches,
+            'stopWords' => HelpCenter::STOP_WORDS[$locale] ?? HelpCenter::STOP_WORDS['en'],
+            'nonce' => SecurityHeaders::nonce($request),
+        ])->header('Cache-Control', 'private, max-age=300');
+    }
+
+    /**
      * The old legal URLs (`/legal/terms`, `/legal/privacy`, used by app versions and store
      * listings before 2026-10-22) moved to `/terms` and `/privacy`.
      */
@@ -99,6 +125,22 @@ class WebsiteController
             : "User-agent: *\nDisallow: /\n";
 
         return response($body, 200, ['Content-Type' => 'text/plain; charset=UTF-8', 'Cache-Control' => 'public, max-age=3600']);
+    }
+
+    /**
+     * AdMob's app-ads.txt (authorized seller line) for the developer website; 404 until the
+     * publisher id is configured.
+     */
+    public function appAds(): Response
+    {
+        $publisherId = (string) config('services.admob.publisher_id');
+
+        abort_unless(preg_match('/^pub-\d{10,20}$/', $publisherId) === 1, 404);
+
+        return response("google.com, {$publisherId}, DIRECT, f08c47fec0942fa0\n", 200, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Cache-Control' => 'public, max-age=3600',
+        ]);
     }
 
     public function sitemap(): Response

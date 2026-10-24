@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Core\Support\HelpCenter;
 use App\Modules\Family\Actions\RequestAccountDeletionByEmail;
 use App\Modules\Family\Mail\AccountDeletionConfirmation;
 use App\Modules\Identity\Models\User;
@@ -9,7 +10,7 @@ use Illuminate\Support\Facades\Mail;
 
 /**
  * The public website (routes/web.php, docs/DEPLOY.md "Website and hosts"): landing page,
- * support, legal pages, robots.txt, sitemap.xml and production host routing.
+ * help center, support, legal pages, robots.txt, sitemap.xml and production host routing.
  */
 
 /**
@@ -134,7 +135,8 @@ describe('pages', function () {
             ->toContain('<loc>'.e(route('legal.privacy', ['lang' => 'en'])).'</loc>')
             ->toContain('<loc>'.e(route('legal.terms', ['lang' => 'fr'])).'</loc>')
             ->toContain('<loc>'.e(route('account.delete', ['lang' => 'en'])).'</loc>')
-            ->and(substr_count((string) $sitemap, '<url>'))->toBe(10);
+            ->toContain('<loc>'.e(route('website.help', ['lang' => 'fr'])).'</loc>')
+            ->and(substr_count((string) $sitemap, '<url>'))->toBe(12);
     });
 
     it('ships the owl mascot as a static file', function () {
@@ -304,6 +306,212 @@ describe('landing page v2', function () {
     });
 });
 
+/**
+ * The "How to play" help center (docs/PLAN.md "How to play" help center (2026-10-24)): structured
+ * en/fr content, anchors for the app's deep links, ?q= search without JavaScript, live numbers,
+ * same-origin images within budget, and the search script allowed only by a per-request nonce.
+ */
+describe('help center', function () {
+    it('renders every section and article in both languages, with anchors and the search box', function (string $lang, array $texts) {
+        $html = (string) $this->get("/help?lang={$lang}")->assertOk()
+            ->assertHeader('Content-Language', $lang)
+            ->assertSee('<html lang="'.$lang.'">', false)
+            ->assertSee('role="search"', false)
+            ->assertSee('<label for="help-q">', false)
+            ->assertSee('aria-live="polite"', false)
+            ->assertSee('<link rel="canonical"', false)
+            ->getContent();
+
+        foreach ($texts as $text) {
+            expect($html)->toContain($text);
+        }
+
+        foreach (HelpCenter::content($lang) as $section) {
+            expect($html)->toContain('<section class="help-section" id="'.$section['id'].'"')
+                ->toContain('href="#'.$section['id'].'"');
+
+            foreach ($section['articles'] as $article) {
+                expect($html)->toContain('<details class="article" id="'.$article['id'].'"')
+                    ->toContain('href="#'.$article['id'].'"');
+            }
+        }
+
+        // Collapsed by default: nothing is open and nothing hidden without a search.
+        expect($html)->not->toMatch('/<details class="article"[^>]*\sopen[\s>]/')
+            ->not->toMatch('/<details class="article"[^>]*\shidden[\s>]/');
+    })->with([
+        'en' => ['en', ['<title>How to play — Brainy Clan</title>', 'Search the guide', 'Invite the kids with a code', 'Sign a child in on a new device', '<strong>I have a sign-in code</strong>', 'Out of lives? Second chances', 'Report a message', 'Notifications and quiet hours', 'Too many attempts']],
+        'fr' => ['fr', ['<title>Comment jouer — Brainy Clan</title>', 'Chercher dans le guide', 'Inviter les enfants avec un code', 'Connecter un enfant sur un nouvel appareil', '<strong>J&#039;ai un code de connexion</strong>', 'Plus de vies ? Les deuxièmes chances', 'Signaler un message', 'Notifications et heures calmes', 'Trop de tentatives']],
+    ]);
+
+    it('has the same sections, articles and images in English and French, each with 2 to 6 steps and keywords', function () {
+        $shape = fn (string $lang): array => array_map(fn (array $section): array => [
+            $section['id'],
+            array_map(fn (array $article): array => [$article['id'], $article['image'] ?? null], $section['articles']),
+        ], HelpCenter::content($lang));
+
+        expect($shape('fr'))->toBe($shape('en'));
+
+        $ids = [];
+        foreach (['en', 'fr'] as $lang) {
+            foreach (app(HelpCenter::class)->sections($lang) as $section) {
+                expect($section['articles'])->not->toBeEmpty()
+                    ->and(is_file(public_path(ltrim($section['icon'], '/'))))->toBeTrue("missing icon {$section['icon']}");
+
+                foreach ($section['articles'] as $article) {
+                    expect(count($article['steps']))->toBeGreaterThanOrEqual(2)->toBeLessThanOrEqual(6)
+                        ->and($article['keywords'])->not->toBeEmpty()
+                        ->and($article['id'])->toMatch('/^[a-z][a-z-]+$/');
+
+                    foreach ([$article['title'], $article['summary'], $article['tip'] ?? '', ...$article['steps']] as $text) {
+                        expect($text)->not->toMatch('/[<>]|\{[a-z_]+\}/');
+                    }
+
+                    if ($lang === 'en') {
+                        $ids[] = $article['id'];
+                    }
+                }
+            }
+        }
+
+        // Anchors are unique, also against the section ids.
+        $sectionIds = array_column(HelpCenter::content('en'), 'id');
+        expect(array_unique([...$ids, ...$sectionIds]))->toHaveCount(count($ids) + count($sectionIds))
+            // The app deep links to these (src/config/links.ts helpAnchors).
+            ->and($ids)->toContain('invite-kids', 'sign-in-code', 'family-chat');
+    });
+
+    it('fills in the numbers from the live settings, config and world catalog', function () {
+        Setting::query()->where('key', 'invites.ttl_days')->whereNull('scope_id')->update(['value' => json_encode(5)]);
+        Setting::query()->where('key', 'chat.retention_days')->where('scope_id', 'free')->update(['value' => json_encode(30)]);
+        ThemeWorld::query()->where('key', 'jungle')->update(['required' => 75]);
+        ThemeWorld::query()->where('unlock_type', 'streak')->update(['active' => false]);
+
+        $html = (string) $this->get('/help?lang=en')->assertOk()->getContent();
+
+        expect($html)->toContain('An invite code works once and stays valid for 5 days.')
+            ->toContain('The code works once, for 15 minutes.')
+            ->toContain('A game ends with a win when you reach 10 points.')
+            ->toContain('You have 3 lives per game.')
+            ->toContain('Messages are kept for 30 days on the free plan and 1 year on the Family plan, then deleted.')
+            ->toContain('Free plan: up to 2 members, 3 categories, 1 active goal, chat kept 30 days.')
+            ->toContain('Family plan: up to 7 members, all categories, unlimited goals and chat kept 1 year.')
+            ->toContain('Free from the start: Candy Land, Glass, Modern and Classic.')
+            ->toContain('Jungle Adventure (75 points)')
+            ->toContain('Included with the Family plan: Dino Valley, Neon Arcade and Midnight.')
+            ->toContain('After 5 wrong passwords in a row, sign-in pauses for 5 minutes, then 1 hour, then 24 hours.')
+            ->toContain('Open the link within 60 minutes')
+            // No streak world is active, so that step is left out instead of reading "…: .".
+            ->not->toContain('Earned with a streak');
+
+        $this->get('/help?lang=fr')->assertOk()
+            ->assertSee('Un code d’invitation sert une seule fois et reste valide 5 jours.', false)
+            ->assertSee('Les messages sont gardés 30 jours avec le forfait gratuit et 1 an avec le forfait Famille, puis supprimés.', false)
+            ->assertSee('Aventure dans la jungle (75 points)', false)
+            ->assertSee('la connexion se met en pause 5 minutes, puis 1 heure, puis 24 heures.', false);
+    });
+
+    it('searches with ?q= without JavaScript: matching articles open, the others hidden', function () {
+        $html = (string) $this->get('/help?q='.urlencode('How do I invite my kids?'))->assertOk()
+            ->assertSee('value="How do I invite my kids?"', false)
+            ->getContent();
+
+        expect($html)->toMatch('/<details class="article" id="invite-kids"[^>]*\sopen[\s>]/')
+            ->toMatch('/<details class="article" id="report-message"[^>]*\shidden[\s>]/')
+            ->toMatch('/<section class="help-section" id="worlds"[^>]*\shidden[\s>]/')
+            ->toMatch('/<div class="empty" id="help-empty"\s+hidden/')
+            ->toContain('1 result for “How do I invite my kids?”');
+
+        // Accents and case don't matter; French stop words are ignored.
+        $fr = (string) $this->get('/help?lang=fr&q='.urlencode('Comment avoir une DEUXIEME chance'))->assertOk()->getContent();
+        expect($fr)->toMatch('/<details class="article" id="second-chances"[^>]*\sopen[\s>]/');
+
+        expect(app(HelpCenter::class)->search(app(HelpCenter::class)->sections('en'), 'quiet hours', 'en'))
+            ->toContain('notifications')->not->toContain('create-family');
+    });
+
+    it('shows a no-results message with a link to support, and escapes the query', function () {
+        $html = (string) $this->get('/help?q='.urlencode('<i onmouseover="x()">zzqx</i>'))->assertOk()->getContent();
+
+        expect($html)->not->toContain('<i onmouseover')
+            ->toContain('value="&lt;i onmouseover=&quot;x()&quot;&gt;zzqx&lt;/i&gt;"')
+            ->toContain('No results for “&lt;i onmouseover=&quot;x()&quot;&gt;zzqx&lt;/i&gt;”')
+            ->toMatch('/<div class="empty" id="help-empty"\s+>/')
+            ->toContain('href="'.route('website.support', ['lang' => 'en']).'"')
+            ->and(substr_count($html, '<script'))->toBe(1);
+
+        // A query of stop words only, an array or an empty q shows everything.
+        foreach (['/help?q=how+do+i', '/help?q[]=x', '/help?q='] as $url) {
+            expect((string) $this->get($url)->assertOk()->getContent())
+                ->not->toMatch('/<details class="article"[^>]*\shidden[\s>]/');
+        }
+    });
+
+    it('only uses same-origin images that exist, with alt texts, sizes and lazy loading, within budget', function (string $lang) {
+        $html = (string) $this->get("/help?lang={$lang}")->assertOk()->getContent();
+        $images = landingImages($html);
+        $shots = array_values(array_filter($images, fn (array $image): bool => str_ends_with($image['src'], '.webp')));
+
+        expect(count($shots))->toBeGreaterThanOrEqual(12);
+
+        foreach ($images as $image) {
+            $path = public_path(ltrim($image['src'], '/'));
+
+            expect($image['src'])->toStartWith('/images/')
+                ->and(is_file($path))->toBeTrue("missing file {$image['src']}")
+                ->and($image['alt'])->not->toBeNull("no alt on {$image['src']}")
+                ->and($image['tag'])->toMatch('/\swidth="\d+"/')->toMatch('/\sheight="\d+"/');
+        }
+
+        foreach ($shots as $shot) {
+            $path = public_path(ltrim($shot['src'], '/'));
+            [$width, $height] = (array) getimagesize($path);
+
+            expect(mb_strlen((string) $shot['alt']))->toBeGreaterThan(20)
+                ->and($shot['tag'])->toContain('loading="lazy"')
+                ->toContain('width="'.$width.'"')->toContain('height="'.$height.'"')
+                ->and(filesize($path))->toBeLessThanOrEqual(60 * 1024);
+        }
+
+        $bytes = array_sum(array_map(fn (string $src): int => (int) filesize(public_path(ltrim($src, '/'))), array_unique(array_column($images, 'src'))));
+        expect($bytes)->toBeLessThanOrEqual((int) (1.5 * 1024 * 1024));
+    })->with(['en', 'fr']);
+
+    it('allows only its own search script, by a per-request nonce, and loads nothing from other hosts', function () {
+        $first = $this->get('/help')->assertOk();
+        $second = $this->get('/help')->assertOk();
+        $html = (string) $first->getContent();
+        $csp = (string) $first->headers->get('Content-Security-Policy');
+
+        preg_match("/script-src 'nonce-([A-Za-z0-9_-]{20,})'/", $csp, $nonce);
+
+        expect($nonce)->toHaveCount(2)
+            ->and($csp)->toBe("default-src 'none'; script-src 'nonce-{$nonce[1]}'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
+            ->and((string) $second->headers->get('Content-Security-Policy'))->not->toContain($nonce[1])
+            ->and($html)->toContain('<script src="/js/help-search.js" nonce="'.$nonce[1].'" defer></script>')
+            ->and(substr_count($html, '<script'))->toBe(1)
+            ->and($html)->not->toMatch('/<script(?![^>]*\ssrc=)[^>]*>/')
+            ->not->toMatch('/\s(src|srcset|href|action)="(https?:)?\/\/(?!'.preg_quote(parse_url((string) config('app.url'), PHP_URL_HOST) ?? 'localhost', '/').')/i')
+            ->not->toMatch('/url\(\s*["\']?(https?:)?\/\//i')
+            ->not->toMatch('/\son[a-z]+="/i')
+            ->and($first->headers->getCookies())->toBe([])
+            ->and((string) $first->headers->get('Cache-Control'))->toContain('private')
+            ->and(is_file(public_path('js/help-search.js')))->toBeTrue()
+            ->and((string) file_get_contents(public_path('js/help-search.js')))->not->toMatch('/https?:\/\/|innerHTML|eval\(|document\.write/');
+
+        // The other website pages keep their script-free CSP.
+        expect((string) $this->get('/support')->headers->get('Content-Security-Policy'))->not->toContain('script-src');
+    });
+
+    it('is linked from the header, the footer and the support page, and listed in the sitemap', function () {
+        $help = route('website.help', ['lang' => 'fr']);
+
+        expect(substr_count((string) $this->get('/?lang=fr')->assertOk()->getContent(), 'href="'.$help.'"'))->toBe(2)
+            ->and(substr_count((string) $this->get('/support?lang=fr')->assertOk()->getContent(), 'href="'.$help.'"'))->toBe(3)
+            ->and((string) $this->get('/sitemap.xml')->getContent())->toContain('<loc>'.e(route('website.help', ['lang' => 'en'])).'</loc>');
+    });
+});
+
 describe('configuration', function () {
     it('has the production domains and emails in the config defaults', function () {
         expect(config('app.website_url'))->toBe(config('app.url'))
@@ -372,4 +580,17 @@ describe('host routing (WEBSITE_HOST set)', function () {
         Mail::assertQueued(AccountDeletionConfirmation::class, fn (AccountDeletionConfirmation $mail) => str_starts_with($mail->confirmUrl, 'https://brainyclan.com/account/delete/confirm/')
             && str_ends_with($mail->confirmUrl, '?lang=fr'));
     });
+});
+
+it('serves app-ads.txt only when the AdMob publisher id is configured', function () {
+    config(['services.admob.publisher_id' => null]);
+    $this->get('/app-ads.txt')->assertNotFound();
+
+    config(['services.admob.publisher_id' => 'not-a-publisher']);
+    $this->get('/app-ads.txt')->assertNotFound();
+
+    config(['services.admob.publisher_id' => 'pub-1234567890123456']);
+    $response = $this->get('/app-ads.txt')->assertOk();
+    expect($response->headers->get('Content-Type'))->toContain('text/plain')
+        ->and($response->getContent())->toBe("google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0\n");
 });

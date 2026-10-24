@@ -1,8 +1,9 @@
 {{--
-    Layout of the public website (landing page, support). No scripts, no cookies, no external
+    Layout of the public website (landing page, help center, support). No cookies, no external
     fonts or CDNs: inline CSS only (strict CSP from SecurityHeaders); images are same-origin files
-    under public/images. Pages add their own CSS with @section('styles'). Light/dark follows the
-    system setting. $locale is en|fr; links carry ?lang= so the choice sticks.
+    under public/images. Pages add their own CSS with @section('styles'); only a page served with
+    SecurityHeaders:script may add a same-origin script (with its CSP nonce) in @section('scripts').
+    Light/dark follows the system setting. $locale is en|fr; links carry ?lang= so the choice sticks.
 --}}
 @php
     $fr = $locale === 'fr';
@@ -98,6 +99,7 @@
             <span>Brainy Clan</span>
         </a>
         <nav class="top" aria-label="{{ $fr ? 'Navigation principale' : 'Main navigation' }}">
+            <a href="{{ route('website.help', $lang) }}">{{ $fr ? 'Comment jouer' : 'How to play' }}</a>
             <a href="{{ route('website.support', $lang) }}">{{ $fr ? 'Aide' : 'Support' }}</a>
             <a href="{{ request()->url() }}?lang={{ $other }}" hreflang="{{ $other }}" lang="{{ $other }}">{{ $fr ? 'English' : 'Français' }}</a>
         </nav>
@@ -109,6 +111,7 @@
 <footer class="site">
     <div class="wrap">
         <nav aria-label="{{ $fr ? 'Liens du pied de page' : 'Footer links' }}">
+            <a href="{{ route('website.help', $lang) }}">{{ $fr ? 'Comment jouer' : 'How to play' }}</a>
             <a href="{{ route('legal.privacy', $lang) }}">{{ $fr ? 'Confidentialité' : 'Privacy' }}</a>
             <a href="{{ route('legal.terms', $lang) }}">{{ $fr ? 'Conditions d’utilisation' : 'Terms' }}</a>
             <a href="{{ route('website.support', $lang) }}">{{ $fr ? 'Aide' : 'Support' }}</a>
@@ -118,5 +121,6 @@
         <p>© {{ now()->year }} Brainy Clan</p>
     </div>
 </footer>
+@yield('scripts')
 </body>
 </html>

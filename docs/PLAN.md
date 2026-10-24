@@ -125,6 +125,37 @@ as written there; if something must change, update `docs/API.md` first and note 
     locked-out or forgetful adult can always get back in. Replaces the "per-email throttle"
     trade-off question.
   - **Devices:** iPhone and iPad (app milestone; layouts get a max content width on tablets).
+- **Mission (2026-10-24, Moe):** "The world of this application should be clean and happy. It
+  focuses on one mission: kids use screen devices to learn and grow rather than waste their time
+  and mind." Every feature, content item, design and marketing message is checked against it:
+  positive, encouraging, educational, calm; no addictive dark patterns (no endless feeds, no
+  loot boxes, no manipulative streak pressure or guilt messages, no social comparison beyond the
+  family), rewards tied to learning, parents in control of time and chat.
+- **Content neutrality rules (2026-10-24, Moe) — apply to ALL content (seed bank, AI batches,
+  wisdom cards, help pages, marketing, store listings, partner material):** no ideological or
+  activist messaging from any side ("no woke culture"); no hate and nothing demeaning about any
+  group; no persuasion or moralising toward a worldview ("no brainwashing"); no political or
+  cultural bias (facts, not judgments; no current politics or politicians); no misinformation
+  (fact-check rules); no sexual content; no content about sexuality or gender identity topics;
+  religion stays excluded (decided earlier). Plain, well-established historical facts stay
+  allowed when stated neutrally. Enforced in the question-bank README rules, the AI generator
+  prompt, reviewer guidance (Filament review page / handbook §8) and marketing rules (§10).
+  Existing content is audited; borderline items are listed for Moe, not silently deleted.
+- **Partner (affiliate) instructions (2026-10-24, Moe: "add instructions for affiliate
+  marketers too"):** a public `https://brainyclan.com/partners` page (en/fr, website style, no
+  scripts) for influencers/affiliates: what Brainy Clan is (true claims only), how the program
+  works (personal code + `/r/{code}` link, what their audience gets e.g. store offer codes / web
+  discount, attribution rules: first code wins, set before the first payment), commission terms
+  read from config/admin defaults (rate, months, 30-day refund hold, monthly payout, currency,
+  minimum payout if any), how payouts happen (manual: PayPal / e-transfer / bank, invoice/tax info
+  is the partner's responsibility), rules (FTC / Competition Bureau "#ad" disclosure in every post,
+  promote to parents — never target or address children, no false or medical/educational-outcome
+  claims, no spam, no bidding on "Brainy Clan" search ads, no fake reviews, no cookie stuffing,
+  no incentivised installs), a brand kit (logo, Clan characters usage rules, approved one-liners
+  and descriptions in en/fr, screenshots from the website), FAQ, how to apply (email
+  partners@ or support@ with links to channels — admin creates the affiliate and code), and the
+  partner agreement summary (draft, lawyer review). Linked from the website footer and the
+  handbook §11. No partner portal yet (planned: read-only stats via magic link).
 - **"How to play" help center (2026-10-24, Moe):** a parents' guide at `https://brainyclan.com/help`
   (en/fr), served by the website like the other pages: short, well-sectioned articles with real app
   screenshots, a sticky table of contents and an instant search box (small script under the
@@ -137,6 +168,11 @@ as written there; if something must change, update `docs/API.md` first and note 
   forgot password, offline). Each article: 2–6 short steps, one screenshot at most, collapsed
   details. The app links to it from Profile → "How to play" and from empty/help states (deep
   links to a section anchor). Content must stay true to the product; updated with each feature.
+  **Built (2026-10-24):** one page `/help` with anchors (fast; no per-section routes); content in
+  `resources/help/{en,fr}.php` with `{placeholders}` from live settings/catalog (HelpCenter); search
+  folds accents and drops stop words, all terms must match, else any term; the script is allowed
+  by a per-request CSP nonce (`SecurityHeaders:script`), page cached privately. Article ids are a
+  contract with the app (`HELP_ANCHORS`).
 - **Family chat (2026-10-23, Moe):** one group chat per family, emoji text only, safe against
   XSS/script injection (plain text end to end: validated + normalized on the server, rendered as
   plain text in the app; no HTML/Markdown/links/attachments), retention free 7 days / Family plan

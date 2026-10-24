@@ -18,6 +18,8 @@
             <p class="lead">{{ $fr ? 'Une question ou un problème ? Écrivez-nous à' : 'A question or a problem? Email us at' }}
                 <a href="mailto:{{ $supportEmail }}">{{ $supportEmail }}</a>.
                 {{ $fr ? 'Nous répondons en français et en anglais.' : 'We answer in English and French.' }}</p>
+            <p class="card" id="how-to-play">{{ $fr ? 'Comment ça marche ? Le guide des parents explique chaque écran en quelques étapes :' : 'How does something work? The parents’ guide explains every screen in a few steps:' }}
+                <a href="{{ route('website.help', $lang) }}"><strong>{{ $fr ? 'Comment jouer' : 'How to play' }}</strong></a>.</p>
         </div>
     </section>
 

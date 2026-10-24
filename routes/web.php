@@ -24,6 +24,7 @@ Route::middleware(RedirectToWebsiteHost::class)->group(function () {
     // Landing page, support, terms and privacy: stateless (no session cookie), no scripts.
     Route::withoutMiddleware(['web'])->middleware(SecurityHeaders::class)->group(function () {
         Route::get('/', [WebsiteController::class, 'home'])->name('website.home');
+        Route::get('app-ads.txt', [WebsiteController::class, 'appAds'])->name('website.app-ads');
         Route::get('support', [WebsiteController::class, 'support'])->name('website.support');
         Route::get('sitemap.xml', [WebsiteController::class, 'sitemap'])->name('website.sitemap');
 
@@ -41,7 +42,13 @@ Route::middleware(RedirectToWebsiteHost::class)->group(function () {
         Route::get('subscribe/thanks', [SubscribePageController::class, 'thanks'])->name('website.subscribe.thanks');
     });
 
-    // Paddle's default payment link page: the only page with a script (Paddle.js); own CSP in the controller.
+    // "How to play" help center (docs/PLAN.md, 2026-10-24): stateless; one small same-origin search
+    // script allowed by a per-request CSP nonce (SecurityHeaders :script); ?q= searches without JS.
+    Route::withoutMiddleware(['web'])->middleware(SecurityHeaders::class.':script')->group(function () {
+        Route::get('help', [WebsiteController::class, 'help'])->name('website.help');
+    });
+
+    // Paddle's default payment link page: Paddle.js from Paddle's CDN; own CSP in the controller.
     Route::withoutMiddleware(['web'])->get('subscribe/pay', [SubscribePageController::class, 'pay'])->name('website.subscribe.pay');
 
     // Web checkout subscribe form (docs/API.md "Web checkout (Paddle)"); ?lang=fr. Session for CSRF.
