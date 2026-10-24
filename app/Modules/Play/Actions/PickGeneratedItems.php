@@ -60,29 +60,40 @@ class PickGeneratedItems
         return array_values(array_filter($candidates, fn (GeneratorSpec $spec, int $i) => $distances[$i] === $nearest, ARRAY_FILTER_USE_BOTH));
     }
 
-    public function points(GeneratorSpec $spec): int
-    {
-        return $this->generator($spec)->pointsForOptions($spec->options);
-    }
-
     /**
-     * @return array{type_key: string, category_id: int, seed: string, difficulty: int, points: int, payload: array<string, mixed>, answer: array<string, mixed>}
+     * The difficulty to generate an item at: random inside the overlap of the spec and the
+     * member's range (the easiest for a redemption round).
      */
-    public function build(GeneratorSpec $spec, FamilyMember $member, bool $easier = false): array
+    public function level(GeneratorSpec $spec, FamilyMember $member, bool $easier = false): int
     {
         $difficulty = $this->policy->difficultyForMember($member);
         [$low, $high] = $spec->rangeFor($difficulty['min'], $difficulty['max']);
-        $level = $easier ? $low : random_int($low, $high);
+
+        return $easier ? $low : random_int($low, $high);
+    }
+
+    public function points(GeneratorSpec $spec, int $level): int
+    {
+        return max(1, $this->generator($spec)->pointsFor($spec->options, $level));
+    }
+
+    /**
+     * Builds one item at $level (see level()) from a fresh seed, in the member's language.
+     *
+     * @return array{type_key: string, category_id: int, seed: string, difficulty: int, points: int, payload: array<string, mixed>, answer: array<string, mixed>}
+     */
+    public function build(GeneratorSpec $spec, FamilyMember $member, int $level): array
+    {
         $seed = bin2hex(random_bytes(8));
         $generator = $this->generator($spec);
-        $item = $generator->generate($seed, $level, $spec->options);
+        $item = $generator->generate($seed, $level, [...$spec->options, 'locale' => $member->user->locale]);
 
         return [
             'type_key' => $spec->type,
             'category_id' => $spec->categoryId,
             'seed' => $seed,
             'difficulty' => $level,
-            'points' => $generator->pointsForOptions($spec->options),
+            'points' => $this->points($spec, $level),
             'payload' => $item['payload'],
             'answer' => $item['answer'],
         ];

@@ -74,7 +74,7 @@ it('returns adult defaults', function () {
     actingAsMember($this->owner);
 
     $this->getJson('/api/v1/me/notification-preferences')->assertOk()->assertExactJson(['data' => [
-        'types' => ['goal_reached' => true, 'period_closed' => true, 'family_activity' => true, 'daily_reminder' => false],
+        'types' => ['goal_reached' => true, 'period_closed' => true, 'family_activity' => true, 'daily_reminder' => false, 'family_chat' => true],
         'quiet_from' => '21:30',
         'quiet_to' => '07:00',
         'reminder_time' => '17:00',

@@ -42,7 +42,7 @@ it('groups endpoints by module', function () {
     $spec = apiSpec();
 
     expect(collect($spec['tags'])->pluck('name')->all())
-        ->toBe(['Health', 'Identity', 'Family', 'Content', 'Play', 'Scoring', 'Goals', 'Billing', 'Legal', 'Notifications']);
+        ->toBe(['Health', 'Identity', 'Family', 'Content', 'Play', 'Scoring', 'Goals', 'Billing', 'Chat', 'Legal', 'Notifications']);
 
     foreach ($spec['paths'] as $path => $operations) {
         foreach ($operations as $method => $operation) {

@@ -40,6 +40,7 @@ class ContentSeeder extends Seeder
      */
     public const array LANGUAGE_BOUND_CATEGORIES = [
         'anagrams', 'missing-letter', 'word-search', 'spelling', 'idioms', 'synonyms', 'grades-1-3', 'grades-4-6', 'grades-7-9',
+        'everyday-words', 'numbers-colours', 'phrases',
     ];
 
     public const array WISDOM_QUESTION = ['en' => 'What is the main idea?', 'fr' => "Quelle est l'idée principale ?"];

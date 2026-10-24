@@ -2,6 +2,7 @@
 
 namespace App\Modules\Identity\Actions;
 
+use App\Modules\Chat\Models\ChatMessage;
 use App\Modules\Core\Exceptions\ApiException;
 use App\Modules\Core\Support\Iso;
 use App\Modules\Family\Models\FamilyMember;
@@ -62,6 +63,13 @@ class ExportUserData
             ->with(['planMembers' => fn ($query) => $query->whereIn('member_id', $memberIds)])
             ->orderBy('id')
             ->get();
+
+        // The user's own family chat messages that still exist (not deleted, not past retention yet).
+        $chatMessages = ChatMessage::query()
+            ->whereIn('family_member_id', $memberIds)
+            ->whereNull('deleted_at')
+            ->orderBy('id')
+            ->get(['id', 'family_id', 'family_member_id', 'body', 'created_at']);
 
         $consents = Consent::query()->where('user_id', $user->id)->orderBy('id')->get();
         $devices = Device::query()->where('user_id', $user->id)->orderBy('id')->get();
@@ -141,6 +149,13 @@ class ExportUserData
                     'member_id' => $planMember->member_id,
                     'target_override' => $planMember->target_override,
                 ])->values()->all(),
+            ])->values()->all(),
+            'chat_messages' => $chatMessages->map(fn (ChatMessage $message): array => [
+                'id' => $message->id,
+                'family_id' => $message->family_id,
+                'member_id' => $message->family_member_id,
+                'body' => $message->body,
+                'created_at' => Iso::format($message->created_at),
             ])->values()->all(),
             'consents' => $consents->map(fn (Consent $consent): array => [
                 'type' => $consent->type,

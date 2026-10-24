@@ -1,6 +1,7 @@
 {{--
     Layout of the public website (landing page, support). No scripts, no cookies, no external
-    fonts or CDNs: inline CSS only (strict CSP from SecurityHeaders). Light/dark follows the
+    fonts or CDNs: inline CSS only (strict CSP from SecurityHeaders); images are same-origin files
+    under public/images. Pages add their own CSS with @section('styles'). Light/dark follows the
     system setting. $locale is en|fr; links carry ?lang= so the choice sticks.
 --}}
 @php
@@ -63,10 +64,6 @@
         p { margin: 0 0 12px; }
         section { padding: 40px 0; }
         .lead { font-size: 1.15rem; color: var(--muted); max-width: 640px; }
-        .hero { padding: 24px 0 48px; }
-        .hero .wrap { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: center; }
-        .hero img { width: min(260px, 60vw); height: auto; justify-self: center; }
-        @media (min-width: 760px) { .hero .wrap { grid-template-columns: 1.4fr 1fr; } }
         .stores { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; padding: 0; list-style: none; }
         .stores li { border: 2px solid var(--fg); border-radius: 12px; padding: 8px 14px; font-weight: 600; font-size: 0.95rem; }
         .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); padding: 0; margin: 0; list-style: none; }
@@ -88,6 +85,9 @@
         footer.site nav { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 12px; }
         @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
     </style>
+    @hasSection('styles')
+        <style>@yield('styles')</style>
+    @endif
 </head>
 <body>
 <a class="skip" href="#main">{{ $fr ? 'Aller au contenu' : 'Skip to content' }}</a>

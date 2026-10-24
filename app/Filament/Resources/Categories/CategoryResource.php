@@ -70,7 +70,7 @@ class CategoryResource extends Resource
                 ->schema([
                     Repeater::make('generators')->hiddenLabel()->defaultItems(0)->columns(4)->schema([
                         Select::make('type')->options(fn () => self::generatorTypes())->required(),
-                        KeyValue::make('options')->helperText('sudoku: size = 4 | 6 | 9 · math_sprint: mode = times_tables | mental | fractions')
+                        KeyValue::make('options')->helperText('sudoku: size = 4 | 6 | 9 · math_sprint: mode = times_tables | mental | fractions · brain games (memory_match, pattern_sequence, nonogram, spot_difference): no options, the difficulty sets the size')
                             ->rules([fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
                                 $registry = app(ChallengeTypeRegistry::class);
                                 $type = (string) $get('type');

@@ -35,7 +35,7 @@ code, restart the workers: `docker compose restart horizon`.
 - **Modules.** Domain code lives in `app/Modules/<Name>/` with the sub-folders
   `Models`, `Actions`, `Events`, `Listeners`, `Http`, `Policies`.
   Modules: `Identity`, `Family`, `Content`, `ChallengeTypes`, `Play`, `Scoring`, `Goals`,
-  `Policy`, `Billing`, `Notifications`. Existing: `Core` (shared API plumbing), `Identity`, `Policy`,
+  `Policy`, `Billing`, `Notifications`, `Chat`. Existing: `Core` (shared API plumbing), `Identity`, `Policy`,
   `Family`, `Content`, `ChallengeTypes`, `Play`, `Scoring` and `Goals`. Each module has a
   `<Name>ServiceProvider` (extends `App\Modules\Core\ModuleServiceProvider`) registered in
   `bootstrap/providers.php`; its routes live in `Http/routes.php` under `/api/v1`.

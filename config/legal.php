@@ -42,10 +42,10 @@ return [
             ],
         ],
         'privacy' => [
-            'version' => '2026-10-16',
+            'version' => '2026-10-23',
             'summary' => [
-                'en' => 'First version of the Brainy Clan privacy policy.',
-                'fr' => 'Première version de la politique de confidentialité de Brainy Clan.',
+                'en' => 'New: family chat — what we store, who can see it (only your family), encryption and how long messages are kept (7 days free, 1 year Family plan).',
+                'fr' => 'Nouveau : discussion familiale — ce que nous conservons, qui peut la voir (seulement votre famille), le chiffrement et la durée de conservation des messages (7 jours gratuit, 1 an forfait Famille).',
             ],
         ],
     ],

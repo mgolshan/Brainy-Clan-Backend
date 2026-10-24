@@ -118,7 +118,7 @@ it('validates sudoku content and points by size', function () {
     expect($sudoku->validate($nine['payload'], $nine['answer']))->toBe([])
         ->and($sudoku->points(contentOf('sudoku', $nine)))->toBe(8)
         ->and($sudoku->points(contentOf('sudoku', $six)))->toBe(5)
-        ->and($sudoku->pointsForOptions(['size' => 9]))->toBe(8)
+        ->and($sudoku->pointsFor(['size' => 9], 7))->toBe(8)
         ->and($sudoku->validate(['size' => 5], []))->toHaveKey('payload.size')
         ->and($sudoku->validate([...$nine['payload'], 'grid' => array_fill(0, 9, array_fill(0, 9, 0))], $nine['answer']))->toHaveKey('payload.grid')
         ->and($sudoku->validateOptions(['size' => 7]))->toHaveKey('options.size');

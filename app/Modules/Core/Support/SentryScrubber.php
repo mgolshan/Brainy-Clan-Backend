@@ -10,7 +10,8 @@ use Sentry\UserDataBag;
 /**
  * `before_send` for Sentry (config/sentry.php): no personal data leaves the server, children's
  * least of all. Keeps only the user id; removes cookies, auth headers and the request body; masks
- * personal fields, emails, bearer tokens and one-time link tokens anywhere in the event (messages,
+ * personal fields (incl. any `body` key: family chat text, docs/API.md "Family chat"), emails, bearer
+ * tokens and one-time link tokens anywhere in the event (messages,
  * exception values, breadcrumbs, extra and contexts).
  */
 final class SentryScrubber
@@ -22,7 +23,7 @@ final class SentryScrubber
         'authorization', 'cookie', 'set-cookie', 'x-xsrf-token', 'x-csrf-token', 'php-auth-user', 'php-auth-pw',
         'password', 'current_password', 'password_confirmation', 'token', 'access_token', 'refresh_token', 'id_token',
         'authorization_code', 'code', 'nonce', 'push_token', 'email', 'display_name', 'nickname', 'name', 'avatar',
-        'birth_year', 'birth_month', 'ip_address', 'ip', 'reward_ref', 'secret', 'api_key', '_token',
+        'birth_year', 'birth_month', 'ip_address', 'ip', 'reward_ref', 'secret', 'api_key', '_token', 'body',
     ];
 
     public static function beforeSend(Event $event, ?EventHint $hint = null): Event

@@ -12,6 +12,8 @@ interface GeneratesItems
 {
     /**
      * Build one item. Must be deterministic: same seed, difficulty and options → same item.
+     * At session time the options also carry `locale` (the member's language, e.g. "fr") for
+     * types that reveal localized text after answering (nonogram picture titles).
      *
      * @param  array<string, mixed>  $options  from the category's generator spec
      * @return array{payload: array<string, mixed>, answer: array<string, mixed>}
@@ -19,12 +21,14 @@ interface GeneratesItems
     public function generate(string $seed, int $difficulty, array $options): array;
 
     /**
-     * What a correct answer to an item generated with these options is worth, known before
-     * generating (the session sizes its batch with it).
+     * What a correct answer to an item generated with these options at this difficulty is
+     * worth, known before generating (the session sizes its batch with it). Sudoku depends on
+     * the size option only; brain games scale with the difficulty (more pairs, longer
+     * sequences, bigger grids, more differences).
      *
      * @param  array<string, mixed>  $options
      */
-    public function pointsForOptions(array $options): int;
+    public function pointsFor(array $options, int $difficulty): int;
 
     /**
      * Validate a category's generator options (admin). Field errors keyed like "options.size".

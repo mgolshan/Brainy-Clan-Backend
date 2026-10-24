@@ -11,8 +11,8 @@ use App\Modules\Policy\PolicyResolver;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Admin edits a member: nickname, avatar, difficulty override, birth data, role, accessibility
- * and the member's email login. The family owner can never be demoted, and only the owner can
+ * Admin edits a member: nickname, avatar, difficulty override, birth data, role, accessibility,
+ * family chat on/off (`chat_enabled`) and the member's email login. The family owner can never be demoted, and only the owner can
  * change the owner's email login.
  *
  * `email`: adds, changes or removes (null) the email login. Only when the member's age band has
@@ -44,7 +44,7 @@ class UpdateMember
         }
 
         return DB::transaction(function () use ($member, $data): FamilyMember {
-            $memberFields = array_intersect_key($data, array_flip(['nickname', 'difficulty_override', 'role']));
+            $memberFields = array_intersect_key($data, array_flip(['nickname', 'difficulty_override', 'role', 'chat_enabled']));
 
             if (array_key_exists('accessibility', $data) && is_array($data['accessibility'])) {
                 $memberFields['accessibility'] = Accessibility::merge($member->accessibility, $data['accessibility']);

@@ -3,6 +3,8 @@
 use App\Modules\Family\Actions\RequestAccountDeletionByEmail;
 use App\Modules\Family\Mail\AccountDeletionConfirmation;
 use App\Modules\Identity\Models\User;
+use App\Modules\Policy\Models\Setting;
+use App\Modules\Policy\Models\ThemeWorld;
 use Illuminate\Support\Facades\Mail;
 
 /**
@@ -59,11 +61,14 @@ describe('pages', function () {
             ->assertSee('Up to 2 family members, you included')
             ->assertSee('Up to 7 family members, you included')
             ->assertSee('3 categories')
-            ->assertSee('All 8 categories')
+            ->assertSee('All 17 categories')
+            ->assertSee('17 categories to start with')
             ->assertSee('1 active family goal')
             ->assertSee('Unlimited family goals')
             ->assertSee('3 free second chances per member per day')
-            ->assertSee('No ads');
+            ->assertSee('No ads')
+            ->assertSee('Family chat: messages kept for 7 days')
+            ->assertSee('Family chat: messages kept for 1 year');
     });
 
     it('picks French from Accept-Language, and ?lang= wins over the browser', function () {
@@ -134,6 +139,168 @@ describe('pages', function () {
 
     it('ships the owl mascot as a static file', function () {
         expect(file_get_contents(public_path('images/owl.svg')))->toContain('<svg');
+    });
+});
+
+/**
+ * Every <img> of a page: src, alt (null when missing) and the whole tag.
+ *
+ * @return list<array{src: string, alt: string|null, tag: string}>
+ */
+function landingImages(string $html): array
+{
+    preg_match_all('/<img\b[^>]*>/i', $html, $tags);
+
+    return array_map(function (string $tag): array {
+        preg_match('/\ssrc="([^"]*)"/', $tag, $src);
+        preg_match('/\salt="([^"]*)"/', $tag, $alt);
+
+        return ['src' => $src[1] ?? '', 'alt' => $alt[1] ?? null, 'tag' => $tag];
+    }, $tags[0]);
+}
+
+/**
+ * Landing page v2 (docs/PLAN.md "Landing page v2 (2026-10-23)"): visual sections, same-origin
+ * images that exist, alt texts in both languages, nothing loaded from other hosts.
+ */
+describe('landing page v2', function () {
+    it('renders every section in both languages', function (string $lang, array $texts) {
+        $response = $this->get("/?lang={$lang}")->assertOk();
+
+        foreach (['worlds', 'how', 'games', 'brain-games', 'categories', 'clan', 'unlocks', 'what', 'chat', 'safety', 'plans', 'get'] as $id) {
+            $response->assertSee('id="'.$id.'"', false);
+        }
+
+        foreach ($texts as $text) {
+            $response->assertSee($text, false);
+        }
+    })->with([
+        'en' => ['en', ['Pick your world', 'How it works', 'Invite the kids with a code', 'Real games, not homework', 'Meet the Clan', 'Play, earn points, unlock worlds', 'Candy Land', 'Neon Arcade', 'Grandpa', 'Brain games for memory and logic', 'Memory Match', 'Pattern &amp; Sequence', 'Nonograms', 'Spot the Difference', 'Chat together, safely', 'Only your family']],
+        'fr' => ['fr', ['Choisissez votre monde', 'Comment ça marche', 'Invitez les enfants avec un code', 'De vrais jeux, pas des devoirs', 'Voici le Clan', 'Jouez, gagnez des points, débloquez des mondes', 'Pays des bonbons', 'Arcade néon', 'Grand-papa', 'Des jeux de cerveau pour la mémoire et la logique', 'Jeu de mémoire', 'Suites à répéter', 'Logimages', 'Jeu des différences', 'Jasez en famille, en toute sécurité', 'Seulement votre famille']],
+    ]);
+
+    it('only references images that exist in public/, with sizes and alt texts', function (string $lang) {
+        $images = landingImages((string) $this->get("/?lang={$lang}")->assertOk()->getContent());
+
+        expect(count($images))->toBeGreaterThan(40);
+
+        foreach ($images as $image) {
+            expect($image['src'])->toStartWith('/images/')
+                ->and(is_file(public_path(ltrim($image['src'], '/'))))->toBeTrue("missing file {$image['src']}")
+                ->and($image['alt'])->not->toBeNull("no alt on {$image['src']}")
+                ->and($image['tag'])->toMatch('/\swidth="\d+"/')->toMatch('/\sheight="\d+"/');
+        }
+
+        // Every app screenshot is described (never decorative); the hero's middle phone is the
+        // eager LCP image and everything below the hero is lazy.
+        $screens = array_values(array_filter($images, fn (array $image): bool => str_contains($image['src'], '/screens/')));
+        expect(count($screens))->toBeGreaterThanOrEqual(15);
+
+        foreach ($screens as $screen) {
+            expect(mb_strlen((string) $screen['alt']))->toBeGreaterThan(15);
+        }
+
+        expect($screens[1]['tag'])->toContain('fetchpriority="high"')->not->toContain('loading="lazy"')
+            ->and(collect($screens)->slice(3)->every(fn (array $image): bool => str_contains($image['tag'], 'loading="lazy"')))->toBeTrue();
+    })->with(['en', 'fr']);
+
+    it('lists every seeded top-level category with its art and both names', function () {
+        /** @var array<string, array{name: array{en: string, fr: string}}> $seeded */
+        $seeded = require database_path('seeders/data/categories.php');
+        $en = (string) $this->get('/?lang=en')->assertOk()->getContent();
+        $fr = (string) $this->get('/?lang=fr')->assertOk()->getContent();
+
+        expect($seeded)->toHaveCount(17)
+            ->and($en)->toContain(count($seeded).' categories to start with')
+            ->and($fr)->toContain(count($seeded).' catégories pour commencer')
+            ->and(substr_count($en, '<li class="cat">'))->toBe(count($seeded));
+
+        foreach ($seeded as $slug => $category) {
+            expect($en)->toContain('src="/images/site/art/'.$slug.'.svg"')
+                ->toContain(e($category['name']['en']))
+                ->and($fr)->toContain(e($category['name']['fr']))
+                ->and(file_get_contents(public_path("images/site/art/{$slug}.svg")))
+                ->toStartWith('<svg')->not->toMatch('/\sid=|url\(#/');
+        }
+    });
+
+    it('loads nothing from other hosts and keeps the strict CSP without scripts or cookies', function () {
+        $response = $this->get('/')->assertOk();
+
+        expect((string) $response->getContent())->not->toContain('<script')
+            ->not->toMatch('/\s(src|srcset)="(https?:)?\/\//i')
+            ->not->toMatch('/url\(\s*["\']?(https?:)?\/\//i')
+            ->not->toContain('@import')
+            ->not->toMatch('/\son[a-z]+="/i')
+            ->and($response->headers->get('Content-Security-Policy'))
+            ->toBe("default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+            ->and($response->headers->getCookies())->toBe([]);
+    });
+
+    it('keeps the page and the site images within the weight budget', function () {
+        $html = (string) $this->get('/')->assertOk()->getContent();
+        $files = array_unique(array_column(landingImages($html), 'src'));
+        $bytes = strlen($html) + array_sum(array_map(fn (string $src): int => (int) filesize(public_path(ltrim($src, '/'))), $files));
+
+        expect($bytes)->toBeLessThan((int) (2.5 * 1024 * 1024));
+
+        $siteImages = 0;
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(public_path('images/site'), FilesystemIterator::SKIP_DOTS)) as $file) {
+            $siteImages += $file->getSize();
+        }
+
+        expect($siteImages)->toBeLessThan(2 * 1024 * 1024);
+    });
+
+    it('shows the four brain games and the family chat with their screenshots', function (string $lang, array $alts) {
+        $html = (string) $this->get("/?lang={$lang}")->assertOk()->getContent();
+        $images = collect(landingImages($html))->keyBy('src');
+
+        foreach (['brain-memory', 'brain-pattern', 'brain-nonogram', 'brain-spot', 'chat-family'] as $i => $name) {
+            $image = $images->get("/images/site/screens/{$name}.webp");
+
+            expect($image)->not->toBeNull("{$name} missing")
+                ->and(is_file(public_path("images/site/screens/{$name}.webp")))->toBeTrue()
+                ->and($image['alt'])->toContain($alts[$i])
+                ->and($image['tag'])->toContain('loading="lazy"');
+        }
+
+        expect(substr_count($html, '<div class="shot">'))->toBe(4);
+    })->with([
+        'en' => ['en', ['Memory Match', 'Pattern &amp; Sequence', 'nonogram', 'Spot the Difference', 'family chat']],
+        'fr' => ['fr', ['jeu de mémoire', 'jeu de suites', 'logimage', 'jeu des différences', 'clavardage familial']],
+    ]);
+
+    it('tells the chat retention of each plan from the tier settings, in the chat section and the plans', function () {
+        Setting::query()->where('key', 'chat.retention_days')->where('scope_id', 'free')->update(['value' => json_encode(30)]);
+        Setting::query()->where('key', 'chat.retention_days')->where('scope_id', 'family')->update(['value' => json_encode(730)]);
+
+        $this->get('/?lang=en')->assertOk()
+            ->assertSee('Kept for 30 days on the free plan and 2 years on the Family plan, then deleted.')
+            ->assertSee('Family chat: messages kept for 30 days')
+            ->assertSee('Family chat: messages kept for 2 years')
+            ->assertSee('a parent can turn it off for a child or remove any message.')
+            ->assertDontSee('No chat and no contact with strangers');
+        $this->get('/?lang=fr')->assertOk()
+            ->assertSee('Gardés 30 jours avec le forfait gratuit et 2 ans avec le forfait Famille, puis supprimés.')
+            ->assertSee('Clavardage familial : messages gardés 2 ans');
+    });
+
+    it('shows the world unlocks from the live catalog', function () {
+        ThemeWorld::query()->where('key', 'jungle')->update(['required' => 75]);
+        ThemeWorld::query()->where('key', 'neon')->update(['active' => false]);
+
+        $this->get('/?lang=en')->assertOk()
+            ->assertSee('75 points to unlock')
+            ->assertSee('Jungle Adventure (75 points)')
+            ->assertSee('3-day streak to unlock')
+            ->assertSee('Exclusive worlds: Dino Valley, Midnight')
+            ->assertDontSee('id="world-neon"', false)
+            ->assertSee('id="world-sea"', false);
+
+        $this->get('/?lang=fr')->assertOk()
+            ->assertSee('Série de 3 jours pour débloquer', false)
+            ->assertSee('Forfait Famille');
     });
 });
 

@@ -64,6 +64,7 @@ class MemberResource extends JsonResource
             'default_ui_theme' => (string) ($band?->rule('ui_theme') ?? 'modern'),
             // False when the stored theme world is locked again (e.g. the family plan ended); the theme is kept.
             'theme_unlocked' => app(EvaluateWorldUnlocks::class)->themeUnlocked($member, $this->worldProgress),
+            'chat_enabled' => (bool) $member->chat_enabled,
             'status' => $member->status,
             'joined_at' => Iso::format($member->joined_at ?? $member->created_at),
             'email' => $this->when($showPrivate, $member->user->email),

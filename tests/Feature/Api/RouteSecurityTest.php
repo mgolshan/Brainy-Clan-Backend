@@ -66,6 +66,24 @@ it('keeps admin-only family routes behind the family:admin middleware', function
     expect($adminRoutes)->toBe([]);
 });
 
+it('keeps the family chat routes authenticated, rate-limited and the post route on its own limiter', function () {
+    $chat = apiRouteMiddleware()->filter(fn (array $middleware, string $route) => Str::contains($route, 'family/chat'));
+
+    expect($chat->keys()->sort()->values()->all())->toBe([
+        'DELETE api/v1/family/chat/messages/{message}',
+        'GET api/v1/family/chat/messages',
+        'GET api/v1/family/chat/unread',
+        'POST api/v1/family/chat/messages',
+        'POST api/v1/family/chat/read',
+    ]);
+
+    foreach ($chat as $middleware) {
+        expect($middleware)->toContain('auth:sanctum')->toContain('throttle:api');
+    }
+
+    expect($chat['POST api/v1/family/chat/messages'])->toContain('throttle:chat-post');
+});
+
 it('never runs production with APP_DEBUG on', function () {
     $entrypoint = (string) file_get_contents(base_path('docker/prod/entrypoint.sh'));
 

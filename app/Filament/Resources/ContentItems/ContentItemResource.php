@@ -210,6 +210,10 @@ class ContentItemResource extends Resource
             ($payload['variant'] ?? null) === 'missing_letter' => 'Missing letter: '.($payload['pattern'] ?? ''),
             ($payload['variant'] ?? null) === 'word_search' => 'Word search: '.implode(', ', (array) ($payload['words'] ?? [])),
             isset($payload['size']) => 'Sudoku '.$payload['size'].'×'.$payload['size'],
+            isset($payload['cards']) => 'Memory match: '.intdiv(count((array) $payload['cards']), 2).' pairs',
+            isset($payload['sequence']) => 'Pattern sequence: '.count((array) $payload['sequence']).' steps',
+            isset($payload['row_clues']) => 'Nonogram '.($payload['rows'] ?? '?').'×'.($payload['cols'] ?? '?'),
+            isset($payload['objects']) => 'Spot the difference: '.count((array) ($payload['changes'] ?? [])).' changes',
             default => '',
         };
     }

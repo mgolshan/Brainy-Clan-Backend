@@ -11,7 +11,7 @@ it('resolves the launch handlers from the registry', function () {
 
     expect($registry->get('multiple_choice'))->toBeInstanceOf(MultipleChoice::class)
         ->and($registry->get('wisdom_card'))->toBeInstanceOf(WisdomCard::class)
-        ->and($registry->activeKeys())->toBe(['multiple_choice', 'wisdom_card', 'sudoku', 'math_sprint', 'word_puzzle'])
+        ->and($registry->activeKeys())->toBe(['multiple_choice', 'wisdom_card', 'sudoku', 'math_sprint', 'word_puzzle', 'memory_match', 'pattern_sequence', 'nonogram', 'spot_difference'])
         ->and(fn () => $registry->get('nope'))->toThrow(InvalidArgumentException::class);
 });
 
@@ -19,7 +19,7 @@ it('lets the admin switch a type off', function () {
     ChallengeType::query()->create(['key' => 'wisdom_card', 'name' => 'Wisdom', 'handler_class' => WisdomCard::class, 'is_active' => false]);
 
     expect(app(ChallengeTypeRegistry::class)->isActive('wisdom_card'))->toBeFalse()
-        ->and(app(ChallengeTypeRegistry::class)->activeKeys())->toBe(['multiple_choice', 'sudoku', 'math_sprint', 'word_puzzle']);
+        ->and(app(ChallengeTypeRegistry::class)->activeKeys())->toBe(['multiple_choice', 'sudoku', 'math_sprint', 'word_puzzle', 'memory_match', 'pattern_sequence', 'nonogram', 'spot_difference']);
 });
 
 it('multiple choice strips the answer and checks responses', function () {

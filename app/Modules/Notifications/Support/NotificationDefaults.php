@@ -9,18 +9,19 @@ use App\Modules\Policy\PolicyResolver;
  * Default notification preferences for a member without a stored row (docs/API.md, B8).
  *
  * Quiet hours: children (PolicyResolver `is_child` age band) 19:30–07:30, everyone else
- * 21:30–07:00. All types on except `daily_reminder`; reminder at 17:00. Times are in the
+ * 21:30–07:00. All types (incl. `family_chat`) on except `daily_reminder`; reminder at 17:00. Times are in the
  * family timezone.
  */
 class NotificationDefaults
 {
-    public const array TYPES = ['goal_reached', 'period_closed', 'family_activity', 'daily_reminder'];
+    public const array TYPES = ['goal_reached', 'period_closed', 'family_activity', 'daily_reminder', 'family_chat'];
 
     public const array TYPE_DEFAULTS = [
         'goal_reached' => true,
         'period_closed' => true,
         'family_activity' => true,
         'daily_reminder' => false,
+        'family_chat' => true,
     ];
 
     public const array CHILD_QUIET_HOURS = ['19:30', '07:30'];

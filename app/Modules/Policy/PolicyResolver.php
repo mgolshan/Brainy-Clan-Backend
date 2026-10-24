@@ -36,6 +36,7 @@ class PolicyResolver
         'play.redemption_items' => 3,
         'invites.ttl_days' => 7,
         'sign_in_codes.ttl_minutes' => 15,
+        'chat.retention_days' => 7,
         'feature_flags' => [],
     ];
 
@@ -115,6 +116,7 @@ class PolicyResolver
                 'max_active_goals' => $this->maxActiveGoalsFor($tier),
             ],
             'accessibility_defaults' => $this->accessibilityDefaults($band),
+            'chat' => ['retention_days' => $this->chatRetentionDays($tier)],
             'feature_flags' => (object) $this->featureFlags($tier, $band?->code),
         ];
     }
@@ -247,6 +249,15 @@ class PolicyResolver
         $value = $this->setting('limits.max_active_goals', $tier);
 
         return $value === null ? null : (int) $value;
+    }
+
+    /**
+     * Days family chat messages are kept for a tier (tier setting `chat.retention_days`, seeded:
+     * free 7, family 365); the hourly retention job deletes older messages. At least 1.
+     */
+    public function chatRetentionDays(string $tier): int
+    {
+        return max(1, (int) $this->setting('chat.retention_days', $tier));
     }
 
     public function inviteTtlDays(): int

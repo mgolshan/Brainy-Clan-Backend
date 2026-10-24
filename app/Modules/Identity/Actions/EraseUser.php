@@ -2,6 +2,7 @@
 
 namespace App\Modules\Identity\Actions;
 
+use App\Modules\Chat\Models\ChatMessage;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Models\Invite;
 use App\Modules\Family\Models\SignInCode;
@@ -21,7 +22,7 @@ use Laravel\Sanctum\PersonalAccessToken;
  * "Deleted player", email, password, birth data, avatar, staff flag) and `erased_at` set. The user
  * row itself stays because the append-only points ledger references its memberships; their
  * nicknames become "Deleted player" and accessibility settings are cleared. Unused sign-in codes are
- * voided, notification preferences deleted, the invite they joined with and the unused invites they
+ * voided, notification preferences and family chat messages deleted, the invite they joined with and the unused invites they
  * created (names + birth data of invitees) deleted. Membership status / `MemberRemoved` are the
  * caller's job. Subscriptions stay with the family. A fixed number of queries for any number of users.
  * The activity log gets one entry with user ids only.
@@ -76,6 +77,8 @@ class EraseUser
                     ->whereNull('voided_at')
                     ->update(['voided_at' => now()]);
                 NotificationPreference::query()->whereIn('family_member_id', $memberIds)->delete();
+                // Family chat: the user's messages go for good, in every family they were in.
+                ChatMessage::query()->whereIn('family_member_id', $memberIds)->delete();
             }
 
             Invite::query()

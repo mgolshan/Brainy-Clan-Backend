@@ -2,6 +2,7 @@
 
 use App\Modules\Billing\BillingServiceProvider;
 use App\Modules\ChallengeTypes\ChallengeTypesServiceProvider;
+use App\Modules\Chat\ChatServiceProvider;
 use App\Modules\Content\ContentServiceProvider;
 use App\Modules\Core\CoreServiceProvider;
 use App\Modules\Family\FamilyServiceProvider;
@@ -32,4 +33,5 @@ return [
     GoalsServiceProvider::class,
     BillingServiceProvider::class,
     NotificationsServiceProvider::class,
+    ChatServiceProvider::class,
 ];

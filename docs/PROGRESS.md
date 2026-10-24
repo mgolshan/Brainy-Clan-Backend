@@ -377,6 +377,89 @@ curl http://localhost:8080/api/v1/health
 
 ## Log
 
+### 2026-10-24 landing: brain games + family chat
+- Landing page: new sections **Brain games** (`#brain-games`: Memory Match, Pattern & Sequence,
+  Nonograms, Spot the Difference with crops of the app's game screens, `screens/brain-*.webp`, GD
+  WebP q82) and **Family chat** (`#chat`: private family group chat, parent controls, text + emoji
+  only, retention per plan; `screens/chat-family.webp`, headless capture of Sam's chat with a
+  short demo conversation that was deleted afterwards). "Safe for kids" now says the only chat is the
+  family's own and that parents can turn it off / remove messages; both plan cards list the chat
+  history. Retention comes from the tier setting `chat.retention_days` (`WebsiteController::plan`
+  `chat_days`), never hard-coded. en + fr. Images +106 KB (page stays within the 2.5 MB budget).
+- `WebsiteTest`: new section ids/texts in both languages, brain/chat images exist with alts and
+  lazy loading, retention follows edited settings. Screenshots `docs/screenshots/landing-*.png`
+  updated (palette PNGs).
+- Chat web QA (app PROGRESS 2026-10-24): demo data restored (test messages deleted through the
+  API — they remain as tombstones until retention; family tier back to `family`; QA devices
+  revoked). Mom accepted the privacy policy 2026-10-23 during the QA sign-in.
+
+### 2026-10-23 family chat (backend)
+- **Module `Chat`** (PLAN "Family chat", API.md "Family chat"): `chat_messages` (body `encrypted` cast,
+  tombstones, unique (family_id, client_id), indexes (family_id, id) + (created_at)), `family_members.chat_enabled`
+  + `chat_last_read_id`; 5 endpoints under `/family/chat/*` (thin controller, Form Requests, `ChatMessageResource`),
+  `ResolveChatMember` (non-members/staff → 404, chat off → 403 `chat_disabled`), `ChatText` normalization (NFC,
+  CRLF→LF, strip `Cc` except `\n`, ≤2 blank lines, trim, 1–1000 code points), idempotent `client_id` (200 on
+  repeat, race-safe), limiter `chat-post` 20/min, read marker only forward (capped at newest id).
+- **Retention:** tier settings `chat.retention_days` (free 7, family 365; data migration + PolicySeeder), Policy
+  `chat`, hourly `chat:prune` (one batched delete per tier); past-retention messages hidden before pruning.
+- **Lifecycle:** `EraseUser` deletes the user's messages (all families); removed members show as "Former member"
+  (FK kept, see PLAN); `FamilyDeleted` → whole chat deleted; `/me/export` gains `chat_messages`.
+- **Push:** `NotifyFamilyChat` (Notifications, queued): `family_chat` preference (default on), localized
+  "Sam sent a message", data `{type, message_id}`, no text, 1 per recipient per 2 min.
+- **Privacy:** no Filament resource / activity log; model hides `body`; SentryScrubber masks any `body` key;
+  DEPLOY.md: back up APP_KEY separately, never rotate without `APP_PREVIOUS_KEYS`. Privacy drafts en/fr gain a
+  "Family chat" paragraph + retention/security lines; **privacy version bumped to `2026-10-23`** (re-acceptance).
+- Tests: `tests/Feature/Api/FamilyChatTest.php` (XSS payloads verbatim, emoji, access matrix, retention with
+  travel, push, N+1 for 50 messages), RouteSecurityTest chat routes; Notifications/Legal/ApiDocs tests adjusted.
+
+### 2026-10-23 brain games (backend)
+- Four generated types (docs/API.md "Brain games"), handlers in `app/Modules/ChallengeTypes/Handlers`
+  (`MemoryMatch`, `PatternSequence`, `Nonogram`, `SpotDifference`, shared `BrainGame` base), generators
+  `NonogramGenerator` (library + line solver + random fallback) and `SpotDifferenceGenerator`, art keys in
+  `Support/ClanArt` (kid avatars = `User::AVATARS` species). Registered in `config/challenge_types.php`;
+  `ChallengeTypeSeeder` + `CategorySeeder` re-run on the dev DB (both idempotent, updateOrCreate).
+- Points depend on difficulty, so `GeneratesItems::pointsForOptions()` became `pointsFor($options,
+  $difficulty)`; `AddSessionItems` plans each generated slot's level up front (exact points for batch
+  sizing). Generators get the member's `locale` in `$options` (nonogram titles en/fr).
+- Nonogram library `database/seeders/data/nonograms.php`: 16 original pictures per size (5/8/10), every
+  one solvable line by line (unique) with no empty row/column — tested.
+- Rules chosen: memory `max_attempts` = 2×pairs+2 (difficulty 1–4) / 2×pairs+1 (perfect memory needs ≤
+  2×pairs−1); pattern pads 3/4/5/6 at difficulty 1–2/3–6/7–8/9–10, length 3,3,4,4,5,6,6,7,8,9; spot the
+  difference 8→14 objects, 3/5/7 changes at 1–3/4–7/8–10, `max_misses` 5 (4 at 9–10), color changes only on
+  props, flips only on kite/boat/fish/bird. Request caps: 200 attempts, 20 inputs, 60 taps (422).
+- Admin: content preview samples for the four types (rough rendering + JSON); category helper text.
+- Tests: `tests/Feature/Actions/BrainGamesTest.php`, `tests/Feature/Api/BrainGamesPlayTest.php`.
+
+### 2026-10-23 new categories art + icons
+- Landing page lists all 17 top-level categories (9 new, en/fr names from `categories.php`, short
+  descriptions from their leaves); heading count stays computed. Art for the 9 new slugs exported
+  from the app generator into `public/images/site/art/` (byte-identical to `categoryArt.generated.ts`).
+- Category grid is now compact flex tiles in centred rows: 6 per row on desktop (6/6/5), 3 on
+  tablets, 2 on phones (smaller art, centred text). WebsiteTest: "All 17 categories" + a test that
+  every seeded top-level slug has its tile, art file (id-free) and both names.
+- Note: after Blade edits, `view:clear` is not enough with OPcache's file cache; also
+  `rm -rf /tmp/opcache/*` and reload FPM (`kill -USR2 1` in the app container).
+
+### 2026-10-23 landing page v2
+- **Page** (PLAN "Landing page v2"): `resources/views/website/home.blade.php` redesigned, same routes, en + fr,
+  all earlier claims/plan data/links kept. Sections: hero (3 fanned CSS phone frames + floating Clan
+  characters, "coming soon" store badges), "Pick your world" scroll-snap slider (11 worlds, anchor dots,
+  `::scroll-button` arrows where supported, keyboard-scrollable, no JS), How it works (4 illustrated
+  steps), game screens strip (quiz + Clan reaction, Sudoku, word search, race, team goal), 8 categories
+  with the Clan category art, Meet the Clan (kid/teen/mom/dad/grandma/grandpa + a parade that stops for
+  reduced motion), world unlocks, What is Brainy Clan, Safe for kids, Plans, final CTA.
+- **True to data:** world unlock tags/lists come from the live catalog (`ThemeWorldCatalog`, passed by
+  `WebsiteController::home`); inactive worlds are hidden; Family plan card lists the exclusive worlds.
+- **Layout:** pages can add CSS via `@section('styles')`; old hero CSS removed. CSP unchanged (no scripts).
+- **Images** `public/images/site/` (48 files, ~0.7 MB): `screens/*.webp` (18 captures of the demo family,
+  480×1039, GD WebP q80, ~0.6 MB), `art/*.svg` (8 category scenes), `clan/*.svg` (22 avatars), minified.
+  Captures: headless Chrome at 390×844 @2x with the demo child token; goal/stat numbers and the race
+  period were adjusted in the intercepted API responses only (demo data, no DB change); screens are in
+  English on both page languages. Sources not kept.
+- **Tests:** `WebsiteTest` "landing page v2" (sections en/fr, every image exists with width/height/alt,
+  descriptive alts on screenshots, lazy below the hero, no external hosts/inline handlers, exact CSP, weight
+  budget, unlocks follow the catalog). Screenshots for Moe: `docs/screenshots/landing-{desktop,phone}.png`.
+
 ### 2026-10-23 world unlocks
 - **Catalog** (PLAN "Theme worlds" phase 2): table `theme_worlds` (key, sort, unlock_type
   free|points|streak|family_plan, required, active), model `Policy\Models\ThemeWorld`

@@ -29,6 +29,10 @@ class ContentPreview extends Page
         'math-times_tables' => ['math_sprint', ['mode' => 'times_tables'], 'Math: times tables'],
         'math-mental' => ['math_sprint', ['mode' => 'mental'], 'Math: mental math'],
         'math-fractions' => ['math_sprint', ['mode' => 'fractions'], 'Math: fractions'],
+        'memory_match' => ['memory_match', [], 'Brain games: memory match'],
+        'pattern_sequence' => ['pattern_sequence', [], 'Brain games: pattern sequence'],
+        'nonogram' => ['nonogram', [], 'Brain games: nonogram'],
+        'spot_difference' => ['spot_difference', [], 'Brain games: spot the difference'],
     ];
 
     protected string $view = 'filament.pages.content-preview';

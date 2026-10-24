@@ -140,7 +140,10 @@ nano .env.prod
 - [ ] Google / Facebook / Apple sign-in keys — README "Google and Facebook sign-in — setup" and "Sign in with Apple — setup"
 - [ ] `REVENUECAT_WEBHOOK_SECRET`, `REVENUECAT_API_KEY`, `EXPO_ACCESS_TOKEN` — README "Subscriptions, rewarded ads and push — setup"
 - [ ] `ANTHROPIC_API_KEY` — README "AI batch generator" (optional in production)
-- [ ] `BACKUP_PASSPHRASE` + Storage Box `RCLONE_CONFIG_STORAGEBOX_*` (section 9). **Keep a copy of `BACKUP_PASSPHRASE` and `APP_KEY` in your password manager**: without them backups and encrypted columns (Apple tokens) cannot be restored.
+- [ ] `BACKUP_PASSPHRASE` + Storage Box `RCLONE_CONFIG_STORAGEBOX_*` (section 9). **Keep a copy of `BACKUP_PASSPHRASE` and `APP_KEY` in your password manager**: without them backups and encrypted columns (Apple tokens, **family chat messages**) cannot be restored.
+  `APP_KEY` must be backed up **separately from the database backups** (never inside them): the chat is
+  encrypted at rest so a leaked dump is unreadable without the key. Never rotate `APP_KEY` without
+  putting the old key in `APP_PREVIOUS_KEYS`, or every stored chat message becomes undecryptable.
 
 ## 6. First deploy (server)
 

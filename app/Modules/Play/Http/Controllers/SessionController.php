@@ -30,7 +30,7 @@ class SessionController
      * Start a play session.
      *
      * Picks items from the category subtree in the member's difficulty range (least seen first) or
-     * generates them (Sudoku, Math Sprint). Items never contain answers. 403
+     * generates them (Sudoku, Math Sprint, brain games). Items never contain answers. 403
      * `category_not_allowed`.
      */
     #[ApiErrors('category_not_allowed')]
@@ -76,7 +76,7 @@ class SessionController
      * fails it. A malformed `response` is a 422 (not a mistake). `correct_response` has the same
      * shape as the item type's `response` (see docs/API.md "Challenge payloads").
      *
-     * @response array{data: array{is_correct: bool, correct_response: array{choice_id?: string, grid?: list<list<int>>, value?: string, word?: string, found?: list<array{word: string, start: list<int>, end: list<int>}>}, explanation: string|null, points_awarded: int, session: SessionResource}}
+     * @response array{data: array{is_correct: bool, correct_response: array{choice_id?: string, grid?: list<list<int>>, value?: string, word?: string, found?: list<array{word: string, start: list<int>, end: list<int>}>, attempts?: null, cards?: list<string>, input?: list<int>, title?: string|null, changes?: list<string>}, explanation: string|null, points_awarded: int, session: SessionResource}}
      */
     #[ApiErrors('session_not_active', 'item_already_answered')]
     public function answer(SubmitAnswerRequest $request, int $session, SubmitAnswer $submit): JsonResponse

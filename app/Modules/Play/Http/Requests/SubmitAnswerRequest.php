@@ -19,6 +19,12 @@ class SubmitAnswerRequest extends FormRequest
             'response.found' => ['sometimes', 'array', 'max:100'],
             /** Sudoku: the grid rows (at most 16). */
             'response.grid' => ['sometimes', 'array', 'max:16'],
+            /** Memory match: every pair of positions turned over, in order (at most 200). */
+            'response.attempts' => ['sometimes', 'array', 'max:200'],
+            /** Pattern sequence: the pad positions tapped, in order (at most 20). */
+            'response.input' => ['sometimes', 'array', 'max:20'],
+            /** Spot the difference: taps as [x, y], normalized 0–1 within the tapped picture (at most 60). */
+            'response.taps' => ['sometimes', 'array', 'max:60'],
             'time_ms' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:3600000'],
         ];
     }

@@ -124,12 +124,14 @@ class PolicySeeder extends Seeder
             ['tier', 'free', 'limits.max_active_goals', 1, 'Free tier: one active goal plan.'],
             ['tier', 'free', 'second_chance.free_per_day', 0, 'Free second chances per member per day.'],
             ['tier', 'free', 'ads.enabled', true, 'Rewarded ads allowed on this tier (age band must allow too).'],
+            ['tier', 'free', 'chat.retention_days', 7, 'Free tier: family chat messages are deleted after this many days.'],
 
             ['tier', 'family', 'limits.max_members', 7, 'Family plan: admin + 6 members.'],
             ['tier', 'family', 'limits.max_categories', 100, 'Family plan: all categories.'],
             ['tier', 'family', 'limits.max_active_goals', null, 'Family plan: unlimited goal plans (null).'],
             ['tier', 'family', 'second_chance.free_per_day', 3, 'Free second chances per member per day.'],
             ['tier', 'family', 'ads.enabled', false, 'Paying families never see ads.'],
+            ['tier', 'family', 'chat.retention_days', 365, 'Family plan: family chat messages are deleted after this many days.'],
         ];
     }
 }

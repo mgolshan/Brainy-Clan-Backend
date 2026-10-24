@@ -52,6 +52,7 @@ and add a line to the changelog at the bottom.
 | `second_chance_unavailable` | 403 | No second chance of that method left / allowed |
 | `goal_limit_reached` | 403 | Tier limit on active goal plans reached |
 | `world_locked` | 403 | That theme world isn't unlocked for this member (see `GET /me/worlds`) |
+| `chat_disabled` | 403 | A family admin turned off chat for this member |
 | `ad_reward_pending` | 409 | Rewarded-ad callback not received yet — retry shortly |
 | `ssv_signature_invalid` | 400 | AdMob SSV callback signature could not be verified |
 | `app_update_required` | 426 | App older than `min_app_version` |
@@ -90,7 +91,8 @@ and add a line to the changelog at the bottom.
   "difficulty_override": null,
   "accessibility": { "text_scale": 1.0, "reduced_motion": false, "calm_timers": false, "theme": null, "sound_effects": null },
   "default_ui_theme": "playful", "status": "active", "joined_at": "2026-10-10T14:00:00Z",
-  "email": null, "has_password": false, "email_login_allowed": false, "has_own_login": false }
+  "email": null, "has_password": false, "email_login_allowed": false, "has_own_login": false,
+  "chat_enabled": true }
 ```
 - `role`: `admin` | `member`. The family owner is always `admin`.
 - `age_band`: `child` | `teen` | `adult` | `senior` (codes come from the `age_bands` table).
@@ -154,6 +156,7 @@ and add a line to the changelog at the bottom.
   "ad_request": { "non_personalized": true, "under_age_of_consent": false, "max_ad_content_rating": "G" },
   "limits": { "max_members": 2, "max_categories": 3, "max_active_goals": 1 },
   "accessibility_defaults": { "text_scale": 1.0, "reduced_motion": false, "calm_timers": false, "sound_effects": true },
+  "chat": { "retention_days": 7 },
   "feature_flags": {}
 }
 ```
@@ -339,7 +342,8 @@ Codes: 8 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no 0/O/1/I), valid 
 ```
   `is_locked` is true for top-level categories beyond the tier's `max_categories` (free tier) — the
   app shows them with an upgrade hint instead of hiding them. `icon` is a short key
-  (`grid, puzzle, quote, globe, landmark, leaf, calculator, book`) the app maps to an icon.
+  (`grid, puzzle, quote, globe, landmark, leaf, calculator, book, bulb, language, rocket, earth,
+  palette, restaurant, football, shield, sparkles`; unknown keys → a generic icon) the app maps to an icon.
 
 ### Play
 Session:
@@ -423,6 +427,44 @@ Words are compared case-insensitively and Unicode-aware (NFC-normalized, `mb_` c
 French accents work); an anagram accepts any listed valid word made of exactly those letters. A word
 search is correct when every word is found at a valid placement; `start`/`end` may be given in
 either order (reading direction or reversed).
+
+**Brain games (2026-10-23)** — four more server-generated types (category `brain-games`). Like
+Sudoku, the app has what it needs to play (these are skill games, not secrets); the server
+verifies the submitted moves and decides correctness and points. Positions are zero-based.
+
+| type | payload | response | correct_response | points |
+| --- | --- | --- | --- | --- |
+| `memory_match` | `{ "cols": 4, "cards": ["fox","owl","fox","frog",…], "max_attempts": 12 }` — `cards` are face-down positions (row-major), each face is a Clan **kid** avatar key and appears exactly twice; 3–10 pairs by difficulty | `{ "attempts": [[0,2],[1,5],…] }` — every pair of positions the member turned over, in order | `{ "attempts": null, "cards": [ … ] }` | 2 (≤ 6 pairs), 3 (8–10 pairs) |
+| `pattern_sequence` | `{ "pads": ["fox","owl","frog","panda"], "sequence": [2,0,3,1,…], "show_ms": 700 }` — 3–6 pads (Clan kid avatar keys); the app plays the sequence (highlight + the pad's sound when sounds are on), then the member repeats it; length 3–9 by difficulty | `{ "input": [2,0,3,1,…] }` | `{ "input": [ …the sequence ] }` | 1 (length ≤ 4), 2 (5–6), 3 (7+) |
+| `nonogram` | `{ "rows": 5, "cols": 5, "row_clues": [[1,1],[5],…], "col_clues": [[2],[1,1],…] }` — every puzzle has exactly one solution (checked by the generator); 5×5, 8×8 or 10×10 by difficulty | `{ "grid": [[0,1,…],…] }` (1 = filled) | `{ "grid": [[…]], "title": "A heart" }` (`title` localized; the picture's name, revealed after) | 3 (5×5), 5 (8×8), 8 (10×10) |
+| `spot_difference` | `{ "aspect": 1.25, "objects": [ { "id": "o1", "kind": "tree", "x": 0.2, "y": 0.6, "size": 0.18, "color": "green", "flip": false }, … ], "changes": [ { "id": "d1", "object_id": "o3", "change": "missing" \| "color" \| "size" \| "flip", "value": "red" \| 0.12 \| true \| null } ], "max_misses": 5 }` — `x`/`y`/`size` are fractions of the picture width; the app draws `objects` on the left and the same objects with `changes` applied on the right; `kind` is a fixed art key (Clan kid avatar keys plus `tree, sun, cloud, flower, house, ball, star, kite, boat, fish, bird, rock`), `color` a named palette key (`red, orange, yellow, green, blue, purple, pink, brown, white`); 3, 5 or 7 changes by difficulty | `{ "taps": [[0.71,0.22],…] }` — taps on either picture, normalized 0–1 within that picture | `{ "changes": [ …ids ] }` | 2 (3 changes), 3 (5), 5 (7) |
+
+- **memory_match:** correct when replaying `attempts` matches every pair (each attempt = two
+  different positions not yet matched) and the number of attempts ≤ `max_attempts`. Otherwise a
+  mistake. Malformed attempts (out of range, same position twice, already matched) → 422
+  `validation_failed`.
+- **pattern_sequence:** correct when `input` equals `sequence` exactly.
+- **nonogram:** correct when the grid satisfies every row and column clue (the solution is unique,
+  so that is the solution). Wrong size → 422.
+- **spot_difference:** all geometry is in **picture-width units**: object `x`, `y`, `size` are
+  fractions of the width (the picture is 1 wide and `1 / aspect` tall). A tap `[tx, ty]` is
+  normalized 0–1 in each axis, so its position in width units is `(tx, ty / aspect)`. A tap finds a
+  change when that point is within the changed object's circle around (`x`, `y`) with radius
+  `max(size, changed size) × 0.75`, at least 0.06 (`changed size` only for a `size` change; the
+  larger one so the bigger version counts too); when two changes' circles overlap the nearest
+  centre wins; each change counts once. Correct when
+  every change is found with at most `max_misses` taps that hit nothing; extra taps after the last
+  find are ignored. At most 60 taps (422 beyond).
+- Difficulty comes from the member's difficulty range like Sudoku; the category's generators set
+  the sizes (`database/seeders/data/categories.php`).
+- Generator details (informative; the app must not rely on them, only on the payload):
+  memory_match `max_attempts` = 2×pairs+2 (difficulty 1–4) or 2×pairs+1; pattern_sequence pads
+  3/4/5/6, lengths 3–9, `show_ms` 900→500; nonogram 5×5 (≤5), 8×8 (6–8), 10×10 (9–10), pictures may
+  be mirrored, `title` in the member's locale ("A mystery pattern" for the rare random fallback);
+  spot_difference aspect 1.25, 8–14 objects, `max_misses` 5 (4 at 9–10), color changes only on props,
+  flips only on asymmetric props. An empty pattern `input` is a wrong answer (not 422); a tap on an
+  already-found change is neither a find nor a miss. Response caps: `attempts` ≤ 200, `input` ≤ 20,
+  `taps` ≤ 60 (422 beyond).
 
 **Sessions and generated items:** Sudoku and Math Sprint items are generated by the server from a
 seed when a session starts (they are not content rows); the API shape is the same, and an
@@ -539,7 +581,7 @@ from RevenueCat webhooks and never trusts the app for the tier.
 - `PUT /me/push-token` (auth) — Body: `token` (Expo push token `ExponentPushToken[...]`), `platform`.
   Stored on the current device (and removed from any other device that had it). → 204; 422 when the token has no device. `DELETE /me/push-token` → 204 (also cleared on logout).
 - `GET /me/notification-preferences` (auth, needs family) → `{ "data": { "types": { "goal_reached": true,
-  "period_closed": true, "family_activity": true, "daily_reminder": false }, "quiet_from": "20:00",
+  "period_closed": true, "family_activity": true, "daily_reminder": false, "family_chat": true }, "quiet_from": "20:00",
   "quiet_to": "07:30", "reminder_time": "17:00" } }` (times in the family timezone; children default
   to quiet hours 19:30–07:30, everyone else 21:30–07:00; `quiet_from`/`quiet_to` both `null` = no quiet
   hours, only one of them → 422). `PATCH /me/notification-preferences` — same shape, all optional.
@@ -550,6 +592,62 @@ from RevenueCat webhooks and never trusts the app for the tier.
   `daily_reminder` (at `reminder_time` if the member hasn't played today). Push `data`:
   `{ "type": "goal_reached", "goal_id": 2, "period_id": 31 }` (goal types carry `goal_id` + `period_id`;
   `family_activity`: `{ type, member_id, session_id }`; `daily_reminder`: `{ type }`) so the app can deep-link.
+
+### Family chat (2026-10-23)
+One group chat per family; only that family's active members can read or write it (every other
+caller gets 404 — staff included: the admin panel never shows message text). Plain text with
+emoji; no HTML, Markdown, links preview, images or attachments. Unlike other family endpoints, a
+signed-in user without an active family membership gets **404 `not_found`** here (not 409 `no_family`).
+
+**Message**
+```json
+{ "id": 812, "member_id": 7, "nickname": "Sam", "avatar": "fox", "body": "We won! 🎉",
+  "deleted": false, "client_id": "6f1c…", "created_at": "2026-10-23T18:02:11Z" }
+```
+- `body` is `null` when `deleted` is true (the app shows "Message deleted"). `nickname`/`avatar`
+  are the author's current values; an author who left the family shows as "Former member"
+  (`member_id` null, `nickname` "Former member" / "Ancien membre" in the viewer's locale, `avatar` null).
+- `body`: 1–1000 characters after trimming — **characters = Unicode code points** (JS: `[...text].length`,
+  not `text.length`; an emoji ZWJ sequence counts as several) — stored and returned as plain UTF-8 text (utf8mb4; any
+  emoji). The server normalizes it (NFC), turns `\r\n`/`\r` into `\n`, removes control characters except `\n`, collapses more
+  than 2 consecutive empty lines and rejects text that is empty after that (422). It never parses
+  or renders it; **clients must render it as plain text** (never as HTML/Markdown, never inject it
+  into a WebView or `innerHTML`).
+- Stored encrypted at rest (application key); never written to logs, Sentry or the activity log.
+
+**Endpoints** (auth, needs family; `chat_enabled` member required, else 403 `chat_disabled`)
+- `GET /family/chat/messages?before=<id>&after=<id>&limit=50` (limit ≤ 100) → newest first for
+  `before`/none, oldest first for `after` (polling):
+  `{ "data": [Message], "meta": { "has_more": true, "retention_days": 7, "last_read_id": 790, "unread": 3 } }`.
+  `before` and `after` together, or `limit` > 100 → 422. Messages past retention are never returned, even
+  before the hourly job deletes them. `unread` counts other members' not-deleted messages after `last_read_id`.
+- `POST /family/chat/messages` — Body `{ body, client_id }` (`client_id`: a UUID the app makes per
+  message; re-sending the same `client_id` returns the existing message with 200 instead of 201, so
+  retries never duplicate). → **201** `{ data: Message }`. Rate limit 20 messages/min per member
+  (429 `rate_limited`).
+- `DELETE /family/chat/messages/{id}` — the author, or a family admin, deletes a message (it stays
+  as a tombstone). → 204. Others → 403 `forbidden`; another family's id → 404.
+- `POST /family/chat/read` — Body `{ last_read_id }` (only moves forward; capped at the family's newest message id). → 204.
+- `GET /family/chat/unread` → `{ "data": { "unread": 3 } }` (cheap; the app polls it for the tab badge).
+- The app polls `after` every ~4 s while the chat screen is open and the unread count every ~60 s
+  otherwise (plus a push). Real-time sockets may replace polling later without changing these shapes.
+
+**Retention:** messages older than the family's `policy.chat.retention_days` are deleted for good
+(hourly job): **free 7 days, Family plan 365 days** (tier settings). After a downgrade the shorter
+period applies from the next run (the app warns the admin on the paywall/chat screen). Account
+deletion erases that user's messages; removing a member keeps their messages as "Former member"
+until retention removes them; deleting the family deletes the chat. `/me/export` includes the
+user's own messages that still exist.
+
+**Members and policy:** Member gains `chat_enabled` (bool, default true); a family admin turns it
+off/on for any member via `PATCH /family/members/{member}` (`chat_enabled`). Policy gains
+`"chat": { "retention_days": 7 }`. A member with chat off neither reads nor posts (403
+`chat_disabled`) and gets no chat pushes.
+
+**Push:** new notification type `family_chat` (preference key, default on; quiet hours apply; at
+most 1 push per member per 2 minutes, collapsed). The push **never contains message text** (it goes
+through Expo/Apple/Google): title "Brainy Clan", body "Sam sent a message" (localized), `data`
+`{ "type": "family_chat", "message_id": 812 }`.
 
 ### Legal, consent and privacy (B9)
 Drafts of the privacy policy and terms are served by the backend and **must be reviewed by a lawyer
@@ -584,7 +682,8 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
   family in the app or contact support). Never reveals whether an email exists.
 - `GET /me/export` (auth; any non-child user — children get 403, their parent exports via support)
   → `{ "data": { "exported_at": "...", "user": {...}, "memberships": [...], "point_entries": [...],
-  "sessions": [...], "goals": [...], "consents": [...], "devices": [...] } }` (devices without tokens,
+  "sessions": [...], "goals": [...], "chat_messages": [{ "id", "family_id", "member_id", "body", "created_at" }],
+  "consents": [...], "devices": [...] } }` (`chat_messages`: the user's own not-deleted messages; devices without tokens,
   social accounts without tokens) — right of access (PIPEDA / Quebec Law 25 / GDPR-style).
   Rate-limited: 1 per hour → 429.
 
@@ -630,3 +729,7 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-22 — Legal pages moved to `/terms` and `/privacy` on the website host; `GET /legal` URLs point there (`https://brainyclan.com/terms`), the old `/legal/terms` and `/legal/privacy` answer 301. No shape change.
 - 2026-10-23 — Theme "worlds": new theme keys `jungle`, `space`, `neon`; member `accessibility.sound_effects` (null | bool) and policy `accessibility_defaults.sound_effects` (child true, others false).
 - 2026-10-23 — Worlds phase 2: keys `sea`, `dino`, `sticker`, `lofi`, `nature`, `midnight`; `GET /me/worlds` (unlock catalog: free / points / streak / family_plan); 403 `world_locked`; Member `theme_unlocked`.
+- 2026-10-23 — 8 new categories (logic-riddles, language-swap, inventions-technology, our-planet, art-music, food-world, sports-games, life-skills) and category icon keys `bulb, language, rocket, earth, palette, restaurant, football, shield`. No shape change.
+- 2026-10-23 — Brain games: types `memory_match`, `pattern_sequence`, `nonogram`, `spot_difference` (server-generated), category `brain-games` (icon `sparkles`).
+- 2026-10-23 — Family chat: `/family/chat/*` endpoints, Message object, Member `chat_enabled`, Policy `chat.retention_days` (free 7 / Family 365), push type `family_chat` (no message text), error `chat_disabled`.
+- 2026-10-24 — Family chat clarifications (backend built): callers without an active membership get 404 on `/family/chat/*` (not 409); body length counted in Unicode code points; CRLF → LF; "Former member" `nickname` localized with `avatar` null; `before`+`after` or `limit` > 100 → 422; read marker capped at the newest id; notification preferences `types.family_chat`; `/me/export` gains `chat_messages`; Member `chat_enabled` and Policy `chat` in the shared-object examples. Privacy policy version bumped to `2026-10-23` (re-acceptance).

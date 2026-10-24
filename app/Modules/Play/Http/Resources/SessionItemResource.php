@@ -30,7 +30,7 @@ class SessionItemResource extends JsonResource
             'position' => $item->position,
             'type' => $type ?? 'unknown',
             'is_redemption' => $item->is_redemption,
-            /** What a correct answer is worth (1 for most types; Sudoku 3/5/8, word search 3). */
+            /** What a correct answer is worth (1 for most types; Sudoku 3/5/8, word search 3, brain games 1–8 by size). */
             'points' => $item->points,
             'payload' => $playable !== null && $type !== null && $registry->has($type) ? $registry->get($type)->forClient($playable) : (object) [],
             'answered' => $item->isAnswered(),

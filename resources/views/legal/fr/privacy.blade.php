@@ -10,7 +10,7 @@
 
     <h2>1. En bref</h2>
     <ul>
-        <li>Pour les enfants, nous recueillons seulement un <strong>surnom, un avatar ainsi que l’année et le mois de naissance</strong> — aucune adresse courriel, aucun nom complet, aucune photo, aucune date de naissance exacte, aucune localisation précise.</li>
+        <li>Pour les enfants, nous recueillons seulement un <strong>surnom, un avatar ainsi que l’année et le mois de naissance</strong> — aucune adresse courriel, aucun nom complet, aucune photo, aucune date de naissance exacte, aucune localisation précise. Si un parent laisse la discussion familiale activée pour eux, nous conservons aussi les messages qu’ils y écrivent, que seule leur famille peut lire (voir « Discussion familiale »).</li>
         <li>Les enfants ne voient <strong>aucune publicité et ne font l’objet d’aucun pistage</strong>. Les adolescents et les adultes du forfait gratuit peuvent regarder des publicités avec récompense facultatives, <strong>non personnalisées</strong>.</li>
         <li>Un parent ou tuteur donne son consentement pour chaque enfant avant que celui-ci puisse se joindre à la famille.</li>
         <li>Nous ne vendons pas de renseignements personnels et ne les utilisons ni pour du profilage ni pour de la publicité ciblée.</li>
@@ -35,6 +35,9 @@
         <li><strong>Achats :</strong> si un adulte s’abonne, la boutique d’applications traite le paiement. Nous recevons seulement l’état de l’abonnement (par exemple actif ou expiré), jamais les données de carte.</li>
         <li><strong>Rapports d’erreurs :</strong> détails techniques des plantages et erreurs (par exemple la version de l’application) dont les noms, adresses courriel, données de naissance et données d’authentification sont retirés avant l’envoi.</li>
     </ul>
+    <h3>Discussion familiale</h3>
+    <p><span class="review">[ÉBAUCHE POUR RÉVISION JURIDIQUE]</span> Chaque famille dispose d’une discussion de groupe privée pour de courts messages texte et des émojis (pas de photos, de fichiers, d’aperçus de liens ni de messages vocaux). Nous conservons le texte de chaque message, son auteur (le membre de la famille), le moment de l’envoi et s’il a été supprimé, ainsi que la position « dernier message lu » de chaque membre. <strong>Seuls les membres actifs de cette famille peuvent voir la discussion</strong> — ni les autres familles, ni notre personnel : les messages ne sont pas affichés dans nos outils d’administration et sont exclus des journaux, des rapports d’erreurs et de nos registres d’activité. Les messages sont <strong>chiffrés au repos</strong> sur nos serveurs avec la clé de l’application. Les notifications de nouveaux messages indiquent seulement qui a écrit (« Sam a envoyé un message »), jamais le texte du message. Un administrateur de la famille peut désactiver la discussion pour n’importe quel membre et supprimer n’importe quel message; chaque membre peut supprimer ses propres messages. Les messages sont supprimés automatiquement après <strong>7 jours avec le forfait gratuit et 1 an avec le forfait Famille</strong> (après un passage au forfait gratuit, la durée la plus courte s’applique). À la suppression d’un compte, tous les messages de cette personne sont supprimés; quand un membre est retiré de la famille, ses messages restent visibles pour la famille comme « Ancien membre » jusqu’à leur expiration; à la suppression de la famille, toute sa discussion est supprimée. Vos propres messages sont inclus dans le téléchargement de vos données. La discussion n’est pas chiffrée de bout en bout.</p>
+
     <p>Nous ne recueillons sciemment aucun autre renseignement personnel auprès des enfants. Si vous croyez qu’un enfant nous a fourni des renseignements que nous n’avons pas demandés, communiquez avec nous et nous les supprimerons.</p>
 
     <h2>3. Utilisation des renseignements</h2>
@@ -59,7 +62,7 @@
             <tr><td>Apple, Google, Meta (Facebook)</td><td>Connexion facultative des adultes</td><td>Identifiant du compte et courriel transmis par le fournisseur</td></tr>
             <tr><td>App Store d’Apple, Google Play, RevenueCat</td><td>Abonnements</td><td>Identifiant de la famille et état de l’abonnement</td></tr>
             <tr><td>Google AdMob</td><td>Publicités avec récompense (adolescents et adultes du forfait gratuit seulement)</td><td>Données de la demande de publicité; une référence de récompense aléatoire</td></tr>
-            <tr><td>Expo (notifications), Apple Push Notification service, Firebase Cloud Messaging</td><td>Notifications</td><td>Jeton de notification et texte de la notification</td></tr>
+            <tr><td>Expo (notifications), Apple Push Notification service, Firebase Cloud Messaging</td><td>Notifications</td><td>Jeton de notification et texte de la notification (jamais le texte des messages de discussion)</td></tr>
             <tr><td>Sentry</td><td>Surveillance des erreurs</td><td>Détails techniques des erreurs, sans renseignements personnels</td></tr>
         </tbody>
     </table>
@@ -75,8 +78,9 @@
     <ul>
         <li>Données du compte et d’activité : tant que le compte existe.</li>
         <li>À la suppression d’un compte (ou au retrait d’un enfant de la famille), nous effaçons immédiatement le nom, le courriel, le mot de passe, les données de naissance, l’avatar, les appareils, les jetons de notification et les comptes de connexion liés. Les données de jeu anonymes (points sans aucun nom) sont conservées pour que les pointages des autres membres restent exacts.</li>
+        <li>Messages de la discussion familiale : 7 jours (forfait gratuit) ou 1 an (forfait Famille) après leur envoi, puis supprimés automatiquement; immédiatement lorsqu’ils sont supprimés par leur auteur ou un administrateur de la famille (seule une mention « Message supprimé » sans le texte subsiste jusqu’à la même échéance), à la suppression du compte de l’auteur ou à la suppression de la famille.</li>
         <li>Les preuves de consentement sont conservées aussi longtemps que la loi l’exige <span class="review">[confirmer la durée]</span>.</li>
-        <li>Les sauvegardes chiffrées sont conservées 14 jours, puis supprimées.</li>
+        <li>Les sauvegardes chiffrées sont conservées 14 jours, puis supprimées (des données supprimées, y compris des messages de discussion, peuvent donc subsister dans une sauvegarde jusqu’à 14 jours).</li>
         <li>Les rapports d’erreurs sont conservés par Sentry jusqu’à 90 jours.</li>
     </ul>
 
@@ -84,7 +88,7 @@
     <p>Selon l’endroit où vous habitez, vous pouvez : accéder à vos renseignements et en obtenir une copie (dans l’application : Réglages → Télécharger mes données), les faire rectifier, supprimer votre compte (Réglages → Supprimer le compte), retirer votre consentement et poser des questions sur leur utilisation. En vertu de la loi québécoise, vous pouvez aussi obtenir vos renseignements dans un format technologique structuré et couramment utilisé, et porter plainte à la Commission d’accès à l’information du Québec; ailleurs au Canada, au Commissariat à la protection de la vie privée du Canada. Les parents et tuteurs exercent ces droits pour leurs enfants.</p>
 
     <h2>10. Sécurité</h2>
-    <p>Les données sont chiffrées en transit (HTTPS). Les mots de passe sont hachés, les jetons d’accès sont conservés sous forme de hachage et chaque appareil a son propre jeton révocable. Les sauvegardes sont chiffrées. L’accès aux outils d’administration est limité au personnel autorisé. Aucune méthode n’est parfaitement sûre; si un incident de confidentialité présente un risque de préjudice sérieux, nous vous en aviserons, ainsi que les autorités, comme la loi l’exige.</p>
+    <p>Les données sont chiffrées en transit (HTTPS). Les mots de passe sont hachés, les jetons d’accès sont conservés sous forme de hachage et chaque appareil a son propre jeton révocable. Les messages de la discussion familiale sont chiffrés au repos. Les sauvegardes sont chiffrées. L’accès aux outils d’administration est limité au personnel autorisé. Aucune méthode n’est parfaitement sûre; si un incident de confidentialité présente un risque de préjudice sérieux, nous vous en aviserons, ainsi que les autorités, comme la loi l’exige.</p>
 
     <h2>11. Modifications</h2>
     <p>Lorsque nous modifions cette politique de façon importante, nous publions une nouvelle version accompagnée d’un résumé des changements, et l’application demande aux adultes et aux adolescents de l’accepter de nouveau.</p>

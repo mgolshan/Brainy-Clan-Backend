@@ -114,12 +114,14 @@ it('CategoryTree returns subtrees and roots', function () {
         ->and($tree->rootOf($leaf->id)?->id)->toBe($root->id);
 });
 
-it('seeds all 8 launch categories and ~50+ items per launch type, idempotently', function () {
+it('seeds all 17 top-level categories and ~50+ items per launch type, idempotently', function () {
     $this->seed([CategorySeeder::class, ChallengeTypeSeeder::class, ContentSeeder::class]);
 
-    expect(Category::query()->whereNull('parent_id')->pluck('slug')->sort()->values()->all())->toBe([
-        'history', 'math-sprint', 'science-nature', 'sudoku', 'vocabulary-spelling', 'wisdom-cards', 'word-puzzles', 'world-geography',
-    ]);
+    $topLevel = array_keys(require database_path('seeders/data/categories.php'));
+    sort($topLevel);
+
+    expect($topLevel)->toHaveCount(17)->toContain('brain-games', 'world-geography')
+        ->and(Category::query()->whereNull('parent_id')->pluck('slug')->sort()->values()->all())->toBe($topLevel);
 
     $mc = ContentItem::query()->where('type_key', 'multiple_choice')->count();
     $wc = ContentItem::query()->where('type_key', 'wisdom_card')->count();

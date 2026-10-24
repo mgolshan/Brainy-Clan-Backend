@@ -24,6 +24,8 @@ class UpdateMemberRequest extends FormRequest
             'role' => ['sometimes', 'string', Rule::in(FamilyMember::ROLES)],
             'accessibility' => ['sometimes', 'array'],
             'email' => ['sometimes', 'nullable', 'string', 'email', 'max:255'],
+            /** Family chat on/off for this member (docs/API.md "Family chat"). */
+            'chat_enabled' => ['sometimes', 'boolean'],
             ...Accessibility::rules('accessibility.'),
         ];
     }

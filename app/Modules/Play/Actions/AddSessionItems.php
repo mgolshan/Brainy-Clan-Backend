@@ -106,13 +106,14 @@ class AddSessionItems
      * the same text as a content item). Small generator pools may run out: after a few tries
      * the last build is kept.
      *
+     * @param  int  $level  the difficulty planned for the slot (its points depend on it)
      * @param  array<string, true>  $seen  question keys in the session; the new key is added
      * @return array{type_key: string, category_id: int, seed: string, difficulty: int, points: int, payload: array<string, mixed>, answer: array<string, mixed>}
      */
-    private function buildUnique(GeneratorSpec $spec, PlaySession $session, bool $redemption, array &$seen): array
+    private function buildUnique(GeneratorSpec $spec, int $level, PlaySession $session, array &$seen): array
     {
         for ($attempt = 0; $attempt < self::UNIQUE_ATTEMPTS; $attempt++) {
-            $built = $this->generated->build($spec, $session->member, easier: $redemption);
+            $built = $this->generated->build($spec, $session->member, $level);
             $key = self::questionKey($built['payload']);
 
             if ($key === null || ! isset($seen[$key])) {
@@ -130,7 +131,7 @@ class AddSessionItems
     /**
      * Question keys of the items already in the session plus the content items about to be added.
      *
-     * @param  list<array{content: ContentItem}|array{spec: GeneratorSpec}>  $slots
+     * @param  list<array{content: ContentItem}|array{spec: GeneratorSpec, level: int}>  $slots
      * @return array<string, true>
      */
     private function questionKeys(PlaySession $session, array $slots, bool $isNew): array
@@ -182,7 +183,7 @@ class AddSessionItems
      * @param  list<ContentItem>  $content
      * @param  list<GeneratorSpec>  $specs
      * @param  list<int>  $pending
-     * @return list<array{content: ContentItem}|array{spec: GeneratorSpec}>
+     * @return list<array{content: ContentItem}|array{spec: GeneratorSpec, level: int}>
      */
     private function plan(PlaySession $session, int $count, bool $redemption, array $content, array $specs, array $pending): array
     {
@@ -199,8 +200,9 @@ class AddSessionItems
             $choice = random_int(0, $sources - 1);
 
             if ($choice < count($specs)) {
-                $slots[] = ['spec' => $specs[$choice]];
-                $points[] = $this->generated->points($specs[$choice]);
+                $level = $this->generated->level($specs[$choice], $session->member, easier: $redemption);
+                $slots[] = ['spec' => $specs[$choice], 'level' => $level];
+                $points[] = $this->generated->points($specs[$choice], $level);
             } else {
                 /** @var ContentItem $item */
                 $item = array_shift($content);
@@ -221,7 +223,7 @@ class AddSessionItems
      * upsert (`times_seen` + 1, `last_seen_at` now; a content item twice in a batch counts twice)
      * and returns the stored rows.
      *
-     * @param  list<array{content: ContentItem}|array{spec: GeneratorSpec}>  $slots
+     * @param  list<array{content: ContentItem}|array{spec: GeneratorSpec, level: int}>  $slots
      * @return Collection<int, SessionItem>
      */
     private function store(PlaySession $session, array $slots, bool $redemption, bool $isNew): Collection
@@ -239,7 +241,7 @@ class AddSessionItems
 
         foreach ($slots as $slot) {
             if (isset($slot['spec'])) {
-                $built = $this->buildUnique($slot['spec'], $session, $redemption, $seen);
+                $built = $this->buildUnique($slot['spec'], $slot['level'], $session, $seen);
 
                 $rows[] = $this->row([
                     'play_session_id' => $session->id,

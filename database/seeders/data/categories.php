@@ -119,4 +119,99 @@ return [
             'spelling' => ['name' => ['en' => 'Spelling', 'fr' => 'Orthographe']],
         ],
     ],
+
+    // Added 2026-10-23 (Moe: "8 categories is not enough"). Multiple choice content.
+    'logic-riddles' => [
+        'name' => ['en' => 'Logic & Riddles', 'fr' => 'Logique et énigmes'],
+        'icon' => 'bulb',
+        'min_age' => 6,
+        'children' => [
+            'patterns' => ['name' => ['en' => 'Patterns', 'fr' => 'Suites logiques']],
+            'riddles' => ['name' => ['en' => 'Riddles', 'fr' => 'Devinettes']],
+            'brain-teasers' => ['name' => ['en' => 'Brain Teasers', 'fr' => 'Casse-têtes'], 'min_age' => 9],
+        ],
+    ],
+    'language-swap' => [
+        'name' => ['en' => 'Language Swap', 'fr' => 'Échange de langues'],
+        'icon' => 'language',
+        'min_age' => 6,
+        'children' => [
+            'everyday-words' => ['name' => ['en' => 'Everyday Words', 'fr' => 'Mots de tous les jours']],
+            'numbers-colours' => ['name' => ['en' => 'Numbers & Colours', 'fr' => 'Nombres et couleurs']],
+            'phrases' => ['name' => ['en' => 'Useful Phrases', 'fr' => 'Phrases utiles'], 'min_age' => 8],
+        ],
+    ],
+    'inventions-technology' => [
+        'name' => ['en' => 'Inventions & Technology', 'fr' => 'Inventions et technologie'],
+        'icon' => 'rocket',
+        'min_age' => 7,
+        'children' => [
+            'inventions' => ['name' => ['en' => 'Inventions', 'fr' => 'Inventions']],
+            'how-things-work' => ['name' => ['en' => 'How Things Work', 'fr' => 'Comment ça marche']],
+            'computers-coding' => ['name' => ['en' => 'Computers & Coding', 'fr' => 'Ordinateurs et programmation'], 'min_age' => 9],
+        ],
+    ],
+    'our-planet' => [
+        'name' => ['en' => 'Our Planet', 'fr' => 'Notre planète'],
+        'icon' => 'earth',
+        'min_age' => 6,
+        'children' => [
+            'weather' => ['name' => ['en' => 'Weather & Seasons', 'fr' => 'Météo et saisons']],
+            'oceans' => ['name' => ['en' => 'Oceans & Rivers', 'fr' => 'Océans et rivières']],
+            'volcanoes-earthquakes' => ['name' => ['en' => 'Volcanoes & Earthquakes', 'fr' => 'Volcans et séismes']],
+            'ecosystems-recycling' => ['name' => ['en' => 'Ecosystems & Recycling', 'fr' => 'Écosystèmes et recyclage']],
+        ],
+    ],
+    'art-music' => [
+        'name' => ['en' => 'Art & Music', 'fr' => 'Art et musique'],
+        'icon' => 'palette',
+        'min_age' => 6,
+        'children' => [
+            'art-artists' => ['name' => ['en' => 'Art & Artists', 'fr' => 'Art et artistes']],
+            'instruments' => ['name' => ['en' => 'Instruments', 'fr' => 'Instruments']],
+            'music-basics' => ['name' => ['en' => 'Music Basics', 'fr' => 'Bases de la musique']],
+        ],
+    ],
+    'food-world' => [
+        'name' => ['en' => 'Food Around the World', 'fr' => 'Cuisine du monde'],
+        'icon' => 'restaurant',
+        'min_age' => 5,
+        'children' => [
+            'fruits-vegetables' => ['name' => ['en' => 'Fruits & Vegetables', 'fr' => 'Fruits et légumes']],
+            'world-dishes' => ['name' => ['en' => 'World Dishes', 'fr' => 'Plats du monde']],
+            'food-origins' => ['name' => ['en' => 'Where Food Comes From', 'fr' => "D'où vient notre nourriture"]],
+        ],
+    ],
+    'sports-games' => [
+        'name' => ['en' => 'Sports & Games', 'fr' => 'Sports et jeux'],
+        'icon' => 'football',
+        'min_age' => 6,
+        'children' => [
+            'rules-equipment' => ['name' => ['en' => 'Rules & Equipment', 'fr' => 'Règles et équipement']],
+            'olympics' => ['name' => ['en' => 'Olympic Games', 'fr' => 'Jeux olympiques']],
+            'board-card-games' => ['name' => ['en' => 'Board & Card Games', 'fr' => 'Jeux de société et de cartes']],
+        ],
+    ],
+    'brain-games' => [
+        'name' => ['en' => 'Brain Games', 'fr' => 'Jeux de cerveau'],
+        'icon' => 'sparkles',
+        'min_age' => 4,
+        'children' => [
+            'memory-match' => ['name' => ['en' => 'Memory Match', 'fr' => 'Jeu de mémoire'], 'generators' => [['type' => 'memory_match', 'options' => [], 'min_difficulty' => 1, 'max_difficulty' => 10]]],
+            'pattern-sequence' => ['name' => ['en' => 'Pattern & Sequence', 'fr' => 'Suites à répéter'], 'generators' => [['type' => 'pattern_sequence', 'options' => [], 'min_difficulty' => 1, 'max_difficulty' => 10]]],
+            'nonogram' => ['name' => ['en' => 'Nonograms', 'fr' => 'Logimages'], 'min_age' => 8, 'generators' => [['type' => 'nonogram', 'options' => [], 'min_difficulty' => 3, 'max_difficulty' => 10]]],
+            'spot-difference' => ['name' => ['en' => 'Spot the Difference', 'fr' => 'Jeu des différences'], 'generators' => [['type' => 'spot_difference', 'options' => [], 'min_difficulty' => 1, 'max_difficulty' => 10]]],
+        ],
+    ],
+    'life-skills' => [
+        'name' => ['en' => 'Life Skills & Safety', 'fr' => 'Vie pratique et sécurité'],
+        'icon' => 'shield',
+        'min_age' => 5,
+        'children' => [
+            'road-safety' => ['name' => ['en' => 'Road Safety', 'fr' => 'Sécurité routière']],
+            'first-aid' => ['name' => ['en' => 'First-Aid Basics', 'fr' => 'Premiers soins'], 'min_age' => 8],
+            'online-safety' => ['name' => ['en' => 'Online Safety', 'fr' => 'Sécurité en ligne'], 'min_age' => 8],
+            'everyday-manners' => ['name' => ['en' => 'Everyday Manners', 'fr' => 'Bonnes manières']],
+        ],
+    ],
 ];

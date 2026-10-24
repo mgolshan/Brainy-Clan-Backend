@@ -164,6 +164,14 @@ class ApiException extends RuntimeException
     }
 
     /**
+     * A family admin turned family chat off for this member (docs/API.md "Family chat").
+     */
+    public static function chatDisabled(): self
+    {
+        return new self('chat_disabled', 'Family chat is turned off for you.', 403);
+    }
+
+    /**
      * A 422 with field errors, for domain validation that happens inside an Action.
      */
     public static function validation(string $field, string $message): self

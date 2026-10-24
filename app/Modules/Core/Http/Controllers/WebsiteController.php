@@ -4,6 +4,7 @@ namespace App\Modules\Core\Http\Controllers;
 
 use App\Modules\Core\Support\Website;
 use App\Modules\Policy\PolicyResolver;
+use App\Modules\Policy\Support\ThemeWorldCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -11,20 +12,27 @@ use Illuminate\Http\Response;
 /**
  * The public website (brainyclan.com in production; docs/DEPLOY.md "Website and hosts"): landing
  * page, support page, robots.txt and sitemap.xml. Static HTML, no cookies, no scripts, no
- * third-party requests. Language: `?lang=en|fr`, else the browser's Accept-Language.
+ * third-party requests. Language: `?lang=en|fr`, else the browser's Accept-Language. Images are
+ * static files in `public/images/site/` (screens: WebP captures of the demo family; art and clan:
+ * SVGs exported from the app).
  */
 class WebsiteController
 {
     /** Pages listed in the sitemap (route names), each in English and French. */
     private const array SITEMAP_ROUTES = ['website.home', 'website.support', 'legal.privacy', 'legal.terms', 'account.delete'];
 
-    public function home(Request $request, PolicyResolver $policy): Response
+    /**
+     * The landing page. Plan limits and the world unlock catalog come from the same data the
+     * app's policy and `GET /me/worlds` use, so the page never promises more than the app does.
+     */
+    public function home(Request $request, PolicyResolver $policy, ThemeWorldCatalog $worlds): Response
     {
         return $this->page($request, 'website.home', [
             'plans' => [
                 'free' => $this->plan($policy, 'free'),
                 'family' => $this->plan($policy, 'family'),
             ],
+            'worlds' => $worlds->all(),
         ]);
     }
 
@@ -108,7 +116,7 @@ class WebsiteController
     /**
      * What a tier really includes, from the same settings the app's policy is built from.
      *
-     * @return array{members: int, categories: int, goals: int|null, free_second_chances: int, ads: bool}
+     * @return array{members: int, categories: int, goals: int|null, free_second_chances: int, ads: bool, chat_days: int}
      */
     private function plan(PolicyResolver $policy, string $tier): array
     {
@@ -118,6 +126,7 @@ class WebsiteController
             'goals' => $policy->maxActiveGoalsFor($tier),
             'free_second_chances' => (int) $policy->setting('second_chance.free_per_day', $tier),
             'ads' => (bool) $policy->setting('ads.enabled', $tier),
+            'chat_days' => $policy->chatRetentionDays($tier),
         ];
     }
 }

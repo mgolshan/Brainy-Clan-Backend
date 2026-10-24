@@ -147,7 +147,7 @@ class MathSprint implements ChallengeType, GeneratesItems
         ];
     }
 
-    public function pointsForOptions(array $options): int
+    public function pointsFor(array $options, int $difficulty): int
     {
         return 1;
     }

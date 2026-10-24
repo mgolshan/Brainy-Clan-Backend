@@ -36,7 +36,7 @@ describe('GET /legal and the pages', function () {
         $this->getJson('/api/v1/legal?lang=fr')
             ->assertOk()
             ->assertJsonPath('data.privacy.url', url('/privacy?lang=fr'))
-            ->assertJsonPath('data.privacy.summary', 'Première version de la politique de confidentialité de Brainy Clan.');
+            ->assertJsonPath('data.privacy.summary', config('legal.documents.privacy.summary.fr'));
 
         $this->getJson('/api/v1/legal?lang=de')->assertOk()->assertJsonPath('data.terms.url', url('/terms'));
     });
@@ -199,14 +199,15 @@ describe('me.legal and POST /me/legal-acceptance', function () {
         acceptCurrent($owner->user);
         actingAsMember($owner);
 
+        $acceptedPrivacy = config('legal.documents.privacy.version');
         config()->set('legal.documents.privacy.version', '2027-01-01');
         $this->getJson('/api/v1/me')
             ->assertJsonPath('data.legal.needs_acceptance', true)
             ->assertJsonPath('data.legal.privacy_version', '2027-01-01')
-            ->assertJsonPath('data.legal.accepted_privacy_version', config('legal.documents.terms.version'));
+            ->assertJsonPath('data.legal.accepted_privacy_version', $acceptedPrivacy);
 
         $terms = config('legal.documents.terms.version');
-        $this->postJson('/api/v1/me/legal-acceptance', ['terms_version' => $terms, 'privacy_version' => '2026-10-16'])
+        $this->postJson('/api/v1/me/legal-acceptance', ['terms_version' => $terms, 'privacy_version' => $acceptedPrivacy])
             ->assertStatus(422)->assertJsonValidationErrors('privacy_version');
         $this->postJson('/api/v1/me/legal-acceptance', ['terms_version' => 'old', 'privacy_version' => '2027-01-01'])
             ->assertStatus(422)->assertJsonValidationErrors('terms_version');

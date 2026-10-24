@@ -80,6 +80,45 @@
         <div>{{ implode(' · ', $p['words']) }}</div>
     @endif
 
+    @if (isset($p['cards'], $p['cols']))
+        <div style="display:grid; grid-template-columns:repeat({{ max(1, $p['cols']) }}, auto); gap:.25rem; justify-content:start; margin-bottom:.5rem;">
+            @foreach ($p['cards'] as $card)<span style="background:{{ $t['card'] }}; border:1px solid {{ $t['accent'] }}; border-radius:6px; padding:.25rem .4rem; font-size:.75em; text-align:center;">{{ $card }}</span>@endforeach
+        </div>
+        <div style="font-size:.75rem; opacity:.7;">Face-down in the app · at most {{ $p['max_attempts'] }} attempts.</div>
+    @endif
+
+    @if (isset($p['pads'], $p['sequence']))
+        <div style="display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:.5rem;">@foreach ($p['pads'] as $i => $pad)<span style="background:{{ $t['card'] }}; border:1px solid {{ $t['accent'] }}; border-radius:8px; padding:.25rem .5rem;">{{ $i }}: {{ $pad }}</span>@endforeach</div>
+        <div>Sequence: <strong>{{ implode(' → ', $p['sequence']) }}</strong> <span style="opacity:.7;">· {{ $p['show_ms'] }} ms per step</span></div>
+    @endif
+
+    @if (isset($p['row_clues'], $p['col_clues']))
+        @php $solution = $preview['correct_response']['grid'] ?? []; @endphp
+        <div style="font-size:.8em; margin-bottom:.25rem;">Columns: {{ implode(' | ', array_map(fn ($c) => implode(' ', $c), $p['col_clues'])) }}</div>
+        <div style="display:inline-block; background:{{ $t['card'] }}; border:2px solid {{ $t['accent'] }}; margin-bottom:.5rem;">
+            @foreach ($solution as $r => $row)
+                <div style="display:flex; align-items:center;">
+                    @foreach ($row as $value)<span style="width:1.1em; height:1.1em; border:1px solid #D1D5DB; background:{{ $value ? '#16A34A' : 'transparent' }};"></span>@endforeach
+                    <span style="font-size:.75em; padding-left:.4rem;">{{ implode(' ', $p['row_clues'][$r] ?? []) }}</span>
+                </div>
+            @endforeach
+        </div>
+        <div style="font-size:.75rem; opacity:.7;">Green = solution · “{{ $preview['correct_response']['title'] ?? '' }}”.</div>
+    @endif
+
+    @if (isset($p['objects'], $p['changes']))
+        @php $changed = array_column($p['changes'], null, 'object_id'); @endphp
+        <svg viewBox="0 0 1 {{ 1 / $p['aspect'] }}" style="width:100%; background:{{ $t['card'] }}; border-radius:8px; margin-bottom:.5rem;">
+            @foreach ($p['objects'] as $object)
+                <circle cx="{{ $object['x'] }}" cy="{{ $object['y'] }}" r="{{ $object['size'] / 2 }}" fill="{{ $object['color'] }}" stroke="{{ isset($changed[$object['id']]) ? '#DC2626' : '#6B7280' }}" stroke-width="{{ isset($changed[$object['id']]) ? 0.008 : 0.003 }}" />
+            @endforeach
+        </svg>
+        @foreach ($p['changes'] as $change)
+            <div style="font-size:.8em;">{{ $change['id'] }}: {{ $change['object_id'] }} → {{ $change['change'] }} {{ is_bool($change['value']) ? '' : $change['value'] }}</div>
+        @endforeach
+        <div style="font-size:.75rem; opacity:.7;">Red outline = changed object · max {{ $p['max_misses'] }} misses.</div>
+    @endif
+
     @foreach ($preview['payload']['choices'] ?? [] as $choice)
         @php $isCorrect = ($preview['correct_response']['choice_id'] ?? null) === $choice['id']; @endphp
         <div style="background:{{ $t['card'] }}; border-radius:{{ $t['radius'] }}; padding:.75rem 1rem; margin-bottom:.5rem; border:2px solid {{ $isCorrect ? '#16A34A' : 'transparent' }};">

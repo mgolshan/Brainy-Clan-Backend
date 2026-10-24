@@ -125,6 +125,38 @@ as written there; if something must change, update `docs/API.md` first and note 
     locked-out or forgetful adult can always get back in. Replaces the "per-email throttle"
     trade-off question.
   - **Devices:** iPhone and iPad (app milestone; layouts get a max content width on tablets).
+- **Family chat (2026-10-23, Moe):** one group chat per family, emoji text only, safe against
+  XSS/script injection (plain text end to end: validated + normalized on the server, rendered as
+  plain text in the app; no HTML/Markdown/links/attachments), retention free 7 days / Family plan
+  1 year, only family members can see it — not even staff in Filament (no message text in the
+  admin, logs, Sentry, activity log or push payloads; encrypted at rest with the app key). No
+  end-to-end encryption for now (Moe: optional if complicated; it would break multi-device
+  history for kids signing in with codes). Polling first (Laravel Reverb later if needed).
+  Parents can turn chat off per member and delete any message. Contract: `docs/API.md` "Family
+  chat". Privacy policy draft must mention the chat and its retention (lawyer review).
+  **Built (2026-10-24):** `Chat` module; read marker as `family_members.chat_last_read_id`; a member
+  who leaves keeps the `family_member_id` link (shown as "Former member" because the membership is
+  no longer active) instead of nulling it, so account erasure still deletes those messages and
+  `/me/export` still finds them; non-members get 404 (not 409 `no_family`); privacy version bumped
+  to `2026-10-23` (adults/teens re-accept).
+- **More categories and brain games (2026-10-23, Moe: "8 categories is not enough"; picked all):**
+  8 new knowledge categories (Logic & Riddles, Language Swap EN↔FR, Inventions & Technology, Our
+  Planet, Art & Music, Food Around the World, Sports & Games, Life Skills & Safety) with
+  hand-written, fact-checked bilingual banks (Language Swap is language-bound: each locale learns the
+  other language), plus a 17th category **Brain Games** with four new server-generated challenge
+  types (`memory_match`, `pattern_sequence`, `nonogram`, `spot_difference`; contract in
+  `docs/API.md` "Brain games"). Free tier still unlocks the first 3 top-level categories; new
+  categories go at the end. Avoided on purpose: pop culture, celebrities, brands, current events,
+  religion.
+- **Landing page v2 (2026-10-23, Moe: "too simple, not motivational… show what the game is and
+  how it looks without reading"):** visual-first page: hero with real app screenshots in phone
+  frames (several worlds), a swipeable worlds gallery (CSS scroll-snap, works without JS; tiny
+  optional enhancement script allowed only under the existing CSP with a nonce), "How it works"
+  in 4 illustrated steps, categories with the Clan category art, "Meet the Clan" character strip
+  (kids + parents + grandparents), real game screens (question, Sudoku, word search, goals,
+  leaderboard). Images are real screenshots of the app from the demo family (no personal data),
+  optimized WebP with fallback, lazy-loaded, explicit sizes, total page weight ≤ 2.5 MB. No
+  cookies, trackers or external hosts. All claims stay true to PLAN/API. en + fr.
 - **Theme worlds (2026-10-23, Moe):** theme keys gain `jungle`, `space`, `neon` (app-side design
   in the frontend PLAN); member `accessibility.sound_effects` (null|bool) with policy default
   `accessibility_defaults.sound_effects` (child true, others false; editable per age band in the
