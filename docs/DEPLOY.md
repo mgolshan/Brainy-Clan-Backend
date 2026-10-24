@@ -218,9 +218,23 @@ Eloquent write and after each `migrate`; if you ever change those tables with ra
 ## 8. Monitoring
 
 - **Errors:** Sentry (section 10). Personal data is scrubbed before sending (`SentryScrubber`).
-- **Uptime:** a free external monitor (e.g. UptimeRobot or Better Stack) on
-  `https://api.brainyclan.com/api/v1/health` (and `https://brainyclan.com/`) every 5 minutes, alerting by email/SMS.
-- **Queues:** Horizon dashboard `https://api.brainyclan.com/horizon` (staff only).
+- **Uptime (deep check):** a free external monitor (UptimeRobot or Better Stack) every 5 minutes on
+  `https://api.brainyclan.com/api/v1/health/deep` with the request header
+  `X-Health-Token: <HEALTH_DEEP_TOKEN>` (UptimeRobot: HTTP(s) monitor → *Custom HTTP Headers*; Better
+  Stack: *Request headers*). Alert when the status is not 200: 503 means MySQL, Redis, the scheduler
+  (heartbeat older than 3 minutes) or Horizon failed — the JSON body says which check
+  (docs/API.md "Health"). Set `HEALTH_DEEP_TOKEN` in `.env.prod` first (`openssl rand -hex 32`),
+  then `$C up -d`; without it the URL answers 404. Alert contacts: Moe (email + SMS) and the
+  monitoring mailbox. Add a second, plain monitor on `https://brainyclan.com/` (website). The shallow
+  `/api/v1/health` stays for the app; it only proves PHP answers.
+- **Alert mail:** Horizon "long wait" notifications (thresholds `waits` in `config/horizon.php`:
+  60 s `default`, 900 s `ai`; at most one per queue every 5 minutes) and failed-job alerts (one per
+  job class per 15 minutes, job class and exception class only) go to `OPS_ALERT_EMAIL` (default
+  `support@brainyclan.com`, needs working SMTP). Optional `OPS_ALERT_WEBHOOK_URL` (a Slack incoming
+  webhook or anything accepting `{"text": "..."}`) receives the same alerts.
+- **Scheduler heartbeat:** `ops:heartbeat` runs every minute (the deep check reads it);
+  `horizon:snapshot` every 5 minutes fills the Horizon metrics graphs. `$C exec app php artisan schedule:list`.
+- **Queues:** Horizon dashboard `https://api.brainyclan.com/horizon` (staff role `admin` only).
 - **Server:** Hetzner console graphs (CPU, disk, network); `docker stats`; disk alert if `/` > 80 %.
 - **Certificates:** renewed by Caddy automatically; Let's Encrypt mails `ACME_EMAIL` if something fails.
 

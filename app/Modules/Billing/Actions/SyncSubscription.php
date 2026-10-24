@@ -4,7 +4,6 @@ namespace App\Modules\Billing\Actions;
 
 use App\Modules\Billing\Contracts\RevenueCatClient;
 use App\Modules\Billing\Models\Subscription;
-use App\Modules\Billing\Models\WebhookEvent;
 use App\Modules\Family\Models\Family;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -49,7 +48,7 @@ class SyncSubscription
         DB::transaction(function () use ($family, $subscriber, $fetchedAt, $source): void {
             /** @var Family $family */
             $family = Family::query()->lockForUpdate()->findOrFail($family->id);
-            $subscription = Subscription::query()->where('family_id', $family->id)->lockForUpdate()->first();
+            $subscription = Subscription::query()->where('family_id', $family->id)->where('provider', Subscription::PROVIDER_REVENUECAT)->lockForUpdate()->first();
             $entitlementId = (string) config('services.revenuecat.entitlement', 'family');
             $entitlements = is_array($subscriber['entitlements'] ?? null) ? $subscriber['entitlements'] : [];
             $entitlement = is_array($entitlements[$entitlementId] ?? null) ? $entitlements[$entitlementId] : null;
@@ -64,7 +63,7 @@ class SyncSubscription
             } else {
                 $subscription ??= new Subscription([
                     'family_id' => $family->id,
-                    'provider' => WebhookEvent::PROVIDER_REVENUECAT,
+                    'provider' => Subscription::PROVIDER_REVENUECAT,
                     'app_user_id' => 'family-'.$family->id,
                     'entitlement' => $entitlementId,
                 ]);

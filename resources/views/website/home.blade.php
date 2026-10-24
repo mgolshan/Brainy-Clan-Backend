@@ -347,6 +347,17 @@
     <div class="hero">
         <div class="wrap">
             <div>
+                @if (($referral ?? null) !== null)
+                    {{-- /r/{code} (B10): affiliate code banner. --}}
+                    <p class="pill" role="note"><strong>Code {{ $referral['code'] }}</strong>&nbsp;—
+                        {{ $referral['has_offer_code']
+                            ? ($fr ? 'entrez ce code dans l’application (« Avez-vous un code ? ») ou utilisez l’offre de l’App Store / Google Play.' : 'enter it in the app (“Have a code?”) or redeem the App Store / Google Play offer.')
+                            : ($fr ? 'entrez ce code dans l’application (« Avez-vous un code ? »).' : 'enter it in the app (“Have a code?”).') }}
+                        @if ($referral['subscribe_url'] !== null)
+                            <a href="{{ $referral['subscribe_url'] }}">{{ $fr ? 'Ou abonnez-vous sur le Web' : 'Or subscribe on the web' }}</a>
+                        @endif
+                    </p>
+                @endif
                 <p class="pill"><img src="/images/site/clan/owl-mom.svg" alt="" width="30" height="30">{{ $fr ? 'Pour les enfants, les ados, les parents et les grands-parents' : 'For kids, teens, parents and grandparents' }}</p>
                 <h1>{!! $fr ? 'Apprendre, jouer et grandir <em>en famille.</em>' : 'Learn, play and grow <em>together as a family.</em>' !!}</h1>
                 <p class="lead">{{ $fr

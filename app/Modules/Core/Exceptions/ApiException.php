@@ -172,6 +172,34 @@ class ApiException extends RuntimeException
     }
 
     /**
+     * The family already has an active plan from a store or the web (docs/API.md "Web checkout").
+     */
+    public static function subscriptionExists(string $message = 'Your family already has an active plan.'): self
+    {
+        return new self('subscription_exists', $message, 409);
+    }
+
+    /**
+     * Web checkout (Paddle) is not configured or Paddle can't be reached right now.
+     */
+    public static function webCheckoutUnavailable(string $message = 'Web checkout is not available right now.'): self
+    {
+        return new self('web_checkout_unavailable', $message, 503);
+    }
+
+    public static function referralCodeInvalid(): self
+    {
+        $message = 'This referral code is unknown or no longer active.';
+
+        return new self('referral_code_invalid', $message, 422, ['code' => [$message]]);
+    }
+
+    public static function referralCodeLocked(): self
+    {
+        return new self('referral_code_locked', 'Your family already has a referral code or has already subscribed.', 409);
+    }
+
+    /**
      * A 422 with field errors, for domain validation that happens inside an Action.
      */
     public static function validation(string $field, string $message): self

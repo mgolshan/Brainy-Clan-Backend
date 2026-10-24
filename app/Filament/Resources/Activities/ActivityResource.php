@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Activities;
 
 use App\Filament\Resources\Activities\Pages\ManageActivities;
+use App\Filament\Support\AdminOnly;
 use BackedEnum;
 use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\TextEntry;
@@ -20,6 +21,8 @@ use UnitEnum;
  */
 class ActivityResource extends Resource
 {
+    use AdminOnly;
+
     protected static ?string $model = Activity::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentList;

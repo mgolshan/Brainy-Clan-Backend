@@ -71,7 +71,7 @@ class ErrorResponsesExtension extends OperationExtension
             $codes[] = 'rate_limited';
         }
 
-        if (! str_ends_with($uri, '/health')) {
+        if (! str_ends_with($uri, '/health') && ! str_ends_with($uri, '/health/deep')) {
             $codes[] = 'app_update_required';
         }
 

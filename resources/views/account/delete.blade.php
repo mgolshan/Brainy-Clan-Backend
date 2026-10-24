@@ -41,8 +41,8 @@
 
         <h2>{{ $fr ? 'Ce qui est supprimé' : 'What is deleted' }}</h2>
         <p>{{ $fr
-            ? 'Votre nom, courriel, mot de passe, données de naissance, avatar, appareils, jetons de notification et comptes de connexion liés sont effacés immédiatement. Les points de jeu restent seulement sous forme anonyme (« Joueur supprimé ») pour que les pointages de la famille restent exacts. Les sauvegardes chiffrées sont effacées après 14 jours. Un abonnement actif doit être annulé dans l’App Store ou Google Play.'
-            : 'Your name, email, password, birth data, avatar, devices, push tokens and linked sign-in accounts are erased immediately. Game points stay only in anonymous form ("Deleted player") so the family’s scores stay correct. Encrypted backups are erased after 14 days. An active subscription must be cancelled in the App Store or Google Play.' }}</p>
+            ? 'Votre nom, courriel, mot de passe, données de naissance, avatar, appareils, jetons de notification et comptes de connexion liés sont effacés immédiatement. Les points de jeu restent seulement sous forme anonyme (« Joueur supprimé ») pour que les pointages de la famille restent exacts. Les sauvegardes chiffrées sont effacées après 14 jours. Un abonnement actif doit être annulé dans l’App Store, sur Google Play ou, pour un achat sur le Web, dans le portail client de Paddle.'
+            : 'Your name, email, password, birth data, avatar, devices, push tokens and linked sign-in accounts are erased immediately. Game points stay only in anonymous form ("Deleted player") so the family’s scores stay correct. Encrypted backups are erased after 14 days. An active subscription must be cancelled in the App Store or Google Play or, for a web purchase, in the Paddle customer portal.' }}</p>
     @elseif ($state === 'confirm')
         <p>{{ $fr
             ? 'Appuyez sur le bouton pour supprimer définitivement votre compte. Cette action est irréversible.'

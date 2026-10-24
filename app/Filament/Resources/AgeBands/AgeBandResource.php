@@ -5,6 +5,7 @@ namespace App\Filament\Resources\AgeBands;
 use App\Filament\Resources\AgeBands\Pages\CreateAgeBand;
 use App\Filament\Resources\AgeBands\Pages\EditAgeBand;
 use App\Filament\Resources\AgeBands\Pages\ListAgeBands;
+use App\Filament\Support\AdminOnly;
 use App\Modules\Policy\Models\AgeBand;
 use BackedEnum;
 use Filament\Actions\EditAction;
@@ -27,6 +28,8 @@ use UnitEnum;
  */
 class AgeBandResource extends Resource
 {
+    use AdminOnly;
+
     protected static ?string $model = AgeBand::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;

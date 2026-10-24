@@ -53,10 +53,7 @@ class CheckAccountDeletion
                 }
             }
 
-            $subscription = Subscription::query()
-                ->where('family_id', $member->family_id)
-                ->whereIn('status', [Subscription::STATUS_ACTIVE, Subscription::STATUS_GRACE])
-                ->first();
+            $subscription = Subscription::currentFor($member->family_id);
         }
 
         $active = $subscription !== null && $subscription->isEntitled();

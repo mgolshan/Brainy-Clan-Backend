@@ -30,7 +30,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property int|null $birth_year
  * @property int|null $birth_month
  * @property string $locale
- * @property bool $is_staff
+ * @property string|null $staff_role Filament admin role: null, `admin` or `support` (never settable through the API)
  * @property Carbon|null $erased_at Account deleted: personal data erased (`EraseUser`)
  */
 #[Fillable(['display_name', 'avatar', 'email', 'password', 'birth_year', 'birth_month', 'locale'])]
@@ -72,6 +72,14 @@ class User extends Authenticatable implements FilamentUser, HasName
 
     public const array LOCALES = ['en', 'fr'];
 
+    /** Everything in the admin (as before B11), Horizon included. */
+    public const string STAFF_ROLE_ADMIN = 'admin';
+
+    /** Read-only admin access: families, members, devices, subscriptions, content, webhooks, dashboard. */
+    public const string STAFF_ROLE_SUPPORT = 'support';
+
+    public const array STAFF_ROLES = [self::STAFF_ROLE_ADMIN, self::STAFF_ROLE_SUPPORT];
+
     protected function casts(): array
     {
         return [
@@ -79,7 +87,6 @@ class User extends Authenticatable implements FilamentUser, HasName
             'password' => 'hashed',
             'birth_year' => 'integer',
             'birth_month' => 'integer',
-            'is_staff' => 'boolean',
             'erased_at' => 'datetime',
         ];
     }
@@ -160,9 +167,25 @@ class User extends Authenticatable implements FilamentUser, HasName
         return $this->socialAccounts()->exists();
     }
 
+    /**
+     * Any staff role (admin or support) and not an erased account.
+     */
+    public function isStaff(): bool
+    {
+        return in_array($this->staff_role, self::STAFF_ROLES, true) && $this->erased_at === null;
+    }
+
+    /**
+     * Full admin access: edits, actions, the AI generator, settings and Horizon.
+     */
+    public function isStaffAdmin(): bool
+    {
+        return $this->staff_role === self::STAFF_ROLE_ADMIN && $this->erased_at === null;
+    }
+
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->is_staff;
+        return $this->isStaff();
     }
 
     public function getFilamentName(): string

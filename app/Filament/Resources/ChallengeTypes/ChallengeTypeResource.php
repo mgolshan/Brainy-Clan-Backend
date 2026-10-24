@@ -4,6 +4,8 @@ namespace App\Filament\Resources\ChallengeTypes;
 
 use App\Filament\Resources\ChallengeTypes\Pages\ManageChallengeTypes;
 use App\Filament\Support\JsonEditor;
+use App\Filament\Support\ReadOnlyForSupport;
+use App\Filament\Support\StaffAccess;
 use App\Modules\ChallengeTypes\Contracts\ChallengeType as ChallengeTypeContract;
 use App\Modules\Content\Models\ChallengeType;
 use BackedEnum;
@@ -24,6 +26,8 @@ use UnitEnum;
  */
 class ChallengeTypeResource extends Resource
 {
+    use ReadOnlyForSupport;
+
     protected static ?string $model = ChallengeType::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPuzzlePiece;
@@ -57,7 +61,7 @@ class ChallengeTypeResource extends Resource
                 TextColumn::make('key')->fontFamily('mono'),
                 TextColumn::make('name'),
                 TextColumn::make('handler_class')->formatStateUsing(fn (string $state) => class_basename($state)),
-                ToggleColumn::make('is_active')->label('Active'),
+                ToggleColumn::make('is_active')->label('Active')->disabled(fn (): bool => ! StaffAccess::isAdmin()),
             ])
             ->recordActions([EditAction::make()]);
     }

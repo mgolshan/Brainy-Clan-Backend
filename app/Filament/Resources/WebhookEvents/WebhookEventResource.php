@@ -5,6 +5,7 @@ namespace App\Filament\Resources\WebhookEvents;
 use App\Filament\Resources\Families\FamilyResource;
 use App\Filament\Resources\WebhookEvents\Pages\ListWebhookEvents;
 use App\Filament\Resources\WebhookEvents\Pages\ViewWebhookEvent;
+use App\Filament\Support\ReadOnlyForSupport;
 use App\Modules\Billing\Models\WebhookEvent;
 use BackedEnum;
 use Filament\Actions\ViewAction;
@@ -21,10 +22,12 @@ use Illuminate\Support\HtmlString;
 use UnitEnum;
 
 /**
- * Received billing webhooks (RevenueCat) with their outcome and raw payload, for support. Read-only.
+ * Received billing webhooks (RevenueCat, Paddle) with their outcome and raw payload, for support. Read-only.
  */
 class WebhookEventResource extends Resource
 {
+    use ReadOnlyForSupport;
+
     protected static ?string $model = WebhookEvent::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedInboxArrowDown;
@@ -83,7 +86,7 @@ class WebhookEventResource extends Resource
                 TextColumn::make('event_id')->label('Event id')->searchable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('provider')->options([WebhookEvent::PROVIDER_REVENUECAT => 'RevenueCat']),
+                SelectFilter::make('provider')->options([WebhookEvent::PROVIDER_REVENUECAT => 'RevenueCat', WebhookEvent::PROVIDER_PADDLE => 'Paddle']),
                 SelectFilter::make('outcome')->options(array_combine(WebhookEvent::OUTCOMES, WebhookEvent::OUTCOMES)),
             ])
             ->recordActions([ViewAction::make()]);

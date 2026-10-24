@@ -8,6 +8,7 @@ use App\Filament\Resources\Families\Pages\ViewFamily;
 use App\Filament\Resources\Families\RelationManagers\AllMembersRelationManager;
 use App\Filament\Resources\Families\RelationManagers\ConsentsRelationManager;
 use App\Filament\Resources\Families\RelationManagers\InvitesRelationManager;
+use App\Filament\Support\ReadOnlyForSupport;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Family\Models\Family;
 use BackedEnum;
@@ -33,6 +34,8 @@ use UnitEnum;
  */
 class FamilyResource extends Resource
 {
+    use ReadOnlyForSupport;
+
     protected static ?string $model = Family::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHome;
@@ -63,7 +66,7 @@ class FamilyResource extends Resource
             TextEntry::make('country_code'),
             TextEntry::make('created_at')->dateTime(),
             Section::make('Subscription')
-                ->description('Read-only: set by RevenueCat webhooks, the app sync and the hourly reconciliation. Webhooks are under Billing → Webhook events.')
+                ->description('Read-only: the most recently updated plan, set by RevenueCat (store) or Paddle (web) webhooks, the app sync and the hourly reconciliation. Webhooks are under Billing → Webhook events.')
                 ->columnSpanFull()->columns(4)
                 ->schema([
                     TextEntry::make('subscription.status')->label('Status')->badge()->default(Subscription::STATUS_NONE)
@@ -83,6 +86,11 @@ class FamilyResource extends Resource
                     TextEntry::make('revenuecat_app_user_id')->label('RevenueCat app user id')
                         ->state(fn (Family $record): string => 'family-'.$record->id)->copyable(),
                     TextEntry::make('subscription.updated_at')->label('Updated')->dateTime()->placeholder('—'),
+                    TextEntry::make('subscription.provider')->label('Provider')->placeholder('—'),
+                    TextEntry::make('subscription.external_id')->label('Paddle subscription')->placeholder('—')->copyable(),
+                    TextEntry::make('first_paid_at')->label('First paid')->dateTime()->placeholder('—'),
+                    TextEntry::make('attribution.affiliateCode.code')->label('Referral code')->placeholder('—')
+                        ->helperText(fn (Family $record): ?string => $record->attribution !== null ? 'Source: '.$record->attribution->source : null),
                 ]),
         ]);
     }
@@ -94,7 +102,7 @@ class FamilyResource extends Resource
      */
     public static function getRecordRouteBindingEloquentQuery(): Builder
     {
-        return parent::getRecordRouteBindingEloquentQuery()->with(['owner', 'subscription']);
+        return parent::getRecordRouteBindingEloquentQuery()->with(['owner', 'subscription', 'attribution.affiliateCode']);
     }
 
     public static function table(Table $table): Table

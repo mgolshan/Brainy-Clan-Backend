@@ -14,6 +14,7 @@ use App\Filament\Widgets\RecentFamilies;
 use App\Filament\Widgets\RecentWebhookErrors;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Models\WebhookEvent;
+use App\Modules\Billing\Support\WebhookRejections;
 use App\Modules\Content\Models\Category;
 use App\Modules\Content\Models\ContentBatch;
 use App\Modules\Content\Models\ContentItem;
@@ -158,6 +159,15 @@ function dashboardDataset(): array
     WebhookEvent::factory()->create(['outcome' => WebhookEvent::OUTCOME_FAILED, 'created_at' => $now->subDays(9)]);
     WebhookEvent::factory()->create(['outcome' => WebhookEvent::OUTCOME_APPLIED]);
 
+    // AdMob SSV rejections: 2 bad signatures today + 1 unusable payload 3 days ago in the week; 1 older.
+    $rejections = app(WebhookRejections::class);
+    $rejections->record(WebhookRejections::PROVIDER_ADMOB, WebhookRejections::REASON_SIGNATURE_INVALID);
+    $rejections->record(WebhookRejections::PROVIDER_ADMOB, WebhookRejections::REASON_SIGNATURE_INVALID);
+    DB::table('webhook_rejections')->insert([
+        ['provider' => WebhookRejections::PROVIDER_ADMOB, 'reason' => WebhookRejections::REASON_INVALID_PAYLOAD, 'day' => $now->subDays(3)->toDateString(), 'hits' => 1, 'created_at' => $now, 'updated_at' => $now],
+        ['provider' => WebhookRejections::PROVIDER_ADMOB, 'reason' => WebhookRejections::REASON_SIGNATURE_INVALID, 'day' => $now->subDays(10)->toDateString(), 'hits' => 5, 'created_at' => $now, 'updated_at' => $now],
+    ]);
+
     Device::factory()->create(['user_id' => $alpha->user_id, 'push_token' => 'ExponentPushToken[a]']);
     Device::factory()->create(['user_id' => $kid->user_id, 'push_token' => 'ExponentPushToken[b]']);
     Device::factory()->create(['user_id' => $beta->user_id]);
@@ -266,6 +276,8 @@ it('computes the system health figures', function () {
         'failed_jobs_day' => 1,
         'failed_push_jobs' => 1,
         'webhook_errors_week' => 1,
+        'admob_ssv_rejections_week' => 3,
+        'admob_ssv_signature_invalid_week' => 2,
         'devices' => 3,
         'devices_with_push' => 2,
         'deletion_requests_pending' => 1,
@@ -276,6 +288,9 @@ it('computes the system health figures', function () {
         ->assertSee('1 in the last 24 hours')
         ->assertSee('67% of 3 devices · 1 failed push jobs')
         ->assertSee('1 blocked in 7 days')
+        ->assertSee('AdMob SSV rejections')
+        ->assertSee('2 bad signatures · 7 days')
+        ->assertSee('/horizon/failed')
         ->assertSee(WebhookEventResource::getUrl('index', ['filters' => ['outcome' => ['value' => WebhookEvent::OUTCOME_FAILED]]]))
         ->assertSee(AccountDeletionRequestResource::getUrl('index', ['filters' => ['status' => ['value' => AccountDeletionRequest::STATUS_PENDING]]]));
 });
@@ -347,6 +362,7 @@ it('runs the same number of queries whatever the number of families and sessions
         dashboardPoints($session, 4, CarbonImmutable::now()->subDays($i));
         ContentBatch::factory()->create(['category_id' => $category->id, 'status' => ContentBatch::STATUS_REVIEW]);
         WebhookEvent::factory()->create(['outcome' => WebhookEvent::OUTCOME_FAILED, 'family_id' => $owner->family_id]);
+        DB::table('webhook_rejections')->insert(['provider' => WebhookRejections::PROVIDER_ADMOB, 'reason' => WebhookRejections::REASON_SIGNATURE_INVALID, 'day' => CarbonImmutable::now()->subDays($i)->toDateString(), 'hits' => $i, 'created_at' => now(), 'updated_at' => now()]);
     }
 
     expect($count())->toBe($small)
@@ -361,7 +377,7 @@ it('runs no aggregate queries while the cache is warm', function () {
         DB::flushQueryLog();
         DB::enableQueryLog();
         Livewire::test($widget)->assertOk();
-        $tables = collect(DB::getQueryLog())->pluck('query')->filter(fn (string $sql) => preg_match('/play_sessions|point_entries|families|subscriptions|content_items|failed_jobs|devices/', $sql));
+        $tables = collect(DB::getQueryLog())->pluck('query')->filter(fn (string $sql) => preg_match('/play_sessions|point_entries|families|subscriptions|content_items|failed_jobs|devices|webhook_rejections/', $sql));
         DB::disableQueryLog();
 
         expect($tables)->toBeEmpty();

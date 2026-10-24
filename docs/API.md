@@ -184,6 +184,26 @@ and add a line to the changelog at the bottom.
 ```json
 { "data": { "status": "ok", "api_version": "1", "min_app_version": "1.0.0", "time": "2026-10-10T14:00:00Z" } }
 ```
+A liveness check only (the app uses it); it does not test MySQL, Redis or the workers.
+
+`GET /health/deep` — **monitoring only, not for the app.** Header `X-Health-Token: <HEALTH_DEEP_TOKEN>`
+(server env). Without a configured token → 404 `not_found`; missing/wrong token → 401
+`unauthenticated`. Exempt from the version check; 30 requests/min per IP (429 `rate_limited`).
+Checks MySQL (`select 1`), Redis (`PING`), the scheduler heartbeat (written every minute, must be
+younger than 180 s) and Horizon (a master supervisor running, not paused) — these are critical —
+and counts failed jobs in the last hour (warning only). **200** when every critical check is `ok`
+(`status: "ok"`, or `"degraded"` when only `failed_jobs` warns), **503** with the same body when any
+critical check fails (`status: "fail"`). Never contains error messages, hosts or versions.
+```json
+{ "data": { "status": "ok",
+  "checks": { "database": { "status": "ok" }, "redis": { "status": "ok" },
+              "scheduler": { "status": "ok", "age_seconds": 42 },
+              "horizon": { "status": "ok", "state": "running" },
+              "failed_jobs": { "status": "ok", "last_hour": 0 } },
+  "time": "2026-10-24T14:00:00Z" } }
+```
+Check `status` values: `ok` | `fail` (`failed_jobs`: `ok` | `warn` | `fail`); Horizon `state`:
+`running` | `paused` | `inactive` | `unknown`; `age_seconds` / `last_hour` are `null` when unreadable.
 
 ### Auth
 All return `AuthPayload`:
@@ -606,7 +626,7 @@ server from RevenueCat and Paddle revenue events (admin-only reports; no public 
   ≤ 20). Sets the family's referral code once, before its first paid transaction. → 200
   `{ "data": { "code": "MAYA", "source": "code" } }`; 422 `referral_code_invalid` (unknown or
   inactive), 409 `referral_code_locked` (already set, or the family already paid).
-- `GET /family` (admin view) gains `"referral_code": "MAYA" | null`.
+- The Family object gains `"referral_code": "MAYA" | null` — the real value only for family admins (`null` for other members), wherever the Family object is returned (e.g. `GET /family`, `/me`).
 - Website `/r/{code}`: the landing page with a "Code MAYA" banner, store badges (and the store
   offer-code hint if the code has one) and the subscribe form pre-filled with the code; unknown
   codes show the normal page. No cookies, no fingerprinting.
@@ -786,3 +806,5 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-23 — Family chat: `/family/chat/*` endpoints, Message object, Member `chat_enabled`, Policy `chat.retention_days` (free 7 / Family 365), push type `family_chat` (no message text), error `chat_disabled`.
 - 2026-10-24 — Family chat clarifications (backend built): callers without an active membership get 404 on `/family/chat/*` (not 409); body length counted in Unicode code points; CRLF → LF; "Former member" `nickname` localized with `avatar` null; `before`+`after` or `limit` > 100 → 422; read marker capped at the newest id; notification preferences `types.family_chat`; `/me/export` gains `chat_messages`; Member `chat_enabled` and Policy `chat` in the shared-object examples. Privacy policy version bumped to `2026-10-23` (re-acceptance).
 - 2026-10-24 — B10: `GET /pricing`, website subscribe flow with Paddle (merchant of record), `GET /family/web-checkout/availability`, Paddle webhook, `store: paddle`, `POST /family/subscription/manage-link`, referral codes (`POST /family/referral-code`, `/r/{code}`, offer codes), new error codes.
+- 2026-10-24 — B11 (additive, monitoring only): `GET /health/deep` with `X-Health-Token` (MySQL, Redis, scheduler heartbeat, Horizon, failed jobs last hour; 200/503). `GET /health` unchanged.
+- 2026-10-24 — B10 clarifications (backend built, no shape change): `POST /family/subscription/manage-link` → 404 `not_found` when the family has no subscription, 503 `web_checkout_unavailable` when Paddle isn't configured or reachable (portal links are temporary — open right away); `GET /family/web-checkout/availability` → 422 for a `storefront` that isn't 3 letters, `link_allowed: false` without one; `POST /family/referral-code` → a malformed code is also 422 `referral_code_invalid`; `GET /family/subscription` shows the entitled plan (store or web) first. Website: the emailed checkout link creates one Paddle transaction — opening it again within 30 min returns to the same checkout; without a Paddle hosted checkout the link goes to `/subscribe/pay` (Paddle.js). Terms and privacy versions bumped to `2026-10-24` (re-acceptance).

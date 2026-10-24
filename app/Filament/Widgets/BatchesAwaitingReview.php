@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Pages\AiBatchGenerator;
 use App\Filament\Pages\AiBatchReview;
+use App\Filament\Support\StaffAccess;
 use App\Modules\Content\Models\ContentBatch;
 use App\Modules\Content\Support\CategoryTree;
 use Filament\Actions\Action;
@@ -21,6 +22,14 @@ class BatchesAwaitingReview extends TableWidget
     public const int LIMIT = 8;
 
     protected static ?int $sort = 8;
+
+    /**
+     * AI generator workflow: admins only (the `support` role has no access to the AI pages).
+     */
+    public static function canView(): bool
+    {
+        return StaffAccess::isAdmin();
+    }
 
     public function table(Table $table): Table
     {

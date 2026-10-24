@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\ThemeWorlds;
 
 use App\Filament\Resources\ThemeWorlds\Pages\ManageThemeWorlds;
+use App\Filament\Support\ReadOnlyForSupport;
+use App\Filament\Support\StaffAccess;
 use App\Modules\Policy\Models\AgeBand;
 use App\Modules\Policy\Models\ThemeWorld;
 use BackedEnum;
@@ -26,6 +28,8 @@ use UnitEnum;
  */
 class ThemeWorldResource extends Resource
 {
+    use ReadOnlyForSupport;
+
     protected static ?string $model = ThemeWorld::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSwatch;
@@ -69,7 +73,7 @@ class ThemeWorldResource extends Resource
                     ->formatStateUsing(fn (string $state): string => (AgeBand::THEME_LABELS[$state] ?? $state)." ({$state})"),
                 TextColumn::make('unlock_type')->label('Unlocks with')->badge(),
                 TextColumn::make('required')->placeholder('—'),
-                ToggleColumn::make('active'),
+                ToggleColumn::make('active')->disabled(fn (): bool => ! StaffAccess::isAdmin()),
             ])
             ->recordActions([EditAction::make()]);
     }

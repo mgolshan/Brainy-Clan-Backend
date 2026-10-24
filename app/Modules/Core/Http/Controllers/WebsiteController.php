@@ -2,6 +2,8 @@
 
 namespace App\Modules\Core\Http\Controllers;
 
+use App\Modules\Billing\Models\AffiliateCode;
+use App\Modules\Billing\Support\PaddleConfig;
 use App\Modules\Core\Support\Website;
 use App\Modules\Policy\PolicyResolver;
 use App\Modules\Policy\Support\ThemeWorldCatalog;
@@ -27,12 +29,44 @@ class WebsiteController
      */
     public function home(Request $request, PolicyResolver $policy, ThemeWorldCatalog $worlds): Response
     {
-        return $this->page($request, 'website.home', [
+        return $this->page($request, 'website.home', $this->homeData($policy, $worlds));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function homeData(PolicyResolver $policy, ThemeWorldCatalog $worlds): array
+    {
+        return [
             'plans' => [
                 'free' => $this->plan($policy, 'free'),
                 'family' => $this->plan($policy, 'family'),
             ],
             'worlds' => $worlds->all(),
+            'referral' => null,
+        ];
+    }
+
+    /**
+     * Affiliate link `/r/{code}` (docs/API.md "Referral / affiliate codes"): the landing page with a
+     * "Code MAYA" banner, the store offer-code hint when the code has one, and a link to the
+     * subscribe form with the code filled in. Unknown or inactive codes show the normal page. No
+     * cookies, nothing stored about the visitor.
+     */
+    public function referral(Request $request, string $code, PolicyResolver $policy, ThemeWorldCatalog $worlds): Response
+    {
+        $affiliateCode = AffiliateCode::findUsable($code);
+
+        return $this->page($request, 'website.home', [
+            ...$this->homeData($policy, $worlds),
+            'canonicalRoute' => 'website.home',
+            'referral' => $affiliateCode !== null ? [
+                'code' => $affiliateCode->code,
+                'has_offer_code' => ($affiliateCode->store_offer_codes ?? []) !== [],
+                'subscribe_url' => PaddleConfig::webCheckoutAvailable()
+                    ? Website::route('website.subscribe', ['code' => $affiliateCode->code, 'src' => 'link', ...(Website::locale($request) === 'fr' ? ['lang' => 'fr'] : [])])
+                    : null,
+            ] : null,
         ]);
     }
 
@@ -61,7 +95,7 @@ class WebsiteController
         $isWebsite = $websiteHost === null || strtolower($request->getHost()) === $websiteHost;
 
         $body = $isWebsite
-            ? "User-agent: *\nDisallow: /account/delete/confirm/\nDisallow: /password/\n\nSitemap: ".Website::route('website.sitemap')."\n"
+            ? "User-agent: *\nDisallow: /account/delete/confirm/\nDisallow: /password/\nDisallow: /subscribe/checkout\nDisallow: /subscribe/pay\nDisallow: /r/\n\nSitemap: ".Website::route('website.sitemap')."\n"
             : "User-agent: *\nDisallow: /\n";
 
         return response($body, 200, ['Content-Type' => 'text/plain; charset=UTF-8', 'Cache-Control' => 'public, max-age=3600']);

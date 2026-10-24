@@ -59,11 +59,11 @@ it('RevokeCurrentDevice deletes the token and device', function () {
 });
 
 it('UpdateProfile only touches profile fields', function () {
-    $user = User::factory()->create(['is_staff' => false]);
+    $user = User::factory()->create(['staff_role' => null]);
 
-    app(UpdateProfile::class)->handle($user, ['display_name' => 'New', 'is_staff' => true]);
+    app(UpdateProfile::class)->handle($user, ['display_name' => 'New', 'staff_role' => 'admin', 'is_staff' => true]);
 
-    expect($user->refresh()->display_name)->toBe('New')->and($user->is_staff)->toBeFalse();
+    expect($user->refresh()->display_name)->toBe('New')->and($user->staff_role)->toBeNull();
 });
 
 it('CreateFamily makes the owner an admin and refuses a second family', function () {

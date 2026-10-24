@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Tags;
 
 use App\Filament\Resources\Tags\Pages\ManageTags;
+use App\Filament\Support\ReadOnlyForSupport;
 use App\Modules\Content\Models\Tag;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
@@ -17,6 +18,8 @@ use UnitEnum;
 
 class TagResource extends Resource
 {
+    use ReadOnlyForSupport;
+
     protected static ?string $model = Tag::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTag;

@@ -27,7 +27,7 @@ describe('GET /legal and the pages', function () {
             ->assertOk()
             ->assertJsonPath('data.terms.version', config('legal.documents.terms.version'))
             ->assertJsonPath('data.terms.url', url('/terms'))
-            ->assertJsonPath('data.terms.summary', 'First version of the Brainy Clan terms of service.')
+            ->assertJsonPath('data.terms.summary', config('legal.documents.terms.summary.en'))
             ->assertJsonPath('data.privacy.version', config('legal.documents.privacy.version'))
             ->assertJsonPath('data.privacy.url', url('/privacy'));
     });

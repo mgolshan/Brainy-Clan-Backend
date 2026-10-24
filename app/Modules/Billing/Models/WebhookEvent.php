@@ -35,6 +35,8 @@ class WebhookEvent extends Model
 
     public const string PROVIDER_REVENUECAT = 'revenuecat';
 
+    public const string PROVIDER_PADDLE = 'paddle';
+
     public const string OUTCOME_APPLIED = 'applied';
 
     public const string OUTCOME_IGNORED = 'ignored';

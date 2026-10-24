@@ -227,6 +227,15 @@ class PolicyResolver
         return $this->emailLoginAllowed($this->bandForMember($member));
     }
 
+    /**
+     * Whether this member's age band may buy the Family plan (`purchases_allowed`; adults only by
+     * default). The same rule as `policy.purchases_allowed`; used by web checkout (Billing).
+     */
+    public function purchasesAllowedFor(FamilyMember $member): bool
+    {
+        return (bool) ($this->bandForMember($member)?->rule('purchases_allowed') ?? false);
+    }
+
     // ---------------------------------------------------------------------------------
     // Rules used by actions
     // ---------------------------------------------------------------------------------

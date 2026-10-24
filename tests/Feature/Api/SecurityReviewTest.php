@@ -203,7 +203,7 @@ it('never lets the API set staff, ownership or ledger fields', function () {
     $kid = addMember($owner->family, 9);
     actingAsMember($owner);
 
-    $this->patchJson('/api/v1/me', ['display_name' => 'Moe', 'is_staff' => true, 'email' => 'evil@example.com', 'password' => 'hunter2hunter2'])->assertOk();
+    $this->patchJson('/api/v1/me', ['display_name' => 'Moe', 'is_staff' => true, 'staff_role' => 'admin', 'email' => 'evil@example.com', 'password' => 'hunter2hunter2'])->assertOk();
     $this->patchJson('/api/v1/family', ['name' => 'Ours', 'tier' => 'family', 'owner_user_id' => $kid->user_id])->assertOk();
     $this->patchJson("/api/v1/family/members/{$kid->id}", ['nickname' => 'Sam', 'family_id' => familyOwner()->family_id, 'user_id' => $owner->user_id, 'status' => 'removed'])->assertOk();
 
@@ -211,7 +211,7 @@ it('never lets the API set staff, ownership or ledger fields', function () {
     $family = $owner->family->refresh();
     $kid->refresh();
 
-    expect($user->is_staff)->toBeFalse()
+    expect($user->staff_role)->toBeNull()
         ->and($user->display_name)->toBe('Moe')
         ->and($user->email)->not->toBe('evil@example.com')
         ->and($family->name)->toBe('Ours')
@@ -355,10 +355,11 @@ it('drops the family name from earlier audit entries when the family is deleted'
         ->and(Activity::query()->get()->toJson())->not->toContain('Golshan');
 });
 
-it('lets only staff open Horizon', function () {
+it('lets only admin staff open Horizon', function () {
     expect(Gate::forUser(null)->allows('viewHorizon'))->toBeFalse()
         ->and(Gate::forUser(User::factory()->create())->allows('viewHorizon'))->toBeFalse()
-        ->and(Gate::forUser(User::factory()->create(['is_staff' => true]))->allows('viewHorizon'))->toBeTrue();
+        ->and(Gate::forUser(User::factory()->support()->create())->allows('viewHorizon'))->toBeFalse()
+        ->and(Gate::forUser(User::factory()->staff()->create())->allows('viewHorizon'))->toBeTrue();
 });
 
 it('ships safe production cookie and CORS settings', function () {

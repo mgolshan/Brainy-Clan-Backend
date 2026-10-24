@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
  */
 const PUBLIC_API_ROUTES = [
     'GET api/v1/health',
+    // Monitoring only: protected by the X-Health-Token header (404 without HEALTH_DEEP_TOKEN).
+    'GET api/v1/health/deep',
     'GET api/v1/legal',
     'POST api/v1/auth/register',
     'POST api/v1/auth/login',
@@ -19,6 +21,8 @@ const PUBLIC_API_ROUTES = [
     'POST api/v1/auth/join',
     'POST api/v1/auth/code',
     'POST api/v1/webhooks/revenuecat',
+    'POST api/v1/webhooks/paddle',
+    'GET api/v1/pricing',
     'GET api/v1/webhooks/admob-ssv',
 ];
 
@@ -58,7 +62,7 @@ it('rate-limits every /api/v1 route', function () {
 
 it('keeps admin-only family routes behind the family:admin middleware', function () {
     $adminRoutes = apiRouteMiddleware()
-        ->filter(fn (array $middleware, string $route) => Str::contains($route, ['family/invites', 'sign-in-codes', 'family/subscription/sync', 'family/members/{member}/worlds']) || $route === 'PATCH api/v1/family')
+        ->filter(fn (array $middleware, string $route) => Str::contains($route, ['family/invites', 'sign-in-codes', 'family/subscription', 'family/members/{member}/worlds', 'family/web-checkout', 'family/referral-code']) || $route === 'PATCH api/v1/family')
         ->reject(fn (array $middleware) => in_array('family:admin', $middleware, true))
         ->keys()
         ->all();

@@ -18,8 +18,9 @@ class SubscriptionController
     /**
      * The family subscription (admin).
      *
-     * `status` is `none` when the family never subscribed. The app passes `revenuecat_app_user_id`
-     * to `Purchases.logIn()`.
+     * `status` is `none` when the family never subscribed. `store` is `paddle` for a plan bought on
+     * the web (the app then hides the paywall and offers "Manage" via `manage-link`). The app passes
+     * `revenuecat_app_user_id` to `Purchases.logIn()`.
      */
     public function show(Request $request): FamilySubscriptionResource
     {
@@ -46,7 +47,7 @@ class SubscriptionController
     {
         return new FamilySubscriptionResource([
             'family' => $family,
-            'subscription' => Subscription::query()->where('family_id', $family->id)->first(),
+            'subscription' => Subscription::currentFor($family->id),
         ]);
     }
 }

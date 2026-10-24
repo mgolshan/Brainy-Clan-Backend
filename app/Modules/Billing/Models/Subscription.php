@@ -12,12 +12,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * A family's subscription, mirrored from RevenueCat webhooks (one row per family).
+ * A family's subscription from one provider: RevenueCat (store purchases) or Paddle (web
+ * checkout). One row per family and provider; the family tier is `family` while any of its rows is
+ * entitled (`ApplyFamilyTier`). The API shows the {@see Subscription::currentFor()} row.
  *
  * @property int $id
  * @property int $family_id
  * @property string $provider
  * @property string $app_user_id
+ * @property string|null $external_id Paddle subscription id
+ * @property string|null $customer_id Paddle customer id
  * @property string $entitlement
  * @property string $status
  * @property string|null $store
@@ -34,7 +38,7 @@ use Illuminate\Support\Carbon;
  * @property-read Family $family
  */
 #[Fillable([
-    'family_id', 'provider', 'app_user_id', 'entitlement', 'status', 'store', 'product_id', 'period_type',
+    'family_id', 'provider', 'app_user_id', 'external_id', 'customer_id', 'entitlement', 'status', 'store', 'product_id', 'period_type',
     'environment', 'will_renew', 'purchased_at', 'expires_at', 'grace_expires_at', 'last_event_ms',
     'last_event_type', 'raw',
 ])]
@@ -43,6 +47,13 @@ class Subscription extends Model
 {
     /** @use HasFactory<SubscriptionFactory> */
     use HasFactory;
+
+    public const string PROVIDER_REVENUECAT = 'revenuecat';
+
+    public const string PROVIDER_PADDLE = 'paddle';
+
+    /** `store` of web checkout (Paddle) rows. */
+    public const string STORE_PADDLE = 'paddle';
 
     public const string STATUS_ACTIVE = 'active';
 
@@ -57,7 +68,7 @@ class Subscription extends Model
     public const array STATUSES = [self::STATUS_ACTIVE, self::STATUS_GRACE, self::STATUS_EXPIRED];
 
     /** Stores the contract exposes; others (promotional, amazon) are reported as null. */
-    public const array API_STORES = ['app_store', 'play_store', 'stripe'];
+    public const array API_STORES = ['app_store', 'play_store', 'stripe', self::STORE_PADDLE];
 
     protected function casts(): array
     {
@@ -93,6 +104,32 @@ class Subscription extends Model
                 || ($this->grace_expires_at ?? $this->expires_at)->greaterThan($at),
             default => false,
         };
+    }
+
+    /**
+     * The row the API and support show for a family: an entitled one first (most recently updated
+     * if, unexpectedly, both a store and a web plan are on), else the most recently updated one.
+     * Null when the family never subscribed.
+     */
+    public static function currentFor(int $familyId): ?self
+    {
+        $rows = self::query()->where('family_id', $familyId)->orderByDesc('updated_at')->orderByDesc('id')->get();
+
+        return $rows->first(fn (self $row): bool => $row->isEntitled()) ?? $rows->first();
+    }
+
+    /**
+     * The family's entitled row from another provider than `$provider`, if any.
+     */
+    public static function entitledElsewhere(int $familyId, string $provider): ?self
+    {
+        return self::query()->where('family_id', $familyId)->where('provider', '!=', $provider)->get()
+            ->first(fn (self $row): bool => $row->isEntitled());
+    }
+
+    public function isPaddle(): bool
+    {
+        return $this->provider === self::PROVIDER_PADDLE;
     }
 
     public function apiStore(): ?string

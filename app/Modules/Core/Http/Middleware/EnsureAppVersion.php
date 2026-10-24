@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Answers 426 `app_update_required` when the `X-App-Version` header is lower than the
- * `min_app_version` setting. Requests without the header pass. The health route is exempt.
+ * `min_app_version` setting. Requests without the header pass. The health routes are exempt.
  */
 class EnsureAppVersion
 {
@@ -21,7 +21,7 @@ class EnsureAppVersion
         $version = $request->header('X-App-Version');
 
         // Runs as global middleware (before routing and auth), so it matches on the path.
-        if (is_string($version) && $version !== '' && $request->is('api/*') && ! $request->is('api/v1/health')) {
+        if (is_string($version) && $version !== '' && $request->is('api/*') && ! $request->is('api/v1/health', 'api/v1/health/deep')) {
             $minimum = $this->policy->minAppVersion();
 
             if (version_compare($version, $minimum, '<')) {

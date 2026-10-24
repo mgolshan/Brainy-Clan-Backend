@@ -37,6 +37,17 @@ class ExportUserData
             throw ApiException::forbidden('Ask your parent to request a copy of your data.');
         }
 
+        return $this->build($user);
+    }
+
+    /**
+     * The export itself, without the child check: also used by the staff "Start data export"
+     * action, which mails a child's export to the family owner (`SendChildDataExport`).
+     *
+     * @return array<string, mixed>
+     */
+    public function build(User $user): array
+    {
         $memberships = FamilyMember::query()
             ->where('user_id', $user->id)
             ->with('family:id,name,timezone,country_code,tier')

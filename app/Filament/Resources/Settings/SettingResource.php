@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Settings;
 
 use App\Filament\Resources\Settings\Pages\ManageSettings;
+use App\Filament\Support\AdminOnly;
 use App\Filament\Support\JsonEditor;
 use App\Modules\Family\Models\Family;
 use App\Modules\Policy\Models\Setting;
@@ -25,6 +26,8 @@ use UnitEnum;
  */
 class SettingResource extends Resource
 {
+    use AdminOnly;
+
     protected static ?string $model = Setting::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedAdjustmentsHorizontal;

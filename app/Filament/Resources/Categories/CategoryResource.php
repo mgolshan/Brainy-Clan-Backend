@@ -5,6 +5,8 @@ namespace App\Filament\Resources\Categories;
 use App\Filament\Resources\Categories\Pages\CreateCategory;
 use App\Filament\Resources\Categories\Pages\EditCategory;
 use App\Filament\Resources\Categories\Pages\ListCategories;
+use App\Filament\Support\ReadOnlyForSupport;
+use App\Filament\Support\StaffAccess;
 use App\Modules\ChallengeTypes\ChallengeTypeRegistry;
 use App\Modules\ChallengeTypes\Contracts\GeneratesItems;
 use App\Modules\Content\Models\Category;
@@ -36,6 +38,8 @@ use UnitEnum;
  */
 class CategoryResource extends Resource
 {
+    use ReadOnlyForSupport;
+
     protected static ?string $model = Category::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedFolder;
@@ -107,7 +111,7 @@ class CategoryResource extends Resource
                 TextColumn::make('content_items_count')->label('Items')->sortable(),
                 TextColumn::make('generators')->label('Generated')->badge()->toggleable()
                     ->state(fn (Category $record) => array_map(fn ($spec) => $spec->type.($spec->options !== [] ? ' '.implode('/', array_map('strval', $spec->options)) : ''), $record->generatorSpecs())),
-                ToggleColumn::make('is_active')->label('Active'),
+                ToggleColumn::make('is_active')->label('Active')->disabled(fn (): bool => ! StaffAccess::isAdmin()),
             ])
             ->filters([
                 SelectFilter::make('parent_id')->label('Parent')

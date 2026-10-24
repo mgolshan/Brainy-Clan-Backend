@@ -8,9 +8,10 @@ use App\Modules\Family\Models\Family;
 
 /**
  * The one place a subscription switches the family tier (docs/PLAN.md "Tier switches only via the
- * server"): `family` while the entitlement is on (active or in the billing grace period), else
- * `free`. Used by the RevenueCat webhook, `POST /family/subscription/sync` and the scheduled
- * reconciliation. Saves the subscription and dispatches {@see SubscriptionChanged}.
+ * server"): `family` while any of the family's subscription rows (RevenueCat or Paddle) is entitled
+ * (active or in the billing grace period), else `free`. Used by the RevenueCat and Paddle webhooks,
+ * `POST /family/subscription/sync` and the scheduled reconciliation. Saves the subscription and
+ * dispatches {@see SubscriptionChanged}.
  */
 class ApplyFamilyTier
 {
@@ -24,7 +25,10 @@ class ApplyFamilyTier
     {
         $subscription->save();
 
-        $tier = $subscription->isEntitled() ? Family::TIER_FAMILY : Family::TIER_FREE;
+        $entitled = $subscription->isEntitled()
+            || Subscription::entitledElsewhere($family->id, $subscription->provider) !== null;
+
+        $tier = $entitled ? Family::TIER_FAMILY : Family::TIER_FREE;
         $changed = $family->tier !== $tier;
 
         if ($changed) {

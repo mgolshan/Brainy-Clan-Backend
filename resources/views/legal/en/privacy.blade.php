@@ -32,7 +32,8 @@
         <li><strong>Family and activity data:</strong> family name, role (admin or member), answers given in quizzes and puzzles, points, streaks, goals and their rewards, accessibility and difficulty settings.</li>
         <li><strong>Device data:</strong> a device name and platform (iOS, Android, web), the app version, the time the app was last used and, if notifications are allowed, a push notification token.</li>
         <li><strong>Consent records:</strong> which version of these documents was accepted, when, and a one-way, keyed hash of the network (IP) address — not the address itself.</li>
-        <li><strong>Purchases:</strong> if an adult subscribes, the app store handles the payment. We receive only the subscription status (for example active or expired), never card details.</li>
+        <li><strong>Purchases:</strong> if an adult subscribes in the app, the app store handles the payment. If an adult subscribes on our website, <strong>Paddle.com</strong> (our reseller and the merchant of record) handles the payment and collects the billing details it needs (name, email, country, postal code, payment method) under its own privacy notice. We receive only the subscription status (for example active or expired), the plan, the amounts paid, refunded and taxed, and Paddle's customer and subscription identifiers — never card details. <span class="review">[DRAFT FOR LAWYER REVIEW]</span></li>
+        <li><strong>Referral codes:</strong> if a family admin enters a partner's referral code (or uses a partner's store offer code or link), we store which code the family came with and the commission owed to that partner for the family's payments. Partners receive totals only, never names or contact details of families. <span class="review">[DRAFT FOR LAWYER REVIEW]</span></li>
         <li><strong>Error reports:</strong> technical crash and error details (for example the app version and the failing code) with names, email addresses, birth data and authentication details removed before they are sent.</li>
     </ul>
     <h3>Family chat</h3>
@@ -45,7 +46,7 @@
         <li>To run the service: accounts, sign-in, families, quizzes, scores, goals and reminders.</li>
         <li>To apply age-appropriate rules: the birth year and month decide the age band, which sets content, difficulty, whether ads may be shown and whether an email login is allowed.</li>
         <li>To send the notifications each person turned on (for example goal results or a daily reminder), respecting quiet hours.</li>
-        <li>To manage subscriptions and, for teens and adults on the free plan, to verify that a rewarded ad was watched.</li>
+        <li>To manage subscriptions (in-app and web purchases), to pay referral partners their commission and, for teens and adults on the free plan, to verify that a rewarded ad was watched.</li>
         <li>To keep the service secure, prevent abuse, fix errors and meet legal obligations.</li>
     </ul>
     <p>We do not use personal information for behavioural advertising, we do not build marketing profiles, and we do not use children's information to train artificial intelligence models.</p>
@@ -61,6 +62,7 @@
             <tr><td>Hetzner Online GmbH (hosting)</td><td>Servers and backups</td><td>All data stored by the service (encrypted backups)</td></tr>
             <tr><td>Apple, Google, Meta (Facebook)</td><td>Optional sign-in for adults</td><td>Account identifier and email shared by the provider</td></tr>
             <tr><td>Apple App Store, Google Play, RevenueCat</td><td>Subscriptions</td><td>Family identifier and subscription status</td></tr>
+            <tr><td>Paddle.com (merchant of record for web purchases)</td><td>Web checkout, billing, tax, receipts, refunds and the customer portal</td><td>Family identifier, the email and billing details you give Paddle, subscription and payment status</td></tr>
             <tr><td>Google AdMob</td><td>Rewarded ads (teens and adults on the free plan only)</td><td>Ad request data from the device; a random reward reference</td></tr>
             <tr><td>Expo (push notifications), Apple Push Notification service, Firebase Cloud Messaging</td><td>Notifications</td><td>Push token and the notification text (never the text of chat messages)</td></tr>
             <tr><td>Sentry</td><td>Error monitoring</td><td>Technical error details with personal data removed</td></tr>
@@ -82,6 +84,7 @@
         <li>Consent records are kept as proof of consent for as long as required by law <span class="review">[confirm period]</span>.</li>
         <li>Encrypted backups are kept for 14 days, then deleted (so deleted data, including chat messages, can remain in a backup for up to 14 days).</li>
         <li>Error reports are kept by Sentry for up to 90 days.</li>
+        <li>Purchase and commission records (amounts, dates, referral code) are kept as long as tax and accounting law requires <span class="review">[confirm period, e.g. 6 years in Canada]</span>, without names.</li>
     </ul>
 
     <h2>9. Your rights</h2>

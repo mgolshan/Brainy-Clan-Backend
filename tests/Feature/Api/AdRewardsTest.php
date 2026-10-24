@@ -3,12 +3,14 @@
 use App\Modules\Billing\Contracts\AdMobVerifierKeys;
 use App\Modules\Billing\Models\AdReward;
 use App\Modules\Billing\Support\HttpAdMobVerifierKeys;
+use App\Modules\Billing\Support\WebhookRejections;
 use App\Modules\Content\Models\Category;
 use App\Modules\Content\Models\ContentItem;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Play\Models\PlaySession;
 use App\Modules\Play\Models\SecondChance;
 use App\Modules\Play\Models\SessionItem;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
@@ -268,4 +270,23 @@ it('answers 400 (not 500) when Google\'s keys cannot be fetched', function () {
 
     // Failures are not cached: the next callback tries again.
     expect(cache()->has(HttpAdMobVerifierKeys::CACHE_KEY))->toBeFalse();
+});
+
+it('counts rejected SSV callbacks per reason and day for the dashboard, without storing payloads', function () {
+    [$member, $sessionId] = adFailedSession();
+    $hits = fn (string $reason): int => (int) DB::table('webhook_rejections')
+        ->where(['provider' => WebhookRejections::PROVIDER_ADMOB, 'reason' => $reason, 'day' => now()->utc()->toDateString()])
+        ->value('hits');
+
+    $query = ssvQuery(['custom_data' => "ref-1:{$sessionId}", 'user_id' => (string) $member->id]);
+    ssv(str_replace('reward_amount=1', 'reward_amount=9', $query))->assertStatus(400);
+    ssv(Str::before($query, '&signature='))->assertStatus(400);
+    ssv(ssvQuery(['custom_data' => 'ref-1:999999', 'user_id' => (string) $member->id]))->assertOk()->assertJsonPath('data.outcome', 'ignored');
+    // AdMob's "Verify URL" test (no custom data) and stored rewards are not rejections.
+    ssv(ssvQuery([]))->assertOk()->assertJsonPath('data.outcome', 'ignored');
+    ssv($query)->assertOk()->assertJsonPath('data.outcome', 'stored');
+
+    expect($hits(WebhookRejections::REASON_SIGNATURE_INVALID))->toBe(2)
+        ->and($hits(WebhookRejections::REASON_INVALID_PAYLOAD))->toBe(1)
+        ->and(DB::table('webhook_rejections')->count())->toBe(2);
 });

@@ -32,7 +32,8 @@
         <li><strong>Données de famille et d’activité :</strong> nom de la famille, rôle (administrateur ou membre), réponses données aux quiz et casse-têtes, points, séries, objectifs et leurs récompenses, réglages d’accessibilité et de difficulté.</li>
         <li><strong>Données de l’appareil :</strong> nom et plateforme de l’appareil (iOS, Android, web), version de l’application, dernière utilisation et, si les notifications sont permises, un jeton de notification.</li>
         <li><strong>Preuves de consentement :</strong> la version des présents documents acceptée, le moment et un hachage à sens unique, avec clé, de l’adresse réseau (IP) — jamais l’adresse elle-même.</li>
-        <li><strong>Achats :</strong> si un adulte s’abonne, la boutique d’applications traite le paiement. Nous recevons seulement l’état de l’abonnement (par exemple actif ou expiré), jamais les données de carte.</li>
+        <li><strong>Achats :</strong> si un adulte s’abonne dans l’application, la boutique d’applications traite le paiement. Si un adulte s’abonne sur notre site Web, <strong>Paddle.com</strong> (notre revendeur et marchand officiel) traite le paiement et recueille les renseignements de facturation dont il a besoin (nom, courriel, pays, code postal, moyen de paiement) selon sa propre politique de confidentialité. Nous recevons seulement l’état de l’abonnement (par exemple actif ou expiré), le forfait, les montants payés, remboursés et taxés, et les identifiants de client et d’abonnement de Paddle — jamais les données de carte. <span class="review">[ÉBAUCHE À FAIRE RÉVISER PAR UN AVOCAT]</span></li>
+        <li><strong>Codes de parrainage :</strong> si un administrateur de la famille entre le code de parrainage d’un partenaire (ou utilise son offre en boutique ou son lien), nous conservons le code associé à la famille et la commission due à ce partenaire sur les paiements de la famille. Les partenaires reçoivent seulement des totaux, jamais le nom ni les coordonnées des familles. <span class="review">[ÉBAUCHE À FAIRE RÉVISER PAR UN AVOCAT]</span></li>
         <li><strong>Rapports d’erreurs :</strong> détails techniques des plantages et erreurs (par exemple la version de l’application) dont les noms, adresses courriel, données de naissance et données d’authentification sont retirés avant l’envoi.</li>
     </ul>
     <h3>Discussion familiale</h3>
@@ -45,7 +46,7 @@
         <li>Pour fournir le service : comptes, connexion, familles, quiz, pointages, objectifs et rappels.</li>
         <li>Pour appliquer des règles adaptées à l’âge : l’année et le mois de naissance déterminent la tranche d’âge, qui fixe le contenu, la difficulté, la possibilité de voir des publicités et celle d’avoir une connexion par courriel.</li>
         <li>Pour envoyer les notifications que chaque personne a activées (par exemple les résultats d’un objectif ou un rappel quotidien), en respectant les heures de silence.</li>
-        <li>Pour gérer les abonnements et, pour les adolescents et adultes du forfait gratuit, vérifier qu’une publicité avec récompense a été regardée.</li>
+        <li>Pour gérer les abonnements (achats dans l’application et sur le Web), verser leur commission aux partenaires de parrainage et, pour les adolescents et adultes du forfait gratuit, vérifier qu’une publicité avec récompense a été regardée.</li>
         <li>Pour assurer la sécurité du service, prévenir les abus, corriger les erreurs et respecter nos obligations légales.</li>
     </ul>
     <p>Nous n’utilisons pas les renseignements personnels pour de la publicité comportementale, ne créons pas de profils marketing et n’utilisons pas les renseignements des enfants pour entraîner des modèles d’intelligence artificielle.</p>
@@ -61,6 +62,7 @@
             <tr><td>Hetzner Online GmbH (hébergement)</td><td>Serveurs et sauvegardes</td><td>Toutes les données du service (sauvegardes chiffrées)</td></tr>
             <tr><td>Apple, Google, Meta (Facebook)</td><td>Connexion facultative des adultes</td><td>Identifiant du compte et courriel transmis par le fournisseur</td></tr>
             <tr><td>App Store d’Apple, Google Play, RevenueCat</td><td>Abonnements</td><td>Identifiant de la famille et état de l’abonnement</td></tr>
+            <tr><td>Paddle.com (marchand officiel des achats sur le Web)</td><td>Paiement sur le Web, facturation, taxes, reçus, remboursements et portail client</td><td>Identifiant de la famille, le courriel et les renseignements de facturation fournis à Paddle, état de l’abonnement et des paiements</td></tr>
             <tr><td>Google AdMob</td><td>Publicités avec récompense (adolescents et adultes du forfait gratuit seulement)</td><td>Données de la demande de publicité; une référence de récompense aléatoire</td></tr>
             <tr><td>Expo (notifications), Apple Push Notification service, Firebase Cloud Messaging</td><td>Notifications</td><td>Jeton de notification et texte de la notification (jamais le texte des messages de discussion)</td></tr>
             <tr><td>Sentry</td><td>Surveillance des erreurs</td><td>Détails techniques des erreurs, sans renseignements personnels</td></tr>
@@ -82,6 +84,7 @@
         <li>Les preuves de consentement sont conservées aussi longtemps que la loi l’exige <span class="review">[confirmer la durée]</span>.</li>
         <li>Les sauvegardes chiffrées sont conservées 14 jours, puis supprimées (des données supprimées, y compris des messages de discussion, peuvent donc subsister dans une sauvegarde jusqu’à 14 jours).</li>
         <li>Les rapports d’erreurs sont conservés par Sentry jusqu’à 90 jours.</li>
+        <li>Les registres d’achats et de commissions (montants, dates, code de parrainage) sont conservés aussi longtemps que l’exigent les lois fiscales et comptables <span class="review">[confirmer la durée, p. ex. 6 ans au Canada]</span>, sans nom.</li>
     </ul>
 
     <h2>9. Vos droits</h2>

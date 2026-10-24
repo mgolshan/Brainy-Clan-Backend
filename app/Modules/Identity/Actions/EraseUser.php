@@ -19,7 +19,7 @@ use Laravel\Sanctum\PersonalAccessToken;
  *
  * Per user: every Sanctum token and device row (push tokens) goes; social accounts are unlinked
  * (Apple refresh tokens revoked with Apple after the commit); personal data is erased (display name
- * "Deleted player", email, password, birth data, avatar, staff flag) and `erased_at` set. The user
+ * "Deleted player", email, password, birth data, avatar, staff role) and `erased_at` set. The user
  * row itself stays because the append-only points ledger references its memberships; their
  * nicknames become "Deleted player" and accessibility settings are cleared. Unused sign-in codes are
  * voided, notification preferences and family chat messages deleted, the invite they joined with and the unused invites they
@@ -102,7 +102,7 @@ class EraseUser
                 'birth_year' => null,
                 'birth_month' => null,
                 'avatar' => null,
-                'is_staff' => false,
+                'staff_role' => null,
                 'erased_at' => now(),
                 'updated_at' => now(),
             ]);

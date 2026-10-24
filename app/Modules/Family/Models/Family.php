@@ -2,6 +2,7 @@
 
 namespace App\Modules\Family\Models;
 
+use App\Modules\Billing\Models\FamilyAttribution;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Identity\Models\Consent;
 use App\Modules\Identity\Models\User;
@@ -26,7 +27,9 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property string $country_code
  * @property string $tier
  * @property Carbon|null $deleted_at Set by `DELETE /family` (row kept for the ledger)
+ * @property Carbon|null $first_paid_at First paid transaction, store or web (Billing; locks the referral code)
  * @property-read Subscription|null $subscription
+ * @property-read FamilyAttribution|null $attribution
  */
 #[Fillable(['owner_user_id', 'name', 'timezone', 'country_code', 'tier'])]
 #[UseFactory(FamilyFactory::class)]
@@ -45,6 +48,7 @@ class Family extends Model
     {
         return [
             'deleted_at' => 'datetime',
+            'first_paid_at' => 'datetime',
         ];
     }
 
@@ -102,13 +106,35 @@ class Family extends Model
     }
 
     /**
-     * The family subscription (Billing), mirrored from RevenueCat; null when the family never subscribed.
+     * The most recently updated subscription row (Billing; RevenueCat or Paddle), for display and
+     * eager loading; null when the family never subscribed. Rules use `Subscription::currentFor()`
+     * and `subscriptions`.
      *
      * @return HasOne<Subscription, $this>
      */
     public function subscription(): HasOne
     {
-        return $this->hasOne(Subscription::class);
+        return $this->hasOne(Subscription::class)->latestOfMany('updated_at');
+    }
+
+    /**
+     * One row per billing provider (RevenueCat, Paddle).
+     *
+     * @return HasMany<Subscription, $this>
+     */
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    /**
+     * The affiliate code the family came with (Billing), if any.
+     *
+     * @return HasOne<FamilyAttribution, $this>
+     */
+    public function attribution(): HasOne
+    {
+        return $this->hasOne(FamilyAttribution::class);
     }
 
     public function getActivitylogOptions(): LogOptions

@@ -32,7 +32,7 @@ class UserFactory extends Factory
             'birth_year' => now()->year - fake()->numberBetween(25, 50),
             'birth_month' => fake()->numberBetween(1, 12),
             'locale' => 'en',
-            'is_staff' => false,
+            'staff_role' => null,
             'remember_token' => Str::random(10),
         ];
     }
@@ -57,8 +57,19 @@ class UserFactory extends Factory
         return $this->state(fn () => ['birth_year' => now()->year - $age, 'birth_month' => 1]);
     }
 
+    /**
+     * Staff with full admin access.
+     */
     public function staff(): static
     {
-        return $this->state(fn () => ['is_staff' => true]);
+        return $this->state(fn () => ['staff_role' => User::STAFF_ROLE_ADMIN]);
+    }
+
+    /**
+     * Staff with the read-only support role.
+     */
+    public function support(): static
+    {
+        return $this->state(fn () => ['staff_role' => User::STAFF_ROLE_SUPPORT]);
     }
 }

@@ -35,17 +35,17 @@ return [
 
     'documents' => [
         'terms' => [
-            'version' => '2026-10-16',
+            'version' => '2026-10-24',
             'summary' => [
-                'en' => 'First version of the Brainy Clan terms of service.',
-                'fr' => 'Première version des conditions d’utilisation de Brainy Clan.',
+                'en' => 'New: buying the Family plan on our website through Paddle (merchant of record), refunds for web purchases, and partner referral codes.',
+                'fr' => 'Nouveau : achat du forfait Famille sur notre site Web par Paddle (marchand officiel), remboursement des achats sur le Web et codes de parrainage des partenaires.',
             ],
         ],
         'privacy' => [
-            'version' => '2026-10-23',
+            'version' => '2026-10-24',
             'summary' => [
-                'en' => 'New: family chat — what we store, who can see it (only your family), encryption and how long messages are kept (7 days free, 1 year Family plan).',
-                'fr' => 'Nouveau : discussion familiale — ce que nous conservons, qui peut la voir (seulement votre famille), le chiffrement et la durée de conservation des messages (7 jours gratuit, 1 an forfait Famille).',
+                'en' => 'New: family chat (only your family can see it, encrypted, kept 7 days free / 1 year Family plan); web purchases through Paddle (merchant of record) and partner referral codes.',
+                'fr' => 'Nouveau : discussion familiale (visible seulement par votre famille, chiffrée, conservée 7 jours gratuit / 1 an forfait Famille); achats sur le Web par Paddle (marchand officiel) et codes de parrainage des partenaires.',
             ],
         ],
     ],

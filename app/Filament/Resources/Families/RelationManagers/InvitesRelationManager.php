@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Families\RelationManagers;
 
+use App\Filament\Support\StaffAccess;
 use App\Modules\Family\Actions\ResetInvite;
 use App\Modules\Family\Actions\RevokeInvite;
 use App\Modules\Family\Models\Invite;
@@ -38,6 +39,7 @@ class InvitesRelationManager extends RelationManager
                     ->icon(Heroicon::OutlinedArrowPath)
                     ->requiresConfirmation()
                     ->visible(fn (Invite $record) => $record->used_at === null)
+                    ->authorize(fn (): bool => StaffAccess::isAdmin())
                     ->action(function (Invite $record): void {
                         $invite = app(ResetInvite::class)->handle($record);
                         Notification::make()->title("New code: {$invite->code}")->success()->send();
@@ -48,6 +50,7 @@ class InvitesRelationManager extends RelationManager
                     ->icon(Heroicon::OutlinedTrash)
                     ->requiresConfirmation()
                     ->visible(fn (Invite $record) => $record->used_at === null)
+                    ->authorize(fn (): bool => StaffAccess::isAdmin())
                     ->action(fn (Invite $record) => app(RevokeInvite::class)->handle($record)),
             ]);
     }

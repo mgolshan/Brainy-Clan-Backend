@@ -39,6 +39,8 @@ error until its keys are in `.env`.
 | Google and Facebook sign-in | [Google and Facebook sign-in — setup](#google-and-facebook-sign-in--setup) | `GOOGLE_CLIENT_ID_*`, `FACEBOOK_CLIENT_*` |
 | Sign in with Apple + token revocation | [Sign in with Apple — setup](#sign-in-with-apple--setup) | `APPLE_CLIENT_IDS`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` |
 | Subscriptions (RevenueCat) | [RevenueCat](#revenuecat-family-plan-subscription) | `REVENUECAT_WEBHOOK_SECRET`, `REVENUECAT_API_KEY` |
+| Web checkout (Paddle) | [Web checkout (Paddle) — setup](#web-checkout-paddle--setup) | `PADDLE_*`, `WEB_CHECKOUT_LINK_STOREFRONTS` |
+| Affiliate program | [Affiliate program — admin guide](#affiliate-program--admin-guide) | none |
 | Rewarded ads (AdMob SSV) | [AdMob rewarded ads](#admob-rewarded-ads-free-tier-second-chance) | none required (`ADMOB_SSV_KEYS_URL` optional) |
 | Push notifications (Expo) | [Expo push notifications](#expo-push-notifications) | none required (`EXPO_ACCESS_TOKEN` optional) |
 | AI content generator | [AI batch generator](#ai-batch-generator-filament--content--ai-batch-generator) | `ANTHROPIC_API_KEY`, `CONTENT_AI_*` |
@@ -148,7 +150,7 @@ docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=1G    # Lara
 | --- | --- | --- |
 | API | http://localhost:8080 (health check: http://localhost:8080/up) | Sanctum tokens |
 | Admin panel (Filament) | http://localhost:8080/admin | `admin@brainyclan.test` / `password` |
-| Horizon dashboard | http://localhost:8080/horizon | open in the local environment; elsewhere staff only (sign in at `/admin` first) |
+| Horizon dashboard | http://localhost:8080/horizon | open in the local environment; elsewhere staff role `admin` only (sign in at `/admin` first) |
 | API docs (Scramble) | http://localhost:8080/docs/api (OpenAPI JSON: http://localhost:8080/docs/api.json) | open in the local environment |
 | Mailpit (caught e-mails) | http://localhost:8026 | - |
 | MySQL from the host | `127.0.0.1:3307`, database `brainy_clan` | `brainy` / `secret` (root: `root`) |
@@ -618,6 +620,109 @@ account for Android) — that is configured on the app side, not here.
 - The `scheduler` container runs `goals:close-periods`, `notifications:daily-reminders` and
   `billing:reconcile-subscriptions`; `docker compose exec app php artisan schedule:list` shows them.
 
+## Web checkout (Paddle) — setup
+
+Families can also buy the Family plan on the website (`/subscribe`). **Paddle is the merchant of
+record**: it sells, charges and remits sales tax / GST / HST / QST / VAT, sends receipts and runs
+the customer portal (cancel, card, invoices, refunds). Our server only creates the checkout and
+listens to Paddle's webhooks. Without the keys below the subscribe page says "coming soon".
+
+How it works: the parent types their account email + plan (+ optional referral code) on
+`/subscribe` → we email a one-time link (30 min) → `/subscribe/checkout?token=…` creates a Paddle
+transaction (`custom_data: { family_id, affiliate_code?, affiliate_source? }`, the code's Paddle
+discount) and redirects to Paddle's checkout → Paddle returns to `/subscribe/thanks` → the webhook
+switches the family to the Family plan. Store plan active → no link, the email explains why (one
+active plan per family). The app asks `GET /family/web-checkout/availability` before showing any
+web link (none by default).
+
+### Step 1 – sandbox account (always first)
+1. Create a **sandbox** account at https://sandbox-vendors.paddle.com (separate from the live one).
+2. **Catalog → Products → New product** "Brainy Clan Family plan" (tax category *Standard digital
+   goods*), then three **prices** (recurring): monthly US$6.99 (+ CAD 8.99 price override),
+   every 6 months US$29.99 / CA$39.99 with a **7-day trial**, yearly US$49.99 / CA$64.99 with a
+   **7-day trial** — the same as `config/billing.php` and the stores. Copy each `pri_…` id.
+3. Optional launch offer: **Catalog → Discounts** "Founding families" 50 % for 12 months (recurring,
+   12 billing periods); copy the `dsc_…` id into an affiliate code (or keep it for marketing).
+4. **Developer tools → Authentication**: create an **API key** (permissions: transactions write,
+   customers read/write + customer portal sessions, subscriptions read). It's shown once.
+5. **Checkout → Hosted checkouts**: create one (name "Web", return/redirect URL
+   `https://brainyclan.com/subscribe/thanks`) and copy its link (`https://…/checkout/hsc_…`).
+   Hosted checkout needs Paddle's approval on the **live** account; until then (or instead) use the
+   default payment link: **Checkout → Checkout settings → Default payment link**
+   `https://brainyclan.com/subscribe/pay` and create a **client-side token** (Developer tools →
+   Authentication) for `PADDLE_CLIENT_TOKEN`.
+6. **Developer tools → Notifications → New destination**: URL
+   `https://api.brainyclan.com/api/v1/webhooks/paddle` (local testing: a tunnel such as
+   `cloudflared tunnel --url http://localhost:8080`), events: `subscription.created`,
+   `subscription.activated`, `subscription.updated`, `subscription.past_due`, `subscription.paused`,
+   `subscription.resumed`, `subscription.canceled`, `transaction.completed`, `adjustment.created`,
+   `adjustment.updated`. Copy the destination's **secret key**.
+
+### Step 2 – `.env`
+```dotenv
+PADDLE_ENVIRONMENT=sandbox          # production on the live account
+PADDLE_API_KEY=pdl_sdbx_apikey_…
+PADDLE_WEBHOOK_SECRET=pdl_ntfset_…
+PADDLE_PRICE_MONTHLY=pri_…
+PADDLE_PRICE_SEMIANNUAL=pri_…
+PADDLE_PRICE_ANNUAL=pri_…
+PADDLE_HOSTED_CHECKOUT_URL=https://sandbox-pay.paddle.io/checkout/hsc_…   # or leave empty and set:
+PADDLE_CLIENT_TOKEN=test_…                                                 # (for /subscribe/pay)
+WEB_CHECKOUT_LINK_STOREFRONTS=      # e.g. USA — only after re-checking Apple 3.1.1/3.1.3 and Play policy
+```
+Then `docker compose exec app php artisan config:cache` (production) and restart Horizon.
+
+### Step 3 – test
+1. Sign in to the app (or seed data) as an adult family admin, open http://localhost:8080/subscribe,
+   enter that email; the link arrives in Mailpit (http://localhost:8025).
+2. Open it → Paddle checkout. Sandbox test card **4242 4242 4242 4242**, any future date, CVC 100
+   (3-D Secure test card 4000 0038 0000 0446). After paying you land on `/subscribe/thanks`.
+3. Admin → Billing → Webhook events shows `paddle` events `applied`; the family is on the Family plan
+   and `GET /family/subscription` says `"store": "paddle"`. `POST /family/subscription/manage-link`
+   returns a customer-portal link.
+4. Refund the transaction in the sandbox dashboard → `adjustment.updated` (approved) adds a negative
+   commission entry if the family had a code. Cancel in the portal → `subscription.canceled` at the
+   end of the period → back to free.
+5. Paddle's **Notifications → simulate** can replay events; duplicates answer `duplicate`.
+
+### Go-live checklist
+- [ ] Live Paddle account: business details, payout bank, identity checks.
+- [ ] **Domain / website verification** (Paddle reviews `brainyclan.com`): the website must show the
+      product, pricing (`/subscribe`), terms with refund policy (`/terms`), privacy (`/privacy`) and a
+      support email — all live and lawyer-reviewed (`LEGAL_DRAFT=false`).
+- [ ] Hosted checkout approved on live (or default payment link `/subscribe/pay` + domain approved).
+- [ ] Live products/prices/discount recreated (sandbox ids don't carry over), live API key, webhook
+      destination + secret, `.env.prod` with `PADDLE_ENVIRONMENT=production`.
+- [ ] One real purchase + refund on production with your own card.
+- [ ] Prices still equal to the App Store / Google Play / RevenueCat offering and `config/billing.php`.
+
+## Affiliate program — admin guide
+
+In-house and commission-based (docs/PLAN.md B10). No tracking SDKs, no cookies: a family is linked
+to a code only by the code itself (typed in the app, on `/subscribe`, carried by a `/r/{code}` link
+or a store offer code). Everything is in the admin under **Billing** (staff only; the `support` role
+can read but not change anything and never sees Monthly payouts).
+
+1. **Affiliates** → New: name, contact, payout method note (no full bank/card numbers), commission
+   rate (default 0.25 = 25 % of net revenue) and months (default 12, counted from the family's first
+   payment). `paused` stops new families; `ended` also stops new commission.
+2. **Affiliate codes** → New: the code (letters/digits/dash, ≤ 20, stored upper case), the affiliate,
+   optionally **store offer codes** (the Apple Offer Code / Google Play promo code names exactly as
+   RevenueCat reports them in `offer_code`) and a **Paddle discount id** applied at web checkout.
+   Give the influencer their link `https://brainyclan.com/r/CODE` and, if any, the store offer code.
+   Influencers must disclose (#ad) and promote to parents only.
+3. **Attributions**: first touch wins; locked at the family's first paid transaction. Change one only
+   for a verified support case with **Change code** (reason required, kept in the activity log).
+4. **Commission entries**: the append-only ledger. Each store/web payment of an attributed family
+   within the window adds `net × rate` (net = price − tax − store/Paddle fee; RevenueCat's estimated
+   tax/commission, else a 15 % store fee). Refunds and chargebacks add negative entries. Entries are
+   `pending` for 30 days (refund window), then `payable` (daily job `billing:release-commissions`).
+5. **Monthly payouts** (first week of the month): payable totals per affiliate, month and currency.
+   **Export CSV** (amounts only, no family data — safe to send to the influencer), pay outside the
+   app (e-Transfer, PayPal…), then **Mark paid** with the payment reference. A negative row means
+   refunds exceeded earnings: mark it paid together with the next positive month and deduct it.
+6. Never send influencers family ids, names or emails.
+
 ## AI batch generator (Filament → Content → AI batch generator)
 
 Generates quiz content as **drafts** with Claude through the Laravel AI SDK (`laravel/ai`). Nothing
@@ -755,8 +860,9 @@ curl -H "Authorization: Bearer <Mom's token>" http://localhost:8080/api/v1/me/ex
   scrubbed (`SentryScrubber`). The audit log (Filament → Activity) records content and admin
   config changes and family name/timezone/tier changes; deleting a family drops the old values
   from its entries. Members, users and devices are not audited.
-- **Admin access:** `/admin` and (outside `local`) `/horizon` only for users with `is_staff`
-  (never settable through the API); the API docs are closed outside `local`.
+- **Admin access:** `/admin` only for users with a staff role (`admin` or read-only `support`, see
+  [Staff roles](#staff-roles-admin-panel)), `/horizon` (outside `local`) only for `admin`; the role is
+  never settable through the API (`staff:role` command only). The API docs are closed outside `local`.
 - **Production settings** (`.env.prod.example`): `APP_DEBUG=false` (the container refuses to start
   otherwise), secure + httpOnly + SameSite=lax session cookies (secure by default when
   `APP_ENV=production`), encrypted sessions, and `CORS_ALLOWED_ORIGINS` empty unless a web build
@@ -786,6 +892,60 @@ email has an account, a one-time link to `WEBSITE_URL/password/reset?token=…` 
 signs the user out of every device, clears all lockouts of that email and emails a "password
 changed" notice. Locally the emails land in Mailpit (http://localhost:8026). Expired tokens are
 removed daily (`auth:clear-resets`, scheduled).
+
+## Staff roles (admin panel)
+
+`users.staff_role` decides who may open `/admin` (B11; it replaced the old `is_staff` flag, existing
+staff became `admin`):
+
+| Role | Can |
+| --- | --- |
+| `admin` | Everything: edits, create/delete, table and bulk actions, CSV import, AI batch generator, settings and age bands, audit log (Activity), Horizon, the staff privacy actions below. |
+| `support` | Read-only: dashboard, families (members, devices, invites, consents, subscription), goal plans, content (items, batches, categories, tags, challenge types, worlds, preview), webhook events, account deletion requests. No create/edit/delete, no actions, no toggles, no AI generator, no settings/age bands, no audit log, no Horizon. |
+| none (`null`) | No admin access (every app user). |
+
+Family chat is never shown in the admin, whatever the role. Set or remove a role (logged in the
+audit log):
+
+```sh
+docker compose exec app php artisan staff:role helper@example.com support   # or admin / none
+```
+
+The seeded `admin@brainyclan.test` is an `admin`. In code: `User::isStaff()` / `isStaffAdmin()`;
+every Filament resource uses `App\Filament\Support\ReadOnlyForSupport` or `AdminOnly` (a test fails
+for a resource without one); custom actions, toggle columns and pages check `StaffAccess::isAdmin()`.
+
+**Staff privacy actions** (admin only; Families → a family → Members, on a child account — a member
+without their own login who is not the owner), for a parent's request that came **from the family
+owner's own email address**:
+
+- **Start data export** — emails the child's export (the same JSON as `GET /me/export`) to the
+  owner's account email, never to another address. Sent right away (not queued), so the data never
+  sits in Redis; staff never see it.
+- **Delete child account** — type the child's nickname to confirm; removes the member and erases the
+  account (the same `RemoveMember` → `EraseUser` flow as in the app). Start the export first if the
+  parent asked for both.
+
+Both are written to the audit log with ids only.
+
+## Monitoring (deep health check and alerts)
+
+- `GET /api/v1/health/deep` with header `X-Health-Token: $HEALTH_DEEP_TOKEN` (docs/API.md "Health"):
+  MySQL, Redis, scheduler heartbeat (< 3 min), Horizon running (503 if any fails) and failed jobs in
+  the last hour (warning). Without `HEALTH_DEEP_TOKEN` it answers 404. 30 requests/min per IP. The
+  shallow `/api/v1/health` is unchanged (the app uses it).
+- `ops:heartbeat` runs every minute and `horizon:snapshot` every 5 minutes (scheduler container).
+- Horizon "long wait" mails and failed-job alerts (one per job class per 15 minutes; class names
+  only) go to `OPS_ALERT_EMAIL` (default `support@brainyclan.com`); optional
+  `OPS_ALERT_WEBHOOK_URL` (Slack incoming webhook or any `{"text": ...}` endpoint). Locally they land
+  in Mailpit.
+- The dashboard "AdMob SSV rejections" card counts bad SSV signatures and signed callbacks with
+  unusable custom data per day (`webhook_rejections`, no payloads).
+
+```sh
+docker compose exec app php artisan config:cache   # after setting the env values
+curl -s -H "X-Health-Token: <token>" http://localhost:8080/api/v1/health/deep
+```
 
 ## Error monitoring (Sentry)
 

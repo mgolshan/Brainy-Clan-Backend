@@ -6,7 +6,7 @@ use App\Modules\Identity\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
- * Staff account for the Filament admin: admin@brainyclan.test / password.
+ * Staff account (role `admin`) for the Filament admin: admin@brainyclan.test / password.
  */
 class AdminUserSeeder extends Seeder
 {
@@ -19,7 +19,7 @@ class AdminUserSeeder extends Seeder
             $admin->password = 'password';
         }
 
-        $admin->is_staff = true;
+        $admin->staff_role = User::STAFF_ROLE_ADMIN;
         $admin->save();
 
         DemoFamilySeeder::acceptCurrentLegal($admin);

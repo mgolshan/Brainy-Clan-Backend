@@ -5,6 +5,8 @@ namespace App\Filament\Resources\GoalPlans;
 use App\Filament\Resources\GoalPlans\Pages\ManageGoalPlans;
 use App\Filament\Resources\GoalPlans\Pages\ViewGoalPlan;
 use App\Filament\Resources\GoalPlans\RelationManagers\PeriodsRelationManager;
+use App\Filament\Support\ReadOnlyForSupport;
+use App\Filament\Support\StaffAccess;
 use App\Modules\Goals\Actions\SaveGoalPlan;
 use App\Modules\Goals\Models\GoalPlan;
 use App\Modules\Goals\Models\GoalPlanMember;
@@ -33,6 +35,8 @@ use UnitEnum;
  */
 class GoalPlanResource extends Resource
 {
+    use ReadOnlyForSupport;
+
     protected static ?string $model = GoalPlan::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTrophy;
@@ -101,6 +105,7 @@ class GoalPlanResource extends Resource
                     ->color('danger')
                     ->requiresConfirmation()
                     ->visible(fn (GoalPlan $record): bool => $record->is_active && ! $record->trashed())
+                    ->authorize(fn (): bool => StaffAccess::isAdmin())
                     ->action(fn (GoalPlan $record) => app(SaveGoalPlan::class)->deactivate($record)),
             ]);
     }

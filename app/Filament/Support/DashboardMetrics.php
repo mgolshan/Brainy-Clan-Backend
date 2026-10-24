@@ -4,6 +4,7 @@ namespace App\Filament\Support;
 
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Models\WebhookEvent;
+use App\Modules\Billing\Support\WebhookRejections;
 use App\Modules\Content\Models\ContentBatch;
 use App\Modules\Content\Models\ContentItem;
 use App\Modules\Content\Support\CategoryTree;
@@ -203,11 +204,12 @@ class DashboardMetrics
     }
 
     /**
-     * Failed jobs, webhook errors, push readiness and account-deletion requests.
+     * Failed jobs, webhook errors, AdMob SSV rejections, push readiness and account-deletion requests.
      *
      * @return array{
      *     failed_jobs: int, failed_jobs_day: int, failed_push_jobs: int,
-     *     webhook_errors_week: int, devices: int, devices_with_push: int,
+     *     webhook_errors_week: int, admob_ssv_rejections_week: int, admob_ssv_signature_invalid_week: int,
+     *     devices: int, devices_with_push: int,
      *     deletion_requests_pending: int, deletion_requests_blocked_week: int
      * }
      */
@@ -222,6 +224,13 @@ class DashboardMetrics
                 ->selectRaw('COALESCE(SUM(CASE WHEN failed_at >= ? THEN 1 ELSE 0 END), 0) AS day', [$now->subDay()])
                 // The queued job's class name is in the serialized payload.
                 ->selectRaw('COALESCE(SUM(CASE WHEN payload LIKE ? THEN 1 ELSE 0 END), 0) AS push', ['%'.class_basename(DeliverPushNotification::class).'%'])
+                ->first();
+
+            $ssvRejections = DB::table('webhook_rejections')
+                ->where('provider', WebhookRejections::PROVIDER_ADMOB)
+                ->where('day', '>=', $weekStart->toDateString())
+                ->selectRaw('COALESCE(SUM(hits), 0) AS total')
+                ->selectRaw('COALESCE(SUM(CASE WHEN reason = ? THEN hits ELSE 0 END), 0) AS signature_invalid', [WebhookRejections::REASON_SIGNATURE_INVALID])
                 ->first();
 
             $devices = DB::table('devices')
@@ -243,6 +252,8 @@ class DashboardMetrics
                     ->where('outcome', WebhookEvent::OUTCOME_FAILED)
                     ->where('created_at', '>=', $weekStart)
                     ->count(),
+                'admob_ssv_rejections_week' => (int) $ssvRejections?->total,
+                'admob_ssv_signature_invalid_week' => (int) $ssvRejections?->signature_invalid,
                 'devices' => (int) $devices?->total,
                 'devices_with_push' => (int) $devices?->with_push,
                 'deletion_requests_pending' => (int) $deletions?->pending,

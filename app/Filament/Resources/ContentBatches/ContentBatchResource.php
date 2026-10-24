@@ -7,6 +7,7 @@ use App\Filament\Resources\ContentBatches\Pages\CreateContentBatch;
 use App\Filament\Resources\ContentBatches\Pages\EditContentBatch;
 use App\Filament\Resources\ContentBatches\Pages\ListContentBatches;
 use App\Filament\Resources\ContentBatches\Pages\ViewContentBatch;
+use App\Filament\Support\ReadOnlyForSupport;
 use App\Modules\ChallengeTypes\ChallengeTypeRegistry;
 use App\Modules\Content\Models\ContentBatch;
 use BackedEnum;
@@ -29,6 +30,8 @@ use UnitEnum;
  */
 class ContentBatchResource extends Resource
 {
+    use ReadOnlyForSupport;
+
     protected static ?string $model = ContentBatch::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;

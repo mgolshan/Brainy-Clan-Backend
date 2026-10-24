@@ -2,12 +2,16 @@
 
 namespace App\Modules\Billing\Actions;
 
+use App\Modules\Billing\Events\RevenueRecorded;
+use App\Modules\Billing\Models\CommissionEntry;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Models\WebhookEvent;
+use App\Modules\Billing\Support\Money;
 use App\Modules\Family\Models\Family;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Applies one RevenueCat webhook to the family's subscription and tier.
@@ -22,6 +26,9 @@ class ApplyRevenueCatEvent
     private const array ACTIVATING = ['INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'PRODUCT_CHANGE', 'NON_RENEWING_PURCHASE'];
 
     private const array HANDLED = [...self::ACTIVATING, 'CANCELLATION', 'BILLING_ISSUE', 'EXPIRATION'];
+
+    /** Events that can carry money: purchases and renewals, and refunds (CANCELLATION with a negative price). */
+    private const array REVENUE = ['INITIAL_PURCHASE', 'RENEWAL', 'NON_RENEWING_PURCHASE', 'PRODUCT_CHANGE', 'CANCELLATION'];
 
     public function __construct(private readonly ApplyFamilyTier $applyTier) {}
 
@@ -102,10 +109,13 @@ class ApplyRevenueCatEvent
 
         $eventMs = is_numeric($event['event_timestamp_ms'] ?? null) ? (int) $event['event_timestamp_ms'] : null;
 
-        $subscription = Subscription::query()->where('family_id', $family->id)->lockForUpdate()->first()
+        // Money moved (purchase, renewal, refund): commissions, independent of the state ordering below.
+        $this->recordRevenue($event, $type, $family, $eventMs);
+
+        $subscription = Subscription::query()->where('family_id', $family->id)->where('provider', Subscription::PROVIDER_REVENUECAT)->lockForUpdate()->first()
             ?? new Subscription([
                 'family_id' => $family->id,
-                'provider' => WebhookEvent::PROVIDER_REVENUECAT,
+                'provider' => Subscription::PROVIDER_REVENUECAT,
                 'app_user_id' => 'family-'.$family->id,
                 'entitlement' => $entitlement,
                 'status' => Subscription::STATUS_ACTIVE,
@@ -146,7 +156,65 @@ class ApplyRevenueCatEvent
 
         $this->applyTier->handle($family, $subscription, ApplyFamilyTier::SOURCE_WEBHOOK);
 
-        return [WebhookEvent::OUTCOME_APPLIED, null, $family->id];
+        $note = null;
+
+        if (in_array($type, self::ACTIVATING, true) && Subscription::entitledElsewhere($family->id, Subscription::PROVIDER_REVENUECAT) !== null) {
+            // The store can't be blocked: both plans are kept; support refunds one (docs/API.md `subscription_exists`).
+            $note = 'Conflict: the family also has an active web (Paddle) plan.';
+            Log::warning('Store purchase while a web plan is active', ['family_id' => $family->id, 'event_id' => $event['id'] ?? null]);
+        }
+
+        return [WebhookEvent::OUTCOME_APPLIED, $note, $family->id];
+    }
+
+    /**
+     * Dispatches {@see RevenueRecorded} for an event that moved money: a purchase / renewal with a
+     * price, or a refund (negative price, sent as CANCELLATION). Net = gross − tax − store fee, with
+     * RevenueCat's estimated `tax_percentage` and `commission_percentage` (falling back to
+     * `billing.affiliates.store_fee_rate`); `price` gives the USD figure.
+     *
+     * @param  array<string, mixed>  $event
+     */
+    private function recordRevenue(array $event, string $type, Family $family, ?int $eventMs): void
+    {
+        $price = $event['price_in_purchased_currency'] ?? null;
+        $currency = is_string($event['currency'] ?? null) && strlen($event['currency']) === 3 ? strtoupper($event['currency']) : null;
+
+        $offerCode = is_string($event['offer_code'] ?? null) && $event['offer_code'] !== '' ? $event['offer_code'] : null;
+
+        // A free trial (price 0) still matters when it carries an offer code: it attributes the family.
+        if (! in_array($type, self::REVENUE, true) || ! is_numeric($price) || $currency === null || ((float) $price === 0.0 && $offerCode === null)) {
+            return;
+        }
+
+        $sign = (float) $price < 0 ? -1 : 1;
+        $taxRate = is_numeric($event['tax_percentage'] ?? null) ? (float) $event['tax_percentage'] : 0.0;
+        $feeRate = is_numeric($event['commission_percentage'] ?? null)
+            ? (float) $event['commission_percentage']
+            : (float) config('billing.affiliates.store_fee_rate', 0.15);
+
+        $gross = Money::toMinor(abs((float) $price), $currency);
+        $tax = (int) round($gross * $taxRate);
+        $fee = (int) round(($gross - $tax) * $feeRate);
+        $usd = is_numeric($event['price'] ?? null) ? Money::toMinor(abs((float) $event['price']), 'USD') : null;
+        $netUsd = $usd !== null ? $usd - (int) round($usd * $taxRate) - (int) round(($usd - (int) round($usd * $taxRate)) * $feeRate) : null;
+        $occurredMs = $eventMs ?? (is_numeric($event['purchased_at_ms'] ?? null) ? (int) $event['purchased_at_ms'] : now()->getTimestampMs());
+
+        RevenueRecorded::dispatch(
+            $family->id,
+            CommissionEntry::SOURCE_REVENUECAT,
+            'revenuecat:'.(string) $event['id'],
+            $sign < 0 ? RevenueRecorded::KIND_REFUND : RevenueRecorded::KIND_SALE,
+            is_scalar($event['transaction_id'] ?? null) ? (string) $event['transaction_id'] : null,
+            Carbon::createFromTimestampMs($occurredMs)->toIso8601String(),
+            $currency,
+            $sign * $gross,
+            $sign * $tax,
+            $sign * $fee,
+            $sign * ($gross - $tax - $fee),
+            $netUsd !== null ? $sign * $netUsd : null,
+            $offerCode,
+        );
     }
 
     /**

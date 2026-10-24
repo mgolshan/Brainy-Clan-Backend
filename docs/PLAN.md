@@ -342,6 +342,19 @@ Scope (backend):
    referral code; Paddle seller onboarding needs the website, pricing, terms, refund policy and
    support email live.
 Contract to be written in `docs/API.md` before building (coordinator).
+Build decisions (backend, 2026-10-24):
+- **Paddle directly, not through RevenueCat:** the contract defines our own signed Paddle webhook; it keeps
+  one source of truth on our server without another RevenueCat product to configure. RevenueCat stays for the
+  stores. Revisit only if the app needs RevenueCat's entitlement to include web purchases.
+- **One subscription row per family and provider** (`unique(family_id, provider)`); the tier is `family` while
+  any row is entitled, so the providers never overwrite each other; a double purchase (race) keeps both and is
+  flagged for support. No website login: the subscribe form emails a one-time link (30 min) that creates one
+  Paddle transaction (re-opening it returns to the same checkout). Hosted checkout preferred; `/subscribe/pay`
+  (Paddle.js) is the fallback default payment link.
+- **Commission** in minor units per currency (+ USD when the source gives it); RevenueCat net uses its
+  estimated `tax_percentage` / `commission_percentage` (fallback 15% store fee), Paddle net = `earnings`.
+  Refunds mirror the sale they reverse (same affiliate and rate) or add nothing. Payouts grouped by affiliate,
+  month of the revenue event and currency; "mark paid" is admin-role only and logged.
 
 ### B11 — Ops hardening (from the operations handbook review, 2026-10-24)
 - Horizon: route long-wait/failed-job notifications (mail to support@ or a webhook), schedule
@@ -354,6 +367,14 @@ Contract to be written in `docs/API.md` before building (coordinator).
 - Staff roles: a read-only "support" role in Filament (no edits, no chat — chat is never visible
   anyway) and a staff action to start a child's data export/deletion on a parent's verified request.
 - App: `env` for EAS `preview`/`development` profiles so builds never fall back to localhost.
+- **Backend done 2026-10-24.** Decisions: deep check is a separate route `GET /api/v1/health/deep`
+  (token header `X-Health-Token`, 404 without a configured token; 503 on a critical failure);
+  alerts by mail to `OPS_ALERT_EMAIL` plus an optional generic `{"text"}` webhook (Horizon's Slack
+  channel would need a new package); failed-job alerts are our own listener (Horizon has none);
+  SSV rejections are daily counters in `webhook_rejections` (no payloads), not `webhook_events`;
+  `users.staff_role` (`admin`/`support`) replaces `is_staff`; Horizon is admin-only; the staff
+  export goes only to the family owner's account email and is sent synchronously (never queued
+  with the data); both staff privacy actions apply to child accounts (no own login) only.
 
 ## Open questions
 - **Answered by Moe (2026-10-22)** — see "Decisions (2026-10-22)" above: iPhone + iPad; Play

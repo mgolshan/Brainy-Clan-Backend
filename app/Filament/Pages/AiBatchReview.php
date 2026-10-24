@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Resources\ContentItems\ContentItemResource;
+use App\Filament\Support\StaffAccess;
 use App\Modules\Content\Actions\PreviewContentItem;
 use App\Modules\Content\Actions\ReviewContentBatchItems;
 use App\Modules\Content\Models\ContentBatch;
@@ -42,6 +43,14 @@ class AiBatchReview extends Page implements HasTable
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $slug = 'ai-batch-review';
+
+    /**
+     * The AI generator costs money and publishes content: admins only (403 and hidden for `support`).
+     */
+    public static function canAccess(): bool
+    {
+        return StaffAccess::isAdmin();
+    }
 
     #[Url]
     public ?int $batch = null;

@@ -46,6 +46,22 @@ class SubscriptionFactory extends Factory
         ]);
     }
 
+    /**
+     * A web checkout (Paddle) subscription.
+     */
+    public function paddle(): static
+    {
+        return $this->state(fn () => [
+            'provider' => Subscription::PROVIDER_PADDLE,
+            'store' => Subscription::STORE_PADDLE,
+            'external_id' => 'sub_'.fake()->unique()->bothify('01h##########'),
+            'customer_id' => 'ctm_'.fake()->bothify('01h##########'),
+            'product_id' => 'pri_annual',
+            'environment' => 'SANDBOX',
+            'last_event_type' => 'subscription.activated',
+        ]);
+    }
+
     public function grace(): static
     {
         return $this->state(fn () => [

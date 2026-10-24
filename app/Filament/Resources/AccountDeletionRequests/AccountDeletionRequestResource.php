@@ -4,6 +4,7 @@ namespace App\Filament\Resources\AccountDeletionRequests;
 
 use App\Filament\Resources\AccountDeletionRequests\Pages\ListAccountDeletionRequests;
 use App\Filament\Resources\AccountDeletionRequests\Pages\ViewAccountDeletionRequest;
+use App\Filament\Support\ReadOnlyForSupport;
 use App\Modules\Family\Models\AccountDeletionRequest;
 use BackedEnum;
 use Filament\Actions\ViewAction;
@@ -26,6 +27,8 @@ use UnitEnum;
  */
 class AccountDeletionRequestResource extends Resource
 {
+    use ReadOnlyForSupport;
+
     protected static ?string $model = AccountDeletionRequest::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTrash;

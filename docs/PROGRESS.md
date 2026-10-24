@@ -23,6 +23,8 @@ Milestones are defined in `docs/PLAN.md`.
 | B7 Remaining launch content | In progress | Sudoku + Math Sprint generated per session, Word Puzzles seeded, item `points`, Filament preview + category generators; **AI batch generator done** (Laravel AI SDK, Horizon `ai` queue, review/approve page; needs `ANTHROPIC_API_KEY` to run for real). **Session 17:** launch question bank (`data/questions/*.php`, en + fr, strict validator + CI test), French content (translation groups, picker dedupe, French capitals/continents/math/word puzzles) seeded on dev. Fact-checked by independent reviewers (quotes string-matched against the public-domain texts) and re-seeded. Left: more content via the AI generator |
 | B8 Billing, ads and notifications | Done | Billing core (s8), push token + preferences (s10), sending + goal notifications (s11); **session 13:** `has_own_login`, `family_activity` (1/member/hour), `daily_reminder` (every 15 min, family tz), `POST /family/subscription/sync` (RevenueCat REST v1), hourly reconciliation, AdMob SSV (`ad_rewards`, ECDSA) + ad second chance (409 `ad_reward_pending`), Policy `ad_request`, Filament subscription section + Webhook events, README setup guide. Needs real RevenueCat/AdMob accounts to try end to end |
 | B9 Production | Done (needs a real server + lawyer) | **Session 14:** legal API (consents, `GET /legal`, terms/privacy pages en+fr drafts, `accept_terms`, `parental_consent`, invite preview, `me.legal`, legal acceptance, `/me/export`), account deletion web page `/account/delete`, Filament consents, Sentry (`sentry/sentry-laravel` 4.29, PII scrubber), production image (`docker/prod/Dockerfile`), `docker-compose.prod.yml` (Caddy HTTPS), encrypted off-site backups + restore drill, `docs/DEPLOY.md`, route security test. Not done on a real server: DNS/HTTPS, Storage Box upload, Sentry DSN. Texts need lawyer review |
+| B10 Pricing, affiliates, web checkout (Paddle) | Done (needs a Paddle account) | `GET /pricing`, website `/subscribe` + emailed one-time link → Paddle checkout, Paddle webhook (signature, idempotent, stale), subscriptions per provider, availability + manage-link, referral codes + `/r/{code}`, offer-code/Paddle attribution, commission ledger + monthly payouts (Filament), legal drafts 2026-10-24. Moe: Paddle sandbox → live (README) |
+| B11 Ops hardening | Done | Staff roles `admin`/`support` (read-only) replacing `is_staff`, staff child export/deletion actions, `/api/v1/health/deep` (token), scheduler heartbeat, Horizon long-wait + failed-job alert mails, `horizon:snapshot`, AdMob SSV rejection counts on the dashboard. Moe: set `HEALTH_DEEP_TOKEN`, uptime monitor, SMTP for alerts |
 
 ## Next up
 
@@ -376,6 +378,95 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-10-24 B10 Paddle, pricing, affiliates (backend)
+- **Contract** (`docs/API.md` B10) implemented as written; clarifications added to its changelog (no shape change).
+  Paddle Billing API v1 over plain `Http` (no SDK, no new composer dependency): `PaddleClient` (create
+  transaction, customer-portal session, get subscription), sandbox/production base URLs.
+- **Decision — subscriptions per provider:** `subscriptions` is now unique on `(family_id, provider)` (was
+  `family_id`), with `external_id`/`customer_id` for Paddle. RevenueCat and Paddle each update only their own row;
+  `ApplyFamilyTier` sets `family` while **any** row is entitled. So a late RevenueCat EXPIRATION can never end a web
+  plan (and vice versa), and the rare double purchase (race) keeps both, flagged `Conflict` in the webhook note +
+  a log warning for support to refund one. `GET /family/subscription` shows `Subscription::currentFor()` (entitled
+  first); `Family::subscription` is `latestOfMany('updated_at')` for display. Migration
+  `2026_10_24_100000_create_web_checkout_and_affiliate_tables` (dev DB migrated, no fresh).
+- **Pricing:** `config/billing.php` (plans, USD/CAD display prices, trials, Paddle ids, storefront allowlist empty,
+  store manage URLs, affiliate defaults); `GET /api/v1/pricing` (public, `?currency=CAD`).
+- **Website:** `/subscribe` (plans, email, optional code, honeypot; "coming soon" without keys), `POST /web/subscribe`
+  (5/h per IP + 3/h per email; always the same page; queued email with the one-time link or the reason: no account,
+  no family, not admin, purchases not allowed, store plan active, web plan active), `/subscribe/checkout?token=…`
+  (30 min; creates **one** Paddle transaction per link — re-opening returns to the same checkout, so mail scanners
+  don't burn it; eligibility re-checked), `/subscribe/thanks`, `/subscribe/pay` (Paddle.js default payment link page,
+  own CSP; only used without `PADDLE_HOSTED_CHECKOUT_URL`), `/r/{code}` banner on the landing page (no cookies).
+  robots.txt disallows `/subscribe/checkout`, `/subscribe/pay`, `/r/`.
+- **Webhook** `POST /api/v1/webhooks/paddle`: `Paddle-Signature` HMAC (`ts:rawBody`, several `h1`, 5-min tolerance;
+  rejections counted in `webhook_rejections` as `paddle`/`signature_invalid`), idempotent by `event_id`,
+  `stale` by `occurred_at`; subscription.* → active/trial/grace (`past_due`, + `PADDLE_GRACE_DAYS`)/expired;
+  `transaction.completed` and approved `adjustment.*` (refund, chargeback, chargeback_reverse) → revenue events.
+  Hourly reconciliation re-reads overdue Paddle rows from `GET /subscriptions/{id}` (or expires them without a key).
+- **App endpoints:** `GET /family/web-checkout/availability`, `POST /family/subscription/manage-link` (Paddle portal /
+  App Store / Google Play URL; 404 none, 503 Paddle unavailable), `POST /family/referral-code`, Family object
+  `referral_code` (admins only, null otherwise — everywhere the Family object is returned).
+- **Affiliates:** `affiliates`, `affiliate_codes` (store offer codes JSON, Paddle discount), `family_attributions`
+  (first touch, locked at first payment), `commission_entries` (append-only, unique source event, minor units +
+  USD figure), `commission_payouts`, `families.first_paid_at`. `RevenueRecorded` (after commit) → queued
+  `RecordCommission` → `RecordRevenue`: first-paid date, attribution from Paddle `custom_data` / RevenueCat
+  `offer_code`, commission = net × rate within `commission_months`; refunds/chargebacks mirror the sale (same
+  affiliate and rate). Daily `billing:release-commissions` (pending → payable after 30 days).
+- **Filament (Billing):** Affiliates, Affiliate codes (CRUD), Attributions (read + "Change code" with reason, logged),
+  Commission entries (read-only), Monthly payouts page (custom data table, CSV export without family data, "Mark paid"
+  → payout row + activity log; admin role only). Family page shows provider, Paddle subscription, first paid, code.
+  Resources use B11's `ReadOnlyForSupport`.
+- **Legal:** terms (web purchase via Paddle as merchant of record, 14-day web refund paragraph, referral codes) and
+  privacy (Paddle row, purchase/referral data, retention) in en + fr, marked for lawyer review. **Both versions bumped
+  once to `2026-10-24`** (re-acceptance; the privacy bump also carries the chat summary). Account deletion page
+  mentions the Paddle portal.
+- Docs: README "Web checkout (Paddle) — setup" + "Affiliate program — admin guide", `.env.example` /
+  `.env.prod.example` keys, OPERATIONS_HANDBOOK §1/§2/§9/§11/§12 statuses.
+- Tests: `PaddleWebhookTest` (20), `WebCheckoutTest` (20), `AffiliatesTest` (17), `Admin/AffiliatesAdminTest` (17);
+  RouteSecurity (new public routes, admin routes) and Legal tests updated.
+
+### 2026-10-24 B11 ops hardening
+- **Staff roles:** migration `replace_is_staff_with_staff_role` (`users.staff_role` null/`admin`/
+  `support`; existing staff → `admin`; `is_staff` dropped). `User::isStaff()` / `isStaffAdmin()`,
+  `canAccessPanel` = any role and not erased; `EraseUser` clears the role; factory `staff()` /
+  `support()`; `staff:role {email} {admin|support|none}` command (audit-logged). Filament:
+  `App\Filament\Support\StaffAccess`, traits `ReadOnlyForSupport` (every other resource, incl. B10's
+  affiliate/commission/attribution resources) and `AdminOnly` (Settings, Age bands, Activity);
+  custom actions (sign-in code, sign out device, invite reset/revoke, goal deactivate, content
+  bulk actions + CSV import) `->authorize(admin)`, toggle columns disabled for support, AI
+  generator/review pages `canAccess` admin, "AI batches awaiting review" widget admin-only,
+  Horizon gate admin-only (HealthStats links to Horizon only for admins).
+- **Staff privacy actions** (members relation manager, admin only, child accounts = no own login,
+  not the owner): "Start data export" (`SendChildDataExport` → `ChildDataExport` mail with the
+  `ExportUserData::build()` JSON to the owner's account email, sent synchronously so no export in
+  Redis) and "Delete child account" (`DeleteChildAccountForParent` → `RemoveMember`/`EraseUser`,
+  nickname typed to confirm). Activity log entries with ids only.
+- **Monitoring:** `config/ops.php` (`OPS_ALERT_EMAIL` default support@, `OPS_ALERT_WEBHOOK_URL`,
+  `HEALTH_DEEP_TOKEN`). Horizon `routeMailNotificationsTo(ops.alert_email)`; `SendFailedJobAlert`
+  (JobFailed → mail + webhook, one per job class per 15 min, class names only) and
+  `ForwardLongWaitToWebhook` (Core listeners, `OpsAlert`). Horizon's Slack channel needs a package
+  that is not installed, so the webhook is a plain `{"text"}` POST. Scheduled `ops:heartbeat`
+  (every minute) and `horizon:snapshot` (every 5 min). `GET /api/v1/health/deep`
+  (`DeepHealthController` → `RunHealthChecks`): token header `X-Health-Token` (404 without a
+  configured token, 401 wrong), throttle `health-deep` 30/min/IP, MySQL/Redis/heartbeat < 180 s/
+  Horizon critical (503), failed jobs last hour warn (`degraded`). Shallow `/health` unchanged.
+  docs/API.md Health + changelog.
+- **Dashboard:** `webhook_rejections` table (provider, reason, day, hits) filled by
+  `RecordAdReward` via `WebhookRejections` (bad signature; signed callback with unusable custom
+  data — not AdMob's "Verify URL" call without custom data); "AdMob SSV rejections" card next to
+  "Webhook errors"; constant-query tests extended.
+- Docs: DEPLOY.md §8 (uptime monitor on the deep URL with the token header, alert mail),
+  OPERATIONS_HANDBOOK §2/§3/§5.4/§5.5/§6/§12/§14 (gaps marked fixed), README "Staff roles" +
+  "Monitoring", `.env.example` / `.env.prod.example`.
+- Tests: `Admin/StaffRolesTest` (every resource has a role trait, support can view / cannot open
+  edit-create-settings-AI-Horizon pages, hidden + forced actions, bulk actions, toggles, relation
+  managers, navigation, dashboard), `Admin/StaffPrivacyActionsTest`, `Api/OpsMonitoringTest`,
+  SSV rejection counting in `AdRewardsTest`, dashboard figures in `DashboardTest`.
+- Moe: set `HEALTH_DEEP_TOKEN` in `.env.prod` and an uptime monitor with the `X-Health-Token`
+  header; SMTP must work for alert mails (optionally `OPS_ALERT_EMAIL`, `OPS_ALERT_WEBHOOK_URL`);
+  grant `support` roles with `staff:role`. The migration drops `users.is_staff` (deploy with
+  migrate, backup first).
 
 ### 2026-10-24 operations handbook
 - New `docs/OPERATIONS_HANDBOOK.md` (canonical, for the external AI ops team): product, system map

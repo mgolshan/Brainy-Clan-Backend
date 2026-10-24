@@ -2,6 +2,7 @@
 
 namespace App\Modules\Billing\Actions;
 
+use App\Modules\Billing\Contracts\PaddleClient;
 use App\Modules\Billing\Contracts\RevenueCatClient;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Family\Models\Family;
@@ -14,7 +15,8 @@ use Illuminate\Support\Facades\DB;
  * `services.revenuecat.reconcile_after_minutes` ago. With `REVENUECAT_API_KEY` each is re-synced
  * from RevenueCat (a missed RENEWAL then keeps the family on its plan; an unreachable API leaves
  * it for the next run); without a key it is marked `expired` and the family goes back to `free`.
- * Both paths switch the tier through {@see ApplyFamilyTier}.
+ * Paddle (web) rows are re-read from the Paddle API the same way (`PADDLE_API_KEY`), else expired.
+ * All paths switch the tier through {@see ApplyFamilyTier}.
  */
 class ReconcileSubscriptions
 {
@@ -22,6 +24,8 @@ class ReconcileSubscriptions
         private readonly RevenueCatClient $client,
         private readonly SyncSubscription $sync,
         private readonly ApplyFamilyTier $applyTier,
+        private readonly PaddleClient $paddle,
+        private readonly SyncPaddleSubscription $syncPaddle,
     ) {}
 
     /**
@@ -34,9 +38,13 @@ class ReconcileSubscriptions
         $this->overdue()->with('family')->chunkById(100, function ($subscriptions) use (&$reconciled): void {
             foreach ($subscriptions as $subscription) {
                 /** @var Subscription $subscription */
-                $done = $this->client->isConfigured()
-                    ? $this->sync->handle($subscription->family, ApplyFamilyTier::SOURCE_RECONCILE)
-                    : $this->expire($subscription);
+                $done = match (true) {
+                    $subscription->isPaddle() => $this->paddle->isConfigured() && $subscription->external_id !== null
+                        ? $this->syncPaddle->handle($subscription)
+                        : $this->expire($subscription),
+                    $this->client->isConfigured() => $this->sync->handle($subscription->family, ApplyFamilyTier::SOURCE_RECONCILE),
+                    default => $this->expire($subscription),
+                };
 
                 $reconciled += $done ? 1 : 0;
             }

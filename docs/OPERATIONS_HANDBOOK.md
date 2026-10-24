@@ -15,7 +15,7 @@ Moe** (see [§14 Known gaps and doc inconsistencies](#14-known-gaps-and-doc-inco
 - **Status at the time of writing: nothing is in production.** No server, no store listing, no
   accounts with Apple/Google/RevenueCat/AdMob/Sentry exist yet (see [§12](#12-launch-checklist-and-current-status)).
   Runbooks below describe how things will run once Moe has completed the launch steps.
-- "Moe" is the owner and only human decision maker. "Staff" = a user with `is_staff` in the admin.
+- "Moe" is the owner and only human decision maker. "Staff" = a user with a staff role in the admin: `admin` (everything) or `support` (read-only), see [§3](#3-roles-for-agents).
 
 ## Contents
 
@@ -29,7 +29,7 @@ Moe** (see [§14 Known gaps and doc inconsistencies](#14-known-gaps-and-doc-inco
 8. [Content operations](#8-content-operations)
 9. [Support](#9-support)
 10. [Marketing and advertising](#10-marketing-and-advertising)
-11. [Affiliate program (planned)](#11-affiliate-program-planned)
+11. [Affiliate program](#11-affiliate-program)
 12. [Launch checklist and current status](#12-launch-checklist-and-current-status)
 13. [Glossary](#13-glossary)
 14. [Known gaps and doc inconsistencies](#14-known-gaps-and-doc-inconsistencies)
@@ -69,7 +69,7 @@ admin under Policy → Settings & flags):
 | Chat history | 7 days | 1 year (365 days) |
 | Worlds | free + earned worlds | also the Family-plan worlds (Dino, Neon, Midnight) |
 
-**Prices — (planned), decided by Moe 2026-10-24 (PLAN.md B10), not yet in any store, RevenueCat
+**Prices — decided by Moe 2026-10-24 (PLAN.md B10); in `config/billing.php` (website, `GET /api/v1/pricing`), not yet in any store, RevenueCat
 or Paddle:**
 
 | Plan (per family, up to 7 members) | USD | CAD | Trial |
@@ -80,8 +80,8 @@ or Paddle:**
 
 Launch offer "founding families": 50% off the first year (store offer codes / Paddle discount)
 **(planned)**. Prices live only in the stores, Paddle and RevenueCat offerings, never in the app.
-Web checkout through **Paddle** (merchant of record) is **(planned)**. Today the only purchase
-path built is in-app (App Store / Google Play through RevenueCat).
+Web checkout through **Paddle** (merchant of record) is **built in the backend (B10)** but **(server)**: no Paddle account or keys yet, so `/subscribe` shows "coming soon". Until then the only live purchase
+path is in-app (App Store / Google Play through RevenueCat). Setup: README "Web checkout (Paddle) — setup".
 
 ### What makes it safe (true today, from PLAN.md / API.md / the code)
 
@@ -111,9 +111,9 @@ path built is in-app (App Store / Google Play through RevenueCat).
 | Privacy policy / Terms | `https://brainyclan.com/privacy` / `https://brainyclan.com/terms` (drafts, lawyer review pending) |
 | Account deletion without the app | `https://brainyclan.com/account/delete` |
 | Password reset (from emails only) | `https://brainyclan.com/password/reset` |
-| API | `https://api.brainyclan.com/api/v1` (health: `/api/v1/health`) |
-| Admin panel (Filament, staff only) | `https://api.brainyclan.com/admin` |
-| Horizon queue dashboard (staff only) | `https://api.brainyclan.com/horizon` |
+| API | `https://api.brainyclan.com/api/v1` (health: `/api/v1/health`; monitoring: `/api/v1/health/deep` with the `X-Health-Token` header) |
+| Admin panel (Filament, staff roles `admin` / `support`) | `https://api.brainyclan.com/admin` |
+| Horizon queue dashboard (staff role `admin` only) | `https://api.brainyclan.com/horizon` |
 | API reference (Scramble) | `https://api.brainyclan.com/docs/api` — **closed outside the local environment** (`viewApiDocs` gate); use `docs/API.md` |
 | Support email (receiving) | `support@brainyclan.com` |
 | App email sender | `no-reply@brainyclan.com` |
@@ -147,7 +147,7 @@ local file). No CI pipeline exists (no `.github/`): checks run in the developer 
  outbound HTTPS: Expo push API, RevenueCat REST, Apple/Google/Facebook token checks, AdMob SSV keys,
                  Anthropic (AI generator), Sentry, SMTP provider, Hetzner Storage Box (backups)
  inbound webhooks: RevenueCat → /api/v1/webhooks/revenuecat ; AdMob SSV → /api/v1/webhooks/admob-ssv
-                   Paddle → /api/v1/webhooks/paddle (planned)
+                   Paddle → /api/v1/webhooks/paddle (built, B10; no account yet)
 ```
 
 | Service | Role | Notes |
@@ -163,7 +163,7 @@ local file). No CI pipeline exists (no `.github/`): checks run in the developer 
 | **Expo push** | Push notifications | Server posts to `https://exp.host/--/api/v2/push/send`; receipts checked 15 min after each send (`CheckPushReceiptsJob`), invalid tokens cleared. APNs/FCM credentials live in EAS. |
 | **RevenueCat** | In-app subscriptions (App Store, Google Play) | App user id `family-{family_id}`, entitlement `family`. Webhook is the source of truth; `POST /family/subscription/sync` + hourly reconciliation as safety nets. |
 | **AdMob** | Rewarded videos (free-tier teens/adults) | Families-certified SDK, non-personalized, rating G, server-side verification (SSV) webhook, Google UMP consent message for EEA/UK/CH. |
-| **Paddle** | Web checkout, merchant of record | **(planned, B10)**: nothing built. |
+| **Paddle** | Web checkout, merchant of record | Built (B10): `/subscribe` + emailed link → Paddle checkout, webhook `/api/v1/webhooks/paddle`, customer portal via `POST /family/subscription/manage-link`. **(server)**: account and keys pending. |
 | **EAS (Expo)** | App builds, store submission, OTA updates | Profiles `development`, `development-simulator`, `preview`, `production`. See the app handbook. |
 | **Anthropic (Claude)** | AI batch generator for draft quiz content | Laravel AI SDK, model `claude-sonnet-5-5` (`CONTENT_AI_MODEL`), Horizon `ai` queue. Optional in production. Prompts contain content rules and category names only — no user data. |
 | **SMTP provider** | Account-deletion and password-reset emails from `no-reply@` | Provider not chosen yet [Moe]. |
@@ -179,13 +179,14 @@ local file). No CI pipeline exists (no `.github/`): checks run in the developer 
 | `play:abandon-idle-sessions` | hourly | Abandons play sessions with no answer for 24 h. |
 | `chat:prune` | hourly | Deletes chat messages older than the family's retention (7 / 365 days). |
 | `auth:clear-resets` | daily | Removes expired password-reset tokens. |
+| `ops:heartbeat` | every minute | Scheduler heartbeat: writes a cache timestamp; `/api/v1/health/deep` fails (503) when it is older than 3 minutes. |
+| `horizon:snapshot` | every 5 minutes | Horizon metrics graphs (throughput, runtime per job and queue). |
 
-All except `auth:clear-resets` run `withoutOverlapping()`; all run `onOneServer()`. List them on the
-server with `$C exec app php artisan schedule:list` (`$C` is defined in [§5.1](#51-conventions)).
-Not scheduled: `horizon:snapshot` (so Horizon's metrics graphs stay empty — see [§14](#14-known-gaps-and-doc-inconsistencies)).
-A scheduler heartbeat / dead-man's switch is **(not built yet)**.
+The jobs before `auth:clear-resets` run `withoutOverlapping()`; all except `ops:heartbeat` run
+`onOneServer()`. List them on the server with `$C exec app php artisan schedule:list` (`$C` is
+defined in [§5.1](#51-conventions)).
 
-Other operator commands that exist: `auth:unlock {email} {--ip=}`, `reference-cache:flush`,
+Other operator commands that exist: `auth:unlock {email} {--ip=}`, `staff:role {email} {admin|support|none}` [Moe], `reference-cache:flush`,
 `sentry:test`, `horizon:status`, `horizon:terminate`, `schedule:list`, `queue:failed`, `queue:retry`.
 
 ### Data flows
@@ -221,9 +222,12 @@ Other operator commands that exist: `auth:unlock {email} {--ip=}`, `reference-ca
 Principles: **least privilege**, one account per agent role, every action logged in the role's
 work log (what, when, why, result), and **when in doubt, ask Moe**. Agents do **not** change code
 or commit to the repositories: anything needing a code or doc change is written up as an issue
-for Moe. The admin panel has only one access level today (`is_staff` = full admin; a read-only or
-support-only role is **(not built yet)**), so any agent given a staff account must stay inside its
-role's allowed actions below.
+for Moe. The admin panel has two staff roles (set by Moe with
+`$C exec app php artisan staff:role <email> admin|support|none`): **`support`** is read-only
+(families, members, devices, subscriptions, content, webhooks, deletion requests, dashboard; no
+edits, no actions, no AI generator, no settings/age bands, no audit log, no Horizon) and is the
+default for agents; **`admin`** can do everything and is given only by Moe. Family chat is never
+visible in the admin. Agents still stay inside their role's allowed actions below.
 
 ### Approval policy (applies to every role)
 
@@ -263,8 +267,10 @@ anything (posts, replies, content, reports) for review.
 #### Monitoring / on-call agent
 - **Goal:** detect and triage problems before families notice; first responder for incidents.
 - **Access:** Sentry (backend + app projects, member role), uptime monitor, Hetzner console
-  (read-only/graphs), SSH read-only commands (`$C ps`, `$C logs`, `df -h`), a staff account to view
-  the admin dashboard and `/horizon`.
+  (read-only/graphs), SSH read-only commands (`$C ps`, `$C logs`, `df -h`), a `support` staff
+  account for the admin dashboard, the deep health token (`HEALTH_DEEP_TOKEN`) for manual checks, the
+  ops alert mailbox (`OPS_ALERT_EMAIL`); `/horizon` needs an `admin` account [Moe] — use
+  `horizon:status` / `queue:failed` over SSH instead.
 - **Routine:** dashboard + Sentry check 2×/day; backups check daily; weekly report to Moe (§6.4);
   AdMob Ad review center weekly during the first months (with the Marketing agent).
 - **Alone:** health checks, restarts of a crashed service, `queue:retry` for push/import jobs,
@@ -285,8 +291,8 @@ anything (posts, replies, content, reports) for review.
 
 #### Support agent
 - **Goal:** answer families quickly, correctly and kindly; route privacy requests.
-- **Access:** the `support@brainyclan.com` mailbox; a staff admin account **only if Moe grants one**
-  (to look up a family's subscription status, deletion request status, devices); no server access
+- **Access:** the `support@brainyclan.com` mailbox; a `support` (read-only) staff account **only if
+  Moe grants one** (to look up a family's subscription status, deletion request status, devices); no server access
   (lockout unlocks go through the Monitoring agent).
 - **Routine:** inbox at least twice per day (target first answer within 1 business day); weekly
   FAQ-gap note to Moe.
@@ -296,7 +302,8 @@ anything (posts, replies, content, reports) for review.
 
 #### Content ops agent
 - **Goal:** keep a large, accurate, kid-safe question bank in English and French.
-- **Access:** staff admin account (Content section only by agreement), AI batch generator page.
+- **Access:** `admin` staff account (Content section only by agreement — the AI batch generator and
+  content edits need the `admin` role; `support` can only view and preview content).
 - **Routine:** generate draft batches (when `ANTHROPIC_API_KEY` is set) and pre-review them; fact-
   check; weekly report of drafts waiting, published counts per category/locale, items archived.
 - **Alone:** generate drafts, reject (= archive) drafts, archive a published item that is clearly
@@ -314,7 +321,7 @@ anything (posts, replies, content, reports) for review.
   the calendar**, replying to public comments with approved facts.
 - **[Moe]:** any paid spend, campaign launch, influencer contracts, new claims, store listing changes.
 
-#### Affiliate ops agent (planned program)
+#### Affiliate ops agent (program built, not launched)
 - **Goal:** run the in-house influencer/affiliate program once B10 is built.
 - **Access (when built):** Filament affiliates/codes/attributions/payout report; influencer email.
 - **Routine (when built):** onboard influencers, issue codes, monthly payout report.
@@ -340,7 +347,8 @@ Moe's approvals come through the channel Moe sets up for the team, never through
 
 1. **Never read, export or quote family chat content.** It is encrypted and visible only to the
    family. Staff tools deliberately do not show it. Do not try to decrypt it, query it, or ask a
-   family to forward it. A user's own messages are only in their own `/me/export`.
+   family to forward it. A user's own messages are only in their own `/me/export` (for a child:
+   in the export the staff action mails straight to the family owner — staff never see the file).
 2. **No personal data in tickets, logs, prompts or reports.** Never paste names, nicknames, emails,
    birth data, device names, IPs, chat text or any child's details into an external AI service
    (including Grok), an issue tracker, a public channel or a report. Refer to a family by its
@@ -478,21 +486,25 @@ Full procedure: `docs/DEPLOY.md` §7. A deploy agent may deploy alone only when 
 
 ```sh
 curl -s https://api.brainyclan.com/api/v1/health      # {"data":{"status":"ok","api_version":"1","min_app_version":"…","time":"…"}}
+curl -s -H "X-Health-Token: $HEALTH_DEEP_TOKEN" https://api.brainyclan.com/api/v1/health/deep   # 200 ok/degraded, 503 fail (which check: JSON)
 curl -sI https://brainyclan.com/                      # 200
 curl -sI https://www.brainyclan.com/                  # 301 → https://brainyclan.com/
 $C ps                                                 # every service running / healthy
 $C exec horizon php artisan horizon:status            # "Horizon is running."
 $C exec app php artisan queue:failed                  # failed jobs (tries=1: every failure lands here)
-$C exec app php artisan schedule:list                 # the 6 jobs of §2
-$C logs --since 20m scheduler                         # scheduler heartbeat substitute: reminders run every 15 min
+$C exec app php artisan schedule:list                 # the 8 jobs of §2
+$C logs --since 20m scheduler                         # scheduler output (the deep check already proves it runs)
 $C logs --tail=50 caddy app horizon scheduler backup
 df -h /                                               # disk; alert > 80 %
 ```
 
-Note: `/api/v1/health` is a liveness check — it does **not** test MySQL, Redis or Horizon (it reads
-`min_app_version` through the reference cache). Use the other commands for those. Admin dashboard
-(`/admin`) "Health" cards: failed jobs (total, last 24 h), webhook errors (failed RevenueCat events,
-7 days), push-ready devices + failed push jobs, pending account deletions.
+Note: `/api/v1/health` is a liveness check for the app — it does **not** test MySQL, Redis or
+Horizon. `/api/v1/health/deep` (token in `X-Health-Token`, docs/API.md "Health") checks MySQL,
+Redis, the scheduler heartbeat (< 3 min), Horizon (running) and failed jobs in the last hour; the
+uptime monitor calls it every 5 minutes. Admin dashboard (`/admin`) "System health" cards: failed
+jobs (total, last 24 h), webhook errors (failed RevenueCat events, 7 days), AdMob SSV rejections
+(bad signatures / unusable data, 7 days), push-ready devices + failed push jobs, pending account
+deletions.
 
 ### 5.5 Incident playbooks
 
@@ -503,13 +515,13 @@ Always: open an incident note (time, symptom, severity), take no destructive act
 | --- | --- | --- |
 | **API down** (health fails) | `$C ps`; `$C logs --tail=200 caddy app`; DNS (`nslookup api.brainyclan.com`); Hetzner console (server up? disk?) | `$C up -d` (restarts stopped services). Still down after a deploy → rollback §5.3. Server unreachable → P1 to Moe (reboot/console access [Moe]). |
 | **5xx spike** | Sentry (new issue? release?), `$C logs --tail=500 app`, recent deploy? | Recent deploy → rollback §5.3. Otherwise collect the Sentry issue link and escalate P1/P2. Never set `APP_DEBUG=true`. |
-| **Queue backlog / Horizon down** | `/horizon` (wait times vs thresholds 60 s default / 900 s ai), `horizon:status`, `queue:failed` | `$C restart horizon`. Failed push/import jobs: `$C exec app php artisan queue:retry <id>` (push older than 12 h is dropped by design). Never retry AI jobs blindly (each costs money) — use the batch's **Retry** button after fixing the cause. |
+| **Queue backlog / Horizon down** | Alert mail "Long wait detected" / "Queued job failed" (to `OPS_ALERT_EMAIL`) or deep health `horizon: fail`; `/horizon` (wait times vs thresholds 60 s default / 900 s ai), `horizon:status`, `queue:failed` | `$C restart horizon`. Failed push/import jobs: `$C exec app php artisan queue:retry <id>` (push older than 12 h is dropped by design). Never retry AI jobs blindly (each costs money) — use the batch's **Retry** button after fixing the cause. |
 | **MySQL disk full / slow** | `df -h /`, `docker system df`, `$C exec mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SHOW FULL PROCESSLIST"'` | Safe cleanup: `docker image prune` (keeps tagged `previous`), old local backups are pruned automatically. Never delete database files or tables. Resize disk/server [Moe]. Slow queries → Sentry/issue for Moe. |
 | **Redis down** | `$C ps redis`, `$C exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping'` | `$C restart redis`, then `$C restart app horizon scheduler`. Effects while down: no queues, no cache, lockout counters reset. |
 | **TLS / Caddy renewal failure** | Let's Encrypt mail to `ACME_EMAIL`; `$C logs --tail=300 caddy`; `curl -vI https://api.brainyclan.com 2>&1 \| grep -i expire`; ports 80/443 open? DNS correct? | `$C restart caddy`. DNS or firewall changes [Moe]. |
 | **RevenueCat webhook failures** | Admin → Billing → Webhook events (filter outcome `failed`); dashboard "Webhook errors"; RevenueCat dashboard delivery log | Wrong secret (401) → `REVENUECAT_WEBHOOK_SECRET` mismatch [Moe]. Affected family: the admin taps Restore purchases / the app calls `POST /family/subscription/sync`; hourly reconciliation catches expiries. Manual tier change on the family's *Edit* page [Moe]. |
-| **Paddle webhook failures** | **(planned)** — webhook `/api/v1/webhooks/paddle` not built | — |
-| **AdMob SSV failures** | Users report "We couldn't confirm your reward yet"; `$C logs caddy \| grep admob-ssv` (400 = `ssv_signature_invalid`) | Check the ad unit's SSV URL `https://api.brainyclan.com/api/v1/webhooks/admob-ssv` (Verify URL in AdMob); Google key fetch needs outbound HTTPS. Users still have the redemption round; no compensation needed. |
+| **Paddle webhook failures** | Admin → Billing → Webhook events (provider `paddle`); bad signatures are counted in `webhook_rejections` (`paddle` / `signature_invalid`) — dashboard tile **(not built yet)** | any rejection streak → check `PADDLE_WEBHOOK_SECRET` |
+| **AdMob SSV failures** | Dashboard "AdMob SSV rejections" (7 days; bad signatures vs. unusable custom data, counted per day in `webhook_rejections`); users report "We couldn't confirm your reward yet"; `$C logs caddy \| grep admob-ssv` (400 = `ssv_signature_invalid`) | Check the ad unit's SSV URL `https://api.brainyclan.com/api/v1/webhooks/admob-ssv` (Verify URL in AdMob); Google key fetch needs outbound HTTPS. Users still have the redemption round; no compensation needed. |
 | **Push failures** | Dashboard "failed push jobs"; Horizon failed jobs `DeliverPushNotification`; Expo status page | Expo receipts clear invalid tokens automatically. All iOS or all Android failing → APNs key / FCM V1 credentials in EAS (App release agent). `EXPO_ACCESS_TOKEN` only if Enhanced push security is on. |
 | **AI generator failures** | Batch status `failed` with the error on the AI batch page; Horizon `ai` queue | Missing/invalid `ANTHROPIC_API_KEY` or spend limit reached [Moe]; JSON/length error → smaller batch (count) or `CONTENT_AI_MAX_TOKENS` [Moe]; then **Retry** once. |
 | **Security incident / data breach** | Signs: unknown staff user, leaked secret, unusual exports, Sentry PII, stolen device with admin | **P1, notify Moe immediately.** Contain without destroying evidence: revoke the leaked credential's access [Moe approves rotation, `APP_KEY` only with `APP_PREVIOUS_KEYS`], keep logs (`$C logs > incident-<date>.log` stored privately on the server). Do not contact users or post publicly. Legal timelines (general guidance; Moe + lawyer decide): **PIPEDA** — report to the Office of the Privacy Commissioner and notify affected people *as soon as feasible* when there is a real risk of significant harm, keep a breach record 24 months; **Quebec Law 25** — notify the Commission d'accès à l'information and affected people *promptly* for a risk of serious injury, keep an incident register; **GDPR/UK GDPR** (EU/UK residents) — supervisory authority within **72 hours**; **US** — state breach laws, FTC (COPPA) for children's data. Also notify the stores/providers only via Moe. |
@@ -518,8 +530,8 @@ Always: open an incident note (time, symptom, severity), take no destructive act
 
 | Request | Process |
 | --- | --- |
-| **Account deletion** | Self-service first: in the app Profile → Privacy → Delete account (`DELETE /me`); a family owner with other members deletes the family (`DELETE /family`); a **child** is removed by the family admin (Family → member → remove = erasure). Without the app: `https://brainyclan.com/account/delete` (emailed confirmation link). Staff can only *view* requests (Admin → Families → Deletion requests). A staff-side deletion tool is **(not built yet)**: if self-service is impossible, escalate to Moe. Deleting an account does **not** cancel a store subscription — tell the user to cancel in the App Store / Google Play. Target: done within 30 days. |
-| **Data export** | Adults/teens: Profile → Privacy → Download my data (`GET /me/export`, 1 per hour). Children get 403: the parent asks support → a staff export tool is **(not built yet)** → escalate to Moe. Answer within 30 days. |
+| **Account deletion** | Self-service first: in the app Profile → Privacy → Delete account (`DELETE /me`); a family owner with other members deletes the family (`DELETE /family`); a **child** is removed by the family admin (Family → member → remove = erasure). Without the app: `https://brainyclan.com/account/delete` (emailed confirmation link). Staff (`support` and `admin`) can *view* requests (Admin → Families → Deletion requests). **Child account on a parent's request** (only when the request comes from the family owner's own email address — the owner email shown on the family page): an `admin` opens Admin → Families → the family → Members → **Delete child account**, types the child's nickname to confirm; this is the same removal + erasure as in the app and is written to the audit log (ids only) [Moe or an admin Moe named]. Adults and teens with their own login delete themselves; if self-service is impossible, escalate to Moe. Deleting an account does **not** cancel a store subscription — tell the user to cancel in the App Store / Google Play. Target: done within 30 days. |
+| **Data export** | Adults/teens: Profile → Privacy → Download my data (`GET /me/export`, 1 per hour). Children get 403: the parent asks support from the family owner's own email address → an `admin` opens Admin → Families → the family → Members → **Start data export**, which emails the child's export (JSON, same as the app's) to the owner's account email — never to another address; staff never see the file; logged in the audit log. Answer within 30 days. |
 | **Lockout** | Self-service first: wait (5 min → 1 h → 24 h), Forgot password, social sign-in, or a sign-in code from a family admin. Manual unlock only when the request comes **from the account's own email address**: Support hands it to Monitoring, who runs `$C exec app php artisan auth:unlock <email>` (add `--ip=<ip>` only if the user supplied it). Never reveal whether an email has an account. |
 
 ### 5.6 Backups and the monthly restore drill
@@ -576,11 +588,12 @@ Flag: any line 20% over expected, Sentry quota > 70%, AI spend > 70% of the limi
 
 | Signal | Where | Warn | Page (P1/P2) |
 | --- | --- | --- | --- |
-| Uptime of `/api/v1/health` and `https://brainyclan.com/` | external monitor every 5 min (UptimeRobot/Better Stack, DEPLOY.md §8) **(server)** | 1 failed check | 2 consecutive failures → P1 |
+| Uptime + dependencies: `/api/v1/health/deep` (token header) and `https://brainyclan.com/` | external monitor every 5 min (UptimeRobot/Better Stack, DEPLOY.md §8) **(server)** | 1 failed check, or `status: degraded` (failed jobs in the last hour) | 2 consecutive failures (any non-200, e.g. 503 = MySQL, Redis, scheduler or Horizon down) → P1 |
 | Errors (backend + app) | Sentry | any new issue → triage within 24 h | one issue > 50 events/hour, or a crash-free rate drop after a release → P1/P2 |
-| Horizon wait time | `/horizon` | `default` > 30 s | `default` > 60 s or `ai` > 900 s (config thresholds) → P2 |
-| Failed jobs | dashboard "Failed jobs", `queue:failed` | > 0 in 24 h | > 10 in 24 h → P2 |
+| Horizon wait time | "Long wait detected" mail to `OPS_ALERT_EMAIL`, `/horizon` (admin) | `default` > 30 s | `default` > 60 s or `ai` > 900 s (config thresholds, mailed) → P2 |
+| Failed jobs | "Queued job failed" mail (one per job class per 15 min), dashboard "Failed jobs", `queue:failed` | > 0 in 24 h | > 10 in 24 h → P2 |
 | Webhook errors | dashboard "Webhook errors" (failed RevenueCat events, 7 days), Billing → Webhook events | > 0 | > 5 in a day, or any 401 (secret mismatch) → P1 |
+| AdMob SSV rejections | dashboard "AdMob SSV rejections" (7 days) | unusable custom data > 0 | bad signatures rising day over day (wrong SSV URL / key fetch failing) → P2 |
 | Push health | dashboard "Push-ready devices", failed push jobs | failed push jobs > 0 | all push failing → P2 |
 | Pending deletions | dashboard "Pending deletions" | "blocked in 7 days" > 0 → Support follow-up | — |
 | Disk `/` | `df -h /`, Hetzner graphs | > 70% | > 80% → P2, > 90% → P1 |
@@ -595,10 +608,12 @@ Flag: any line 20% over expected, Sentry quota > 70%, AI spend > 70% of the limi
 - Uptime monitor → Monitoring agent + Moe (SMS/email) **(server)**.
 - Sentry alerts → Monitoring agent (backend project), App release agent (app project).
 - Let's Encrypt expiry mails → `ACME_EMAIL` (Moe's address) — forward to Monitoring.
-- Horizon's own notifications (`LongWaitDetected`) are **not routed** (`HorizonServiceProvider`
-  leaves `routeMailNotificationsTo` commented out) → Monitoring checks `/horizon` manually until
-  Moe decides on routing.
-- Scheduler heartbeat **(not built yet)** → manual log check (§5.4).
+- Horizon "long wait" notifications and failed-job alerts → `OPS_ALERT_EMAIL` (default
+  `support@brainyclan.com`; Moe may point it to a dedicated ops mailbox) and, when set, the
+  `OPS_ALERT_WEBHOOK_URL` webhook (e.g. a Slack channel) → Monitoring agent. They contain job/queue
+  and exception class names only, never personal data.
+- Scheduler heartbeat → part of the deep health check (503 when older than 3 minutes) → uptime
+  monitor alert.
 
 ### 6.3 Daily routine (Monitoring)
 
@@ -763,7 +778,7 @@ children's details. Never confirm whether an email has an account.
 | **Forgot password** | Sign in → **Forgot password?** → enter the email → we send a link (valid 60 minutes; check spam; the newest link wins). Setting a new password signs you out on all devices. Children don't have passwords — use a sign-in code. |
 | **Delete my account / my child's account** | Profile → Privacy → **Delete account**. The family owner with other members deletes the whole family instead (or removes the members first). A child's account is deleted by the family admin removing the child in the Family tab. Without the app: `https://brainyclan.com/account/delete`. Deleting an account does **not** cancel a store subscription — cancel it in your App Store / Google Play account first. |
 | **Download my data** | Profile → Privacy → **Download my data** (once per hour). For a child's data, the parent writes to support (we handle it manually — escalate). |
-| **Subscription: manage, cancel, refund** | The Family plan is bought in the app through the **App Store or Google Play**; manage or cancel in your store account's subscription settings (renews automatically unless cancelled at least 24 h before the end of the period). Refunds for store purchases are decided by Apple / Google: Apple at reportaproblem.apple.com, Google in the Play Store order history. One purchase covers the whole family (up to 7 members). Didn't unlock? Open Family → Plan → **Restore purchases**; it can take up to ~30 seconds. **Web purchase through Paddle is (planned) — not available yet.** |
+| **Subscription: manage, cancel, refund** | The Family plan is bought in the app through the **App Store or Google Play**; manage or cancel in your store account's subscription settings (renews automatically unless cancelled at least 24 h before the end of the period). Refunds for store purchases are decided by Apple / Google: Apple at reportaproblem.apple.com, Google in the Play Store order history. One purchase covers the whole family (up to 7 members). Didn't unlock? Open Family → Plan → **Restore purchases**; it can take up to ~30 seconds. **Web purchase (Paddle):** built but not launched; once live, web plans are managed in the Paddle customer portal (app: Subscription → Manage, or the link in Paddle's receipt) and refunds go through Paddle within 14 days (terms §6). |
 | **What does the Family plan add?** | Up to 7 members (free: 2), all categories (free: 3), unlimited goals (free: 1), 3 free second chances per member per day, no ads, chat history kept 1 year (free: 7 days), special worlds. Prices: show what the store shows; do not quote planned prices. |
 | **Chat: who can see it, how long is it kept?** | Only your family's members — not other families and not our staff. Text and emoji only. Messages are deleted after **7 days** on the free plan and **1 year** on the Family plan; after a downgrade the shorter period applies. Parents can turn chat off for any member and delete any message. We cannot recover, read or send you chat messages. |
 | **Why is a world locked? / How do I unlock it?** | Some worlds are free, some unlock with lifetime points or a daily streak, three come with the Family plan. Seeded values: free Candy Land, Glass, Modern, Classic; points Jungle 50, Sticker 100, Space 150, Nature 200; streak Sea 3 days, Lo-fi 7 days; Family plan Dino, Neon, Midnight (live values: Admin → Policy → Theme worlds). Earned worlds stay unlocked; Family-plan worlds lock again when the plan ends. |
@@ -895,10 +910,12 @@ Thanks, <name> for Brainy Clan — support@brainyclan.com
 
 ---
 
-## 11. Affiliate program (planned)
+## 11. Affiliate program
 
-**Status: (planned) — decided 2026-10-24 (PLAN.md B10), nothing built, contract not yet written in
-`docs/API.md`.** Do not promise codes, links or commissions to anyone before Moe confirms launch.
+**Status: built in the backend (B10, 2026-10-24); not launched.** Admin: Billing → Affiliates,
+Affiliate codes, Attributions, Commission entries, Monthly payouts (how-to: README "Affiliate program —
+admin guide"). The app's "Have a code?" screen is F8 (app). Do not promise codes, links or commissions to
+anyone before Moe confirms launch.
 
 Rules as decided:
 
@@ -917,7 +934,8 @@ Rules as decided:
 - **Payouts:** monthly, manual, from the Filament payout report + CSV, then "mark paid" [Moe].
 - Influencers never see family identities; an optional read-only stats page via magic link
   (counts and amounts only) is "later".
-- Legal: privacy policy and terms must mention the referral code and Paddle as seller before launch.
+- Legal: the terms and privacy drafts (version 2026-10-24) mention the referral code, Paddle as seller and the web refund policy — lawyer review pending.
+- Built details: store offer codes are mapped to a code in the admin (RevenueCat `offer_code`); web checkout carries the code to Paddle (`custom_data`); net = price − tax − fee (RevenueCat estimates, else a 15% store fee; Paddle `earnings`); entries kept per currency with a USD figure when the source gives one; only the `admin` staff role can change attributions or mark payouts paid (logged).
 
 ---
 
@@ -925,22 +943,22 @@ Rules as decided:
 
 ### 12.1 Built (as of 2026-10-24)
 
-Backend milestones B0–B9 done locally (B7 content generation needs the API key); app milestones
+Backend milestones B0–B9 done locally, B10 (pricing, Paddle web checkout, affiliates) built locally without a Paddle account (B7 content generation needs the API key); app milestones
 F0–F6 built, F7 release in progress. Built: accounts and families, invites, sign-in codes,
 social sign-in (Google, Facebook, Apple), lockout + password reset, policy/age bands, 17
 categories with a fact-checked en/fr bank, all challenge types incl. brain games, play/scoring,
 goals, worlds + unlocks, family chat, RevenueCat billing + webhooks, AdMob SSV + UMP consent,
 push notifications, legal/consent/export/deletion (drafts), website (landing, support, legal,
 deletion, password reset), admin dashboard, production Docker stack, backups, Sentry integration,
-store kit (STORE.md), iPad layouts.
+store kit (STORE.md), iPad layouts. B11 ops hardening: staff roles (`admin` / read-only `support`),
+staff child export/deletion actions, deep health check, scheduler heartbeat, Horizon/failed-job
+alert mails, `horizon:snapshot`, AdMob SSV rejection counts on the dashboard.
 
 ### 12.2 Planned / not built
 
 | Item | Status |
 | --- | --- |
-| B10 pricing (3 plans, trials, founding offer), Paddle web checkout + webhooks + customer portal, affiliates/codes/attributions/commissions/payout report, `/r/{code}`, F8 app paywall with 3 plans + "Have a code?" | (planned) |
-| Staff read-only/support role, staff-side child export and deletion tools | (not built yet) |
-| Scheduler heartbeat, Horizon alert routing, `horizon:snapshot` schedule | (not built yet) |
+| B10 pricing (3 plans, trials, founding offer), Paddle web checkout + webhooks + customer portal, affiliates/codes/attributions/commissions/payout report, `/r/{code}`, F8 app paywall with 3 plans + "Have a code?" | backend built 2026-10-24 (B10); F8 app paywall and Paddle account (planned) |
 | Public web app | (not built yet) — "Later" |
 | CI pipeline | (not built yet) |
 | Staging backend (screenshots use the production review/demo family or a local dev build, STORE.md §8) | (not built yet) |
@@ -988,7 +1006,8 @@ store kit (STORE.md), iPad layouts.
 - [ ] iOS: build → TestFlight → submit [Moe] → phased release; Android: first AAB manually → internal → closed (≥ 12 testers × 14 days if a new personal account) → production staged rollout [Moe]
 
 **Business (B10, planned)**
-- [ ] Contract in `docs/API.md`, Paddle seller onboarding (needs website, pricing, terms, refund policy, support email live), affiliate program build, F8 paywall
+- [x] Contract in `docs/API.md`, backend build (B10)
+- [ ] Paddle seller onboarding (needs website, pricing, terms, refund policy, support email live), F8 paywall
 
 ---
 
@@ -999,7 +1018,7 @@ store kit (STORE.md), iPad layouts.
 | **Age band** | `child` 0–12, `teen` 13–17, `adult` 18–64, `senior` 65+. Computed by the server from birth year/month; drives the policy. |
 | **Policy** | Rules for a signed-in member, computed by the server's `PolicyResolver` from age band + tier + settings: ads allowed, purchases allowed, email login allowed, difficulty range, limits, ad request flags, chat retention, default theme. The app only renders it. |
 | **Tier** | `free` or `family` (the paid Family plan). |
-| **Family plan** | The paid subscription for the whole family (up to 7 members), bought in-app via RevenueCat; web via Paddle (planned). |
+| **Family plan** | The paid subscription for the whole family (up to 7 members), bought in-app via RevenueCat; web via Paddle (backend built, account pending). |
 | **Family admin / owner** | Admins manage members, invites, codes, goals, chat switches; the owner (always an admin) created the family and is the only one who can delete it. |
 | **Invite code** | 8-character code (no 0/O/1/I), valid 7 days, single use, to join a family for the first time. |
 | **Sign-in code** | 8-character one-time code an admin issues for a member's new device; valid 15 minutes. How children sign in. |
@@ -1019,7 +1038,7 @@ store kit (STORE.md), iPad layouts.
 | **Fingerprint runtime** | `runtimeVersion` policy: OTA updates only reach builds with identical native code. |
 | **`min_app_version`** | Global setting; older apps get 426 `app_update_required`. |
 | **Families Policy** | Google Play rules for apps whose audience includes children. |
-| **Merchant of record** | Paddle sells on our behalf and handles sales tax (planned). |
+| **Merchant of record** | Paddle sells on our behalf and handles sales tax (web checkout, B10). |
 
 ---
 
@@ -1030,28 +1049,32 @@ Found while writing this handbook (2026-10-24). Until fixed, follow the safer re
 ### 14.1 Open
 
 1. **Restore drill frequency:** DEPLOY.md says every 3 months; this handbook sets monthly.
-2. **Horizon** (B11): notifications not routed, `horizon:snapshot` not scheduled (metrics graphs
-   empty), no scheduler heartbeat — all monitoring of these is manual.
-3. **Dashboard "Webhook errors"** counts failed **RevenueCat** events only; AdMob SSV rejections
-   (400) are not stored and only visible in Caddy logs (B11).
-4. **Admin access** is all-or-nothing (`is_staff`): staff see owner/member emails and family data
-   (not chat). A support/read-only role is not built.
-5. **`/api/v1/health`** does not check MySQL/Redis/Horizon (B11 deep mode planned).
-6. **Preview/development EAS profiles** have no `env` in `eas.json`: their API URL comes only from
+2. **Preview/development EAS profiles** have no `env` in `eas.json`: their API URL comes only from
    EAS environment variables; if `EXPO_PUBLIC_API_URL` is missing there the app falls back to
    `http://localhost:8080`.
-7. **External AI ops team:** support emails contain personal data; whether the ops AI provider may
+3. **External AI ops team:** support emails contain personal data; whether the ops AI provider may
    process them must be decided with the lawyer and listed in the privacy policy [Moe].
-8. **Android push config:** `app.json` has no `android.googleServicesFile` yet; Android push
+4. **Android push config:** `app.json` has no `android.googleServicesFile` yet; Android push
    tokens need Firebase's `google-services.json` (app README "Push notifications — setup", step 3).
    Native change → new build [Moe provides the Firebase project].
-9. **Store answers to verify live:** STORE.md now declares the family chat, but the Apple age
+5. **Store answers to verify live:** STORE.md now declares the family chat, but the Apple age
    rating (expected 4+, may be raised by "Messaging and chat"), Apple's data type for messages
    ("Other User Content" vs "Emails or Text Messages") and a possible Guideline 1.2 request for an
    in-app report/block button must be checked in App Store Connect; the lawyer re-checks the
    privacy answers and policy wording for the chat [Moe].
 
-### 14.2 Fixed (2026-10-24, docs only)
+### 14.2 Fixed (2026-10-24, B11 ops hardening, code)
+
+- **Horizon:** "long wait" notifications mailed to `OPS_ALERT_EMAIL` (+ optional
+  `OPS_ALERT_WEBHOOK_URL`), failed-job alerts added (Horizon has none), `horizon:snapshot`
+  scheduled every 5 minutes, scheduler heartbeat `ops:heartbeat` every minute.
+- **Health:** `/api/v1/health/deep` (token-protected) checks MySQL, Redis, scheduler heartbeat,
+  Horizon and failed jobs; the shallow `/api/v1/health` is unchanged.
+- **Dashboard:** "AdMob SSV rejections" card next to "Webhook errors" (counts per day, no payloads).
+- **Admin access:** staff roles `admin` / `support` (read-only) replace `is_staff`; Horizon is
+  admin-only; staff "Start data export" / "Delete child account" actions for verified parent requests.
+
+### 14.3 Fixed (2026-10-24, docs only)
 
 - **STORE.md and the family chat:** §6 IARC (users interact: private family chat only), Apple age
   rating (messaging limited to the family, parental controls, "verify in App Store Connect"), §7

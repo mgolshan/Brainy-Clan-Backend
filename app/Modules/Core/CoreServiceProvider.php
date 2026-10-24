@@ -3,21 +3,33 @@
 namespace App\Modules\Core;
 
 use App\Modules\Core\Console\FlushReferenceCachesCommand;
+use App\Modules\Core\Console\SchedulerHeartbeatCommand;
+use App\Modules\Core\Listeners\ForwardLongWaitToWebhook;
+use App\Modules\Core\Listeners\SendFailedJobAlert;
 use App\Modules\Core\Support\ReferenceCache;
 use App\Modules\Identity\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Http\Request;
+use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
+use Laravel\Horizon\Events\LongWaitDetected;
 
 /**
- * Shared API plumbing: health endpoint, rate limiters
- * (`auth/*` 10/min per IP and per email, everything else 120/min per token) and the reference
- * cache plumbing (ReferenceCache, `reference-cache:flush`).
+ * Shared API plumbing: health endpoints, rate limiters
+ * (`auth/*` 10/min per IP and per email, everything else 120/min per token), the reference
+ * cache plumbing (ReferenceCache, `reference-cache:flush`) and ops monitoring (B11): failed-job
+ * and long-wait alerts, the scheduler heartbeat and `horizon:snapshot`.
  */
 class CoreServiceProvider extends ModuleServiceProvider
 {
+    protected array $listen = [
+        JobFailed::class => [SendFailedJobAlert::class],
+        LongWaitDetected::class => [ForwardLongWaitToWebhook::class],
+    ];
+
     public function boot(): void
     {
         // 10/min per IP, plus 10/min per email address so a password guesser spread over many
@@ -55,11 +67,21 @@ class CoreServiceProvider extends ModuleServiceProvider
         // Password reset web form (/password/reset): 10 posts per hour per IP.
         RateLimiter::for('password-reset', fn (Request $request) => Limit::perHour((int) config('auth.password_forgot.reset_per_ip', 10))->by('password-reset|'.$request->ip()));
 
+        // Deep health check (uptime monitor): 30/min per IP by default.
+        RateLimiter::for('health-deep', fn (Request $request) => Limit::perMinute((int) config('ops.health.deep_rate_per_minute', 30))->by('health-deep|'.$request->ip()));
+
         // A migration may change reference rows with raw SQL: start from fresh reference caches.
         Event::listen(MigrationsEnded::class, fn () => ReferenceCache::flush(...ReferenceCache::ALL));
 
         if ($this->app->runningInConsole()) {
-            $this->commands([FlushReferenceCachesCommand::class]);
+            $this->commands([FlushReferenceCachesCommand::class, SchedulerHeartbeatCommand::class]);
+
+            $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+                // Heartbeat for the deep health check (no onOneServer: every scheduler should beat).
+                $schedule->command('ops:heartbeat')->everyMinute();
+                // Horizon metrics graphs (throughput / runtime per job and queue).
+                $schedule->command('horizon:snapshot')->everyFiveMinutes()->onOneServer();
+            });
         }
 
         parent::boot();

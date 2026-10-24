@@ -9,6 +9,8 @@ use App\Filament\Resources\ContentItems\Pages\CreateContentItem;
 use App\Filament\Resources\ContentItems\Pages\EditContentItem;
 use App\Filament\Resources\ContentItems\Pages\ListContentItems;
 use App\Filament\Support\JsonEditor;
+use App\Filament\Support\ReadOnlyForSupport;
+use App\Filament\Support\StaffAccess;
 use App\Modules\ChallengeTypes\ChallengeTypeRegistry;
 use App\Modules\Content\Actions\ChangeContentStatus;
 use App\Modules\Content\Actions\TagContentItems;
@@ -49,6 +51,8 @@ use UnitEnum;
  */
 class ContentItemResource extends Resource
 {
+    use ReadOnlyForSupport;
+
     protected static ?string $model = ContentItem::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQuestionMarkCircle;
@@ -114,7 +118,8 @@ class ContentItemResource extends Resource
             ->defaultSort('id', 'desc')
             ->modifyQueryUsing(fn (Builder $query) => $query->with(['category', 'tags']))
             ->headerActions([
-                ImportAction::make()->importer(ContentItemImporter::class)->label('Import CSV'),
+                ImportAction::make()->importer(ContentItemImporter::class)->label('Import CSV')
+                    ->authorize(fn (): bool => StaffAccess::isAdmin()),
             ])
             ->columns([
                 TextColumn::make('id')->sortable(),
@@ -162,6 +167,7 @@ class ContentItemResource extends Resource
                     self::statusBulkAction('archive', ContentItem::STATUS_ARCHIVED, Heroicon::OutlinedArchiveBox),
                     BulkAction::make('retag')
                         ->icon(Heroicon::OutlinedTag)
+                        ->authorize(fn (): bool => StaffAccess::isAdmin())
                         ->schema([
                             TagsInput::make('tags')->required(),
                             Toggle::make('replace')->label('Replace existing tags'),
@@ -181,6 +187,7 @@ class ContentItemResource extends Resource
     {
         return BulkAction::make($name)
             ->icon($icon)
+            ->authorize(fn (): bool => StaffAccess::isAdmin())
             ->requiresConfirmation()
             ->action(function (Collection $records) use ($status): void {
                 /** @var Collection<int, ContentItem> $records */

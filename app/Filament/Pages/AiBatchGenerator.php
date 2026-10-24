@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Resources\Categories\CategoryResource;
+use App\Filament\Support\StaffAccess;
 use App\Modules\Content\Actions\QueueContentBatch;
 use App\Modules\Content\Generation\ContentBatchAgent;
 use App\Modules\Content\Generation\GenerationTypes;
@@ -52,6 +53,14 @@ class AiBatchGenerator extends Page implements HasTable
     protected static ?string $title = 'AI batch generator';
 
     protected static ?string $slug = 'ai-batch-generator';
+
+    /**
+     * The AI generator costs money and publishes content: admins only (403 and hidden for `support`).
+     */
+    public static function canAccess(): bool
+    {
+        return StaffAccess::isAdmin();
+    }
 
     /** @var array<string, mixed>|null */
     public ?array $data = [];
