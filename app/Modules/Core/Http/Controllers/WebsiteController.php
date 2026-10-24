@@ -15,7 +15,7 @@ use Illuminate\Http\Response;
 
 /**
  * The public website (brainyclan.com in production; docs/DEPLOY.md "Website and hosts"): landing
- * page, support page, the "How to play" help center, robots.txt and sitemap.xml. Static HTML, no
+ * page, support page, the "How to play" help center, the partners page, robots.txt and sitemap.xml. Static HTML, no
  * cookies, no third-party requests; the only script is the help center's same-origin search.
  * Language: `?lang=en|fr`, else the browser's Accept-Language. Images are static files in
  * `public/images/site/` (screens and help: WebP captures of the demo family; art and clan:
@@ -24,7 +24,7 @@ use Illuminate\Http\Response;
 class WebsiteController
 {
     /** Pages listed in the sitemap (route names), each in English and French. */
-    private const array SITEMAP_ROUTES = ['website.home', 'website.help', 'website.support', 'legal.privacy', 'legal.terms', 'account.delete'];
+    private const array SITEMAP_ROUTES = ['website.home', 'website.help', 'website.support', 'website.partners', 'legal.privacy', 'legal.terms', 'account.delete'];
 
     /**
      * The landing page. Plan limits and the world unlock catalog come from the same data the
@@ -77,6 +77,36 @@ class WebsiteController
     {
         return $this->page($request, 'website.support', [
             'signInCodeMinutes' => $policy->signInCodeTtlMinutes(),
+        ]);
+    }
+
+    /**
+     * The partner (affiliate) program page (docs/PLAN.md "Partner (affiliate) instructions
+     * (2026-10-24)"; same content as docs/PARTNER_GUIDE.md). Every commission and payout number
+     * comes from `billing.affiliates` (the defaults new affiliates get in the admin); a line whose
+     * value is not configured is left out. The web discount is only mentioned while web checkout
+     * is open.
+     */
+    public function partners(Request $request): Response
+    {
+        $affiliates = (array) config('billing.affiliates', []);
+        $payout = (array) ($affiliates['payout'] ?? []);
+        $rate = is_numeric($affiliates['commission_rate'] ?? null) ? (float) $affiliates['commission_rate'] : 0.0;
+        $months = (int) ($affiliates['commission_months'] ?? 0);
+        $refundDays = (int) ($affiliates['refund_window_days'] ?? 0);
+        $minimum = array_filter((array) ($payout['minimum'] ?? []), fn (mixed $amount): bool => is_numeric($amount) && (float) $amount > 0);
+
+        return $this->page($request, 'website.partners', [
+            'terms' => [
+                'rate' => $rate > 0 ? rtrim(rtrim(number_format($rate * 100, 2, '.', ''), '0'), '.') : null,
+                'months' => $months > 0 ? $months : null,
+                'refund_days' => $refundDays > 0 ? $refundDays : null,
+                'schedule' => ($payout['schedule'] ?? null) === 'monthly' ? 'monthly' : null,
+                'currencies' => array_values(array_filter((array) ($payout['currencies'] ?? []), 'is_string')),
+                'minimum' => array_map(fn (string $currency, mixed $amount): string => number_format((float) $amount, 2, '.', '').' '.$currency, array_keys($minimum), $minimum),
+                'methods' => array_values(array_intersect(['paypal', 'interac', 'bank'], (array) ($payout['methods'] ?? []))),
+            ],
+            'webCheckout' => PaddleConfig::webCheckoutAvailable(),
         ]);
     }
 

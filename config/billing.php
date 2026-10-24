@@ -104,6 +104,25 @@ return [
 
         /* Store fee assumed when RevenueCat sends no `commission_percentage` (Apple SBP / Google subscriptions). */
         'store_fee_rate' => 0.15,
+
+        /*
+         * Payout terms shown on the public partners page (`/partners`, docs/PARTNER_GUIDE.md). The
+         * page reads every number from here (and the defaults above) and leaves out a line whose
+         * value is empty. Payouts are manual (Billing → Monthly payouts → Export CSV → Mark paid).
+         */
+        'payout' => [
+            /* `monthly` (the only schedule the admin report supports today), or null to hide. */
+            'schedule' => 'monthly',
+
+            /* Currencies commission is earned and paid in (the currencies we sell in). */
+            'currencies' => ['CAD', 'USD'],
+
+            /* Minimum balance per currency before a payout, decimal strings, e.g. ['CAD' => '50.00']. Empty: no minimum. */
+            'minimum' => [],
+
+            /* Methods offered (labels on the page): paypal, interac (Interac e-Transfer, Canada), bank (bank transfer). */
+            'methods' => ['paypal', 'interac', 'bank'],
+        ],
     ],
 
 ];

@@ -26,6 +26,8 @@ Route::middleware(RedirectToWebsiteHost::class)->group(function () {
         Route::get('/', [WebsiteController::class, 'home'])->name('website.home');
         Route::get('app-ads.txt', [WebsiteController::class, 'appAds'])->name('website.app-ads');
         Route::get('support', [WebsiteController::class, 'support'])->name('website.support');
+        // Partner (affiliate) program: how it works, commission terms from config, rules, brand kit.
+        Route::get('partners', [WebsiteController::class, 'partners'])->name('website.partners');
         Route::get('sitemap.xml', [WebsiteController::class, 'sitemap'])->name('website.sitemap');
 
         // Terms of service and privacy policy (docs/API.md "Legal, consent and privacy (B9)"); ?lang=fr.

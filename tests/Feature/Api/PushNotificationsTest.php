@@ -614,3 +614,118 @@ it('skips the receipts check when Expo fails, without logging tokens', function 
     Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context) => $message === 'Expo receipts request failed'
         && ! str_contains((string) json_encode($context), 'ExponentPushToken'))->once();
 });
+
+// ---------------------------------------------------------------------------------------------
+// Push texts in the recipient's language (en/fr), content audit 2026-10-24
+// ---------------------------------------------------------------------------------------------
+
+function speaks(FamilyMember $member, string $locale): FamilyMember
+{
+    $member->user->forceFill(['locale' => $locale])->save();
+
+    return $member;
+}
+
+/**
+ * @return array<string, array{title: string, body: string}> title/body keyed by push token
+ */
+function pushTexts(): array
+{
+    return collect(test()->sender->sent)->mapWithKeys(fn (array $message) => [$message['to'] => ['title' => $message['title'], 'body' => $message['body']]])->all();
+}
+
+it('sends daily reminders in each member\'s language, inviting to learn', function () {
+    $english = reminderMember('Europe/Berlin', '17:00');
+    $french = speaks(reminderMember('Europe/Berlin', '17:00', owner: $english), 'fr');
+    $other = speaks(reminderMember('Europe/Berlin', '17:00', owner: $english), 'de');
+
+    remindAt('2026-10-15 17:00', 'Europe/Berlin');
+
+    expect(pushTexts())->toEqual([
+        "ExponentPushToken[r{$english->id}]" => ['title' => 'Something new to learn today', 'body' => 'A short challenge is ready when you are.'],
+        "ExponentPushToken[r{$french->id}]" => ['title' => 'Quelque chose de nouveau à apprendre aujourd’hui', 'body' => 'Un petit défi est prêt quand tu veux.'],
+        "ExponentPushToken[r{$other->id}]" => ['title' => 'Something new to learn today', 'body' => 'A short challenge is ready when you are.'],
+    ]);
+});
+
+it('sends family_activity in each recipient\'s language without a "your turn" nudge', function () {
+    [$owner, $kid, $teen] = activityFamily();
+    speaks($teen, 'fr');
+
+    finishSession($kid, 12);
+    $texts = pushTexts();
+
+    expect($texts["ExponentPushToken[m{$owner->id}]"])->toBe(['title' => "{$kid->nickname} finished a challenge!", 'body' => "{$kid->nickname} earned 12 points for the family."])
+        ->and($texts["ExponentPushToken[m{$teen->id}]"])->toBe(['title' => "{$kid->nickname} a terminé un défi !", 'body' => "{$kid->nickname} a gagné 12 points pour la famille."]);
+
+    $this->sender->sent = [];
+    finishSession($teen, 1);
+
+    expect(pushTexts()["ExponentPushToken[m{$owner->id}]"]['body'])->toBe("{$teen->nickname} earned 1 point for the family.");
+});
+
+it('sends goal_reached in each member\'s language', function () {
+    [$plan, [$owner, $child]] = pushPlan();
+    speaks($child, 'fr');
+
+    GoalReached::dispatch(1, $plan->id, $plan->family_id, []);
+
+    expect(pushTexts())->toEqual([
+        "ExponentPushToken[m{$owner->id}]" => ['title' => 'Goal reached!', 'body' => 'Team goal reached: Pizza goal!'],
+        "ExponentPushToken[m{$child->id}]" => ['title' => 'Objectif atteint !', 'body' => 'Objectif d’équipe atteint : Pizza goal !'],
+    ]);
+});
+
+it('names the race winners in each member\'s language', function () {
+    [$plan, [$owner, $first, $second]] = pushPlan(2);
+    $plan->update(['mode' => GoalPlan::MODE_COMPETITION]);
+    speaks($first, 'fr');
+
+    GoalReached::dispatch(1, $plan->id, $plan->family_id, [$first->id, $second->id]);
+    $both = pushTexts();
+
+    $this->sender->sent = [];
+    GoalReached::dispatch(2, $plan->id, $plan->family_id, [$second->id]);
+    $one = pushTexts();
+
+    $this->sender->sent = [];
+    GoalReached::dispatch(3, $plan->id, $plan->family_id, []);
+    $nobody = pushTexts();
+
+    expect($both["ExponentPushToken[m{$owner->id}]"]['body'])->toBe("{$first->nickname} and {$second->nickname} reached the goal in Pizza goal!")
+        ->and($both["ExponentPushToken[m{$first->id}]"]['body'])->toBe("{$first->nickname} et {$second->nickname} ont atteint l’objectif : Pizza goal !")
+        ->and($one["ExponentPushToken[m{$first->id}]"]['body'])->toBe("{$second->nickname} a atteint l’objectif : Pizza goal !")
+        ->and($nobody["ExponentPushToken[m{$owner->id}]"]['body'])->toBe('The goal in Pizza goal was reached!')
+        ->and($nobody["ExponentPushToken[m{$first->id}]"]['body'])->toBe('Objectif atteint : Pizza goal !');
+});
+
+it('sends period_closed in each member\'s language', function () {
+    [$plan, [$owner, $child]] = pushPlan();
+    speaks($child, 'fr');
+
+    PeriodClosed::dispatch(7, $plan->id, $plan->family_id, false, []);
+
+    expect(pushTexts())->toEqual([
+        "ExponentPushToken[m{$owner->id}]" => ['title' => 'Results are in', 'body' => 'Pizza goal: see how everyone did.'],
+        "ExponentPushToken[m{$child->id}]" => ['title' => 'Les résultats sont là', 'body' => 'Pizza goal : voici les résultats de chacun.'],
+    ]);
+});
+
+it('localizes pushes without extra queries per member', function () {
+    $count = function (int $extra): int {
+        $members = activityFamily($extra);
+        foreach (array_slice($members, 1) as $i => $member) {
+            speaks($member, $i % 2 === 0 ? 'fr' : 'en');
+        }
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        app(NotifyFamilyActivity::class)->handle(new SessionCompleted(1, $members[0]->family_id, $members[0]->id, 5));
+        DB::disableQueryLog();
+
+        return count(DB::getQueryLog());
+    };
+
+    $count(2);
+
+    expect($count(8))->toBe($count(2));
+});

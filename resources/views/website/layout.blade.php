@@ -115,6 +115,7 @@
             <a href="{{ route('legal.privacy', $lang) }}">{{ $fr ? 'Confidentialité' : 'Privacy' }}</a>
             <a href="{{ route('legal.terms', $lang) }}">{{ $fr ? 'Conditions d’utilisation' : 'Terms' }}</a>
             <a href="{{ route('website.support', $lang) }}">{{ $fr ? 'Aide' : 'Support' }}</a>
+            <a href="{{ route('website.partners', $lang) }}">{{ $fr ? 'Partenaires' : 'Partners' }}</a>
             <a href="{{ route('account.delete', $lang) }}">{{ $fr ? 'Supprimer un compte' : 'Delete account' }}</a>
         </nav>
         <p>{{ $fr ? 'Nous joindre :' : 'Contact:' }} <a href="mailto:{{ $supportEmail }}">{{ $supportEmail }}</a></p>

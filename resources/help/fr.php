@@ -468,7 +468,7 @@ return [
                     'Le paiement passe par votre compte App Store ou Google Play.',
                     'Toute la famille, enfants compris, profite du forfait Famille.',
                 ],
-                'tip' => 'Seul un administrateur adulte de la famille peut acheter le forfait. Les enfants ne voient jamais d’écran d’achat.',
+                'tip' => 'Seul un administrateur adulte de la famille peut acheter le forfait. Les enfants ne voient jamais d’écran d’achat ni d’incitation à s’abonner : les mondes et catégories du forfait Famille portent seulement la mention neutre « fait partie du forfait Famille ».',
                 'keywords' => ['s’abonner', 'acheter', 'achat', 'payer', 'essai', 'app store', 'google play'],
             ],
             [
@@ -495,6 +495,18 @@ return [
                 ],
                 'tip' => 'Supprimer votre compte ne résilie pas un abonnement en boutique : résiliez-le d’abord. Les remboursements des achats en boutique sont décidés par Apple ou Google.',
                 'keywords' => ['résilier', 'annuler', 'remboursement', 'gérer l’abonnement', 'arrêter de payer', 'renouvellement'],
+            ],
+            [
+                'id' => 'partner-program',
+                'title' => 'Recommander Brainy Clan comme partenaire',
+                'summary' => 'Pour les parents et les créateurs qui partagent notre mission.',
+                'steps' => [
+                    'Les partenaires reçoivent un code et un lien personnels à partager avec d’autres parents, toujours avec une divulgation claire (#pub).',
+                    'Quand une famille utilise le code avant son premier paiement et achète le forfait Famille, le partenaire touche une commission.',
+                    'Les conditions, les règles et la façon de postuler sont sur la page des partenaires.',
+                ],
+                'links' => [['route' => 'website.partners', 'label' => 'Programme partenaires']],
+                'keywords' => ['partenaire', 'affiliation', 'influenceur', 'créateur', 'commission', 'parrainage', 'code', 'recommander'],
             ],
         ],
     ],

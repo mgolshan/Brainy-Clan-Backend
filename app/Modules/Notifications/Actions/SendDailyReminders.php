@@ -4,6 +4,7 @@ namespace App\Modules\Notifications\Actions;
 
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Notifications\Models\NotificationPreference;
+use App\Modules\Notifications\Support\PushLocale;
 use App\Modules\Play\Models\PlaySession;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -14,13 +15,20 @@ use Illuminate\Support\Facades\Cache;
  * current 15-minute window of their family's local time, who have the type on and have not started
  * a session today (family timezone). Members are processed in chunks with a constant number of
  * queries per chunk (members, preferences, today's sessions); sending goes through
- * {@see SendMemberNotification} (quiet hours). A member is reminded at most once per local day.
+ * {@see SendMemberNotification} (quiet hours), in each member's language ({@see PushLocale}). The text
+ * invites to learn, without pressure (PLAN.md Mission). A member is reminded at most once per local day.
  */
 class SendDailyReminders
 {
     public const int WINDOW_MINUTES = 15;
 
     public const int CHUNK = 500;
+
+    /** @var array<string, array{title: string, body: string}> */
+    public const array TEXTS = [
+        'en' => ['title' => 'Something new to learn today', 'body' => 'A short challenge is ready when you are.'],
+        'fr' => ['title' => 'Quelque chose de nouveau à apprendre aujourd’hui', 'body' => 'Un petit défi est prêt quand tu veux.'],
+    ];
 
     public function __construct(
         private readonly GetNotificationPreferences $preferences,
@@ -57,7 +65,10 @@ class SendDailyReminders
                     return;
                 }
 
-                $this->send->handle($due, 'daily_reminder', 'Time for a challenge!', 'A quick round keeps your brain busy. Ready?', [], $now);
+                foreach (PushLocale::group($due) as $locale => $group) {
+                    $this->send->handle($group, 'daily_reminder', self::TEXTS[$locale]['title'], self::TEXTS[$locale]['body'], [], $now);
+                }
+
                 $reminded += $due->count();
             });
 

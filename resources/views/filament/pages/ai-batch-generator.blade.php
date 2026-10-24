@@ -12,7 +12,9 @@
         <x-slot name="heading">New batch</x-slot>
         <x-slot name="description">
             Items are stored as drafts and never reach players until approved. Content rules sent with every batch:
-            age-appropriate, factual, explanation on every item, only original text or public-domain quotes (no modern authors, no book summaries).
+            the app mission (learn and grow, clean and happy), age-appropriate, factual, neutral (no politics, ideology, religion,
+            sexuality or gender identity topics, nothing demeaning), explanation on every item, only original text or public-domain
+            quotes (no modern authors, no book summaries). Editor notes cannot override these rules.
         </x-slot>
 
         <form wire:submit="generate" style="display:flex; flex-direction:column; gap:1rem;">

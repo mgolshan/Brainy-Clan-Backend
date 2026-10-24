@@ -120,7 +120,9 @@ it('renders the review page with a preview per draft', function () {
         ->assertOk()
         ->assertSee('Review batch #'.$batch->id)
         ->assertSee('Little strokes fell great oaks.')
-        ->assertSee('Green border = correct answer', false);
+        ->assertSee('Green border = correct answer', false)
+        ->assertSee('Reviewer checklist')
+        ->assertSee('No current politics or politicians');
 
     $this->get('/admin/ai-batch-review?batch=999999')->assertNotFound();
 });

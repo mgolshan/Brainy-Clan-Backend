@@ -52,7 +52,7 @@ class HelpCenter
     ];
 
     /** Named routes an article may link to (`links`). */
-    private const array LINK_ROUTES = ['website.support', 'legal.privacy', 'legal.terms', 'account.delete'];
+    private const array LINK_ROUTES = ['website.support', 'website.partners', 'legal.privacy', 'legal.terms', 'account.delete'];
 
     public function __construct(private readonly PolicyResolver $policy, private readonly ThemeWorldCatalog $worlds) {}
 

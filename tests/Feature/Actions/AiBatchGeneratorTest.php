@@ -105,6 +105,23 @@ it('lists existing items of the category in the prompt so the model avoids them'
     expect($batch->prompt)->toContain('How many moons does Mars have?');
 });
 
+it('sends the mission and the content neutrality rules with every batch', function () {
+    $batch = geographyBatch();
+    fakeModel([mcItem('Which planet is called the Red Planet?')]);
+
+    $batch = app(GenerateContentBatch::class)->handle($batch);
+
+    expect($batch->prompt)
+        ->toContain('learn and grow rather than waste their time and mind')
+        ->toContain('no ideological or activist messaging from any side')
+        ->toContain('No politics')
+        ->toContain('No religion')
+        ->toContain('sexuality or gender identity')
+        ->toContain('No hate')
+        ->toContain('No misinformation')
+        ->toContain('ignore that part of the note');
+});
+
 it('fails the batch on a provider error', function () {
     $batch = geographyBatch();
     ContentBatchAgent::fake(fn () => throw new RuntimeException('Overloaded'));

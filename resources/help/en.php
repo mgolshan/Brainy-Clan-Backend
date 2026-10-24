@@ -474,7 +474,7 @@ return [
                     'Payment goes through your App Store or Google Play account.',
                     'Everyone in the family, children included, gets the Family plan.',
                 ],
-                'tip' => 'Only an adult family admin can buy the plan. Children never see purchase screens.',
+                'tip' => 'Only an adult family admin can buy the plan. Children never see purchase screens or upgrade prompts: Family plan worlds and categories only show a neutral “comes with the Family plan” label.',
                 'keywords' => ['subscribe', 'buy', 'purchase', 'pay', 'trial', 'app store', 'google play'],
             ],
             [
@@ -501,6 +501,18 @@ return [
                 ],
                 'tip' => 'Deleting your account does not cancel a store subscription: cancel it first. Refunds for store purchases are decided by Apple or Google.',
                 'keywords' => ['cancel', 'refund', 'manage subscription', 'stop paying', 'renew', 'downgrade'],
+            ],
+            [
+                'id' => 'partner-program',
+                'title' => 'Recommend Brainy Clan as a partner',
+                'summary' => 'For parents and creators who share our mission.',
+                'steps' => [
+                    'Partners get a personal code and link to share with other parents, always with a clear #ad disclosure.',
+                    'When a family uses the code before its first payment and buys the Family plan, the partner earns a commission.',
+                    'Commission terms, rules and how to apply are on the partners page.',
+                ],
+                'links' => [['route' => 'website.partners', 'label' => 'Partner program']],
+                'keywords' => ['partner', 'affiliate', 'influencer', 'creator', 'commission', 'referral', 'code', 'recommend'],
             ],
         ],
     ],

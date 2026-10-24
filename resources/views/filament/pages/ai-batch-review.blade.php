@@ -21,6 +21,20 @@
         @endif
     </x-filament::section>
 
+    <x-filament::section collapsible>
+        <x-slot name="heading">Reviewer checklist</x-slot>
+        <x-slot name="description">Mission: kids use screens to learn and grow. Clean, happy, neutral. Reject or edit any item that fails one line.</x-slot>
+        <ul style="list-style:disc; padding-left:1.25rem; font-size:.85rem; display:grid; gap:.2rem;">
+            <li>Correct: one defensible answer, every distractor clearly wrong, no fact that changes quickly. If in doubt, reject.</li>
+            <li>Neutral: no ideological or activist message from any side, no moralising or persuasion toward a worldview, facts not judgments.</li>
+            <li>No current politics or politicians, no culture-war topics, no religion.</li>
+            <li>No sexual content, nothing about sexuality or gender identity topics.</li>
+            <li>No hate: nothing demeaning about any group, nationality, body or ability; no stereotypes.</li>
+            <li>Child-safe: no violence detail, gore or scary content; history stated plainly (who, what, when).</li>
+            <li>Positive and kind tone; the explanation teaches something; original text or public-domain quotes only.</li>
+        </ul>
+    </x-filament::section>
+
     @if (! empty($skipped['invalid']) || ! empty($skipped['duplicates']))
         <x-filament::section collapsible collapsed>
             <x-slot name="heading">Not stored: {{ count($skipped['invalid'] ?? []) }} invalid, {{ count($skipped['duplicates'] ?? []) }} duplicates</x-slot>

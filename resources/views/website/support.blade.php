@@ -97,6 +97,10 @@
             <p class="note">{{ $fr
                 ? 'Pour votre sécurité, n’envoyez jamais votre mot de passe par courriel.'
                 : 'For your safety, never send your password by email.' }}</p>
+            <p id="partners">{{ $fr
+                ? 'Vous êtes un créateur ou un parent et vous aimeriez recommander Brainy Clan ? Voyez le'
+                : 'A creator or a parent who would like to recommend Brainy Clan? See the' }}
+                <a href="{{ route('website.partners', $lang) }}">{{ $fr ? 'programme partenaires' : 'partner program' }}</a>.</p>
         </div>
     </section>
 @endsection

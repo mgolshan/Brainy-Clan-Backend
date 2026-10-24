@@ -379,6 +379,66 @@ curl http://localhost:8080/api/v1/health
 
 ## Log
 
+### 2026-10-24 audit rewordings + push localization
+
+- Applied the 11 **reword** findings of `docs/CONTENT_AUDIT_2026-10-24.md` (marked "applied
+  2026-10-24" there; the 36 **keep** items stay open for Moe): app copy A1–A6 (frontend), push texts
+  B1–B2, word-puzzle hints W1–W3 (`database/seeders/data/words.php`: ZEBRA "A wild animal with black
+  and white stripes", MOUSE "A small animal with a long tail", LION "A big cat with a mane"; dev DB
+  re-seeded with `db:seed --class=WordPuzzleSeeder`, idempotent).
+- **Push localization:** `daily_reminder`, `family_activity`, `goal_reached` and `period_closed` were
+  English only; they now follow the recipient's `users.locale` (en/fr, others → en) like the chat
+  pushes: texts as `TEXTS` constants per listener/action, sent once per locale group through the new
+  `Notifications/Support/PushLocale` (needs `user` loaded; no extra queries). New texts: daily
+  reminder "Something new to learn today / A short challenge is ready when you are." (fr « Quelque
+  chose de nouveau à apprendre aujourd’hui / Un petit défi est prêt quand tu veux. »); family activity
+  "Sam finished a challenge! / Sam earned 12 points for the family." (no "Your turn?"); goal reached
+  and period closed translated (French winner lists use « et » and singular/plural verbs).
+- Plan term in French: **"forfait Famille"** everywhere (most used in app, help, website, store
+  listing, legal); `fr.json` "formule Famille" occurrences fixed; "formule" stays only for choosing
+  a monthly/yearly option. Website views and help `fr.php` already used "forfait".
+- Help center tip (en/fr, "Subscribe"): children see no purchase screens or upgrade prompts, only
+  a neutral "comes with the Family plan" label.
+- API.md: B8 note + changelog (push texts follow `locale`, no shape change).
+- Tests: `PushNotificationsTest` +6 (en/fr per push type, race winners singular/plural, fallback
+  locale, constant queries with mixed locales). Affected files + pint + phpstan (Notifications) green.
+
+### 2026-10-24 partners page
+- **`/partners`** (en/fr, `WebsiteController::partners`, `resources/views/website/partners.blade.php`):
+  stateless, no scripts, same look as the landing/help pages. Hero (mission), what Brainy Clan is
+  (handbook §10.3 claims only), how it works in 4 steps (apply → code + `brainyclan.com/r/CODE` → share
+  with #ad → earn), what the audience gets ("if your code includes an offer": store offer code; the web
+  discount line only while `PaddleConfig::webCheckoutAvailable()`), commission and payouts, rules,
+  brand kit (owl/Clan usage, approved one-liners and short/long descriptions in en + fr, links to the
+  existing screenshots), FAQ, how to apply (`mailto:` the `legal.support_email` with subject
+  "Partner application"), partner agreement summary marked [DRAFT FOR LAWYER REVIEW].
+- **Numbers from config only:** rate / months / refund hold from `billing.affiliates`; new
+  `billing.affiliates.payout` (`schedule` monthly, `currencies` [CAD, USD], `minimum` [] = none,
+  `methods` [paypal, interac, bank]). Each line is left out when its value is unset (tested).
+- **Links:** website footer, `/support` (contact section), help center Plans section (new article
+  `partner-program`; `website.partners` added to `HelpCenter::LINK_ROUTES`), sitemap (12 → 14 URLs).
+- **Docs:** `docs/PARTNER_GUIDE.md` + `docs/PARTNER_GUIDE.fr.md` (same content, for email), linked from
+  OPERATIONS_HANDBOOK §11. Screenshot `docs/screenshots/partners-desktop.png`; checked at 390 px.
+- Tests: WebsiteTest "partners page" (en/fr render, config → page, unset omitted, web discount gate,
+  no scripts/external hosts/inline style attributes, CSP unchanged, links + sitemap) — 45 passed.
+- Dev note: the `app` container had a cached config; ran `php artisan config:cache` so the new keys show.
+
+### 2026-10-24 content rules + audit
+
+- **Rules written into the content sources** (PLAN decisions "Mission" and "Content neutrality
+  rules"): `database/seeders/data/questions/README.md` (new "Mission and neutrality" section),
+  AI generator system prompt `BatchPromptBuilder::CONTENT_RULES` (mission, tone, neutrality, no
+  politics/religion/sexuality-gender topics/hate/misinformation, neutral history, editor notes
+  can't override), Filament **Review batch** page (reviewer checklist) and generator page
+  description, handbook §8.3/§8.4 (checklist for content ops) and §10.1 (every marketing and
+  partner message follows the mission and rules; no guilt/FOMO/streak pressure).
+- Tests: new `AiBatchGeneratorTest` case (rules sent with every batch), `AiBatchAdminTest` checks
+  the checklist; both files green.
+- **Audit** `docs/CONTENT_AUDIT_2026-10-24.md`: all 1,707 bank items + other seed files, word
+  lists, nonogram titles, app en/fr copy, push texts, emails, website. 0 remove, 11 reword (6 app
+  strings incl. the kid-facing "Ask a parent to get the Family plan", 2 push texts, 3 word hints),
+  36 borderline keeps for Moe. Nothing changed in content or copy yet.
+
 ### 2026-10-24 How to play help center
 
 - **Page** `GET /help` (`website.help`, en/fr, one page with anchors; PLAN "How to play" help center):

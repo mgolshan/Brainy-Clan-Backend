@@ -664,6 +664,7 @@ server from RevenueCat and Paddle revenue events (admin-only reports; no public 
   `daily_reminder` (at `reminder_time` if the member hasn't played today). Push `data`:
   `{ "type": "goal_reached", "goal_id": 2, "period_id": 31 }` (goal types carry `goal_id` + `period_id`;
   `family_activity`: `{ type, member_id, session_id }`; `daily_reminder`: `{ type }`) so the app can deep-link.
+  Push title/body are in the recipient's `locale` (en/fr; other locales get English), for every push type.
 
 ### Family chat (2026-10-23)
 One group chat per family; only that family's active members can read or write it (every other
@@ -818,3 +819,4 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-24 — B10 clarifications (backend built, no shape change): `POST /family/subscription/manage-link` → 404 `not_found` when the family has no subscription, 503 `web_checkout_unavailable` when Paddle isn't configured or reachable (portal links are temporary — open right away); `GET /family/web-checkout/availability` → 422 for a `storefront` that isn't 3 letters, `link_allowed: false` without one; `POST /family/referral-code` → a malformed code is also 422 `referral_code_invalid`; `GET /family/subscription` shows the entitled plan (store or web) first. Website: the emailed checkout link creates one Paddle transaction — opening it again within 30 min returns to the same checkout; without a Paddle hosted checkout the link goes to `/subscribe/pay` (Paddle.js). Terms and privacy versions bumped to `2026-10-24` (re-acceptance).
 - 2026-10-24 — Chat report: `POST /family/chat/messages/{id}/report` (to family admins only), Message `reported` (admins), push/preference `family_chat_report`.
 - 2026-10-24 — Chat report clarifications (backend built, no shape change): reporting an already deleted message → 204 no-op; a message past retention → 404; own message → 422 `validation_failed` (`errors.message`); the push goes to active admins with chat on, except the reporter; deleting a message (tombstone) clears its reports (`reported` false); reports are deleted with the message (retention, erasure, family deletion) and with the reporter's account; `types.family_chat_report` is in every member's preferences (only admins receive it). Message examples show `reported`.
+- 2026-10-24 — Push texts for `goal_reached`, `period_closed`, `family_activity` and `daily_reminder` now follow the recipient's `locale` (en/fr), like the chat pushes; reworded `daily_reminder` / `family_activity` texts (content audit). No shape change.

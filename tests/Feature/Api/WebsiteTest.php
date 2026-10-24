@@ -136,7 +136,8 @@ describe('pages', function () {
             ->toContain('<loc>'.e(route('legal.terms', ['lang' => 'fr'])).'</loc>')
             ->toContain('<loc>'.e(route('account.delete', ['lang' => 'en'])).'</loc>')
             ->toContain('<loc>'.e(route('website.help', ['lang' => 'fr'])).'</loc>')
-            ->and(substr_count((string) $sitemap, '<url>'))->toBe(12);
+            ->toContain('<loc>'.e(route('website.partners', ['lang' => 'fr'])).'</loc>')
+            ->and(substr_count((string) $sitemap, '<url>'))->toBe(14);
     });
 
     it('ships the owl mascot as a static file', function () {
@@ -509,6 +510,122 @@ describe('help center', function () {
         expect(substr_count((string) $this->get('/?lang=fr')->assertOk()->getContent(), 'href="'.$help.'"'))->toBe(2)
             ->and(substr_count((string) $this->get('/support?lang=fr')->assertOk()->getContent(), 'href="'.$help.'"'))->toBe(3)
             ->and((string) $this->get('/sitemap.xml')->getContent())->toContain('<loc>'.e(route('website.help', ['lang' => 'en'])).'</loc>');
+    });
+});
+
+/**
+ * Partner (affiliate) program page (docs/PLAN.md "Partner (affiliate) instructions (2026-10-24)"):
+ * en/fr, commission terms from config('billing.affiliates'), unset values left out, no scripts.
+ */
+describe('partners page', function () {
+    it('renders in English and French with every section', function (string $lang, array $texts) {
+        $response = $this->get("/partners?lang={$lang}")
+            ->assertOk()
+            ->assertSee('<html lang="'.$lang.'">', false)
+            ->assertHeader('Content-Language', $lang)
+            ->assertSee('<link rel="canonical" href="'.route('website.partners', ['lang' => $lang]).'">', false)
+            ->assertSee('[DRAFT FOR LAWYER REVIEW]')
+            ->assertSee('brainyclan.com/r/', false)
+            ->assertSee('#ad')
+            ->assertSee('mailto:support@brainyclan.com?subject=Partner%20application', false);
+
+        foreach ($texts as $text) {
+            $response->assertSee($text, false);
+        }
+
+        foreach (['what', 'how', 'audience', 'commission', 'rules', 'brand', 'faq', 'apply', 'agreement'] as $section) {
+            $response->assertSee('<section id="'.$section.'"', false);
+        }
+    })->with([
+        'en' => ['en', ['<title>Partners — Brainy Clan</title>', 'Partner with Brainy Clan', 'Target or address children', 'Bid on “Brainy Clan” in search ads.', 'If your code includes an offer', 'A stats page is planned', 'Partner agreement — summary']],
+        'fr' => ['fr', ['<title>Partenaires — Brainy Clan</title>', 'Devenez partenaire de Brainy Clan', 'Si votre code comprend une offre', 'Une page de statistiques est prévue', 'Entente de partenariat — résumé']],
+    ]);
+
+    it('shows the commission and payout terms from the config', function () {
+        $this->get('/partners')
+            ->assertOk()
+            ->assertSeeInOrder(['25%', 'of net revenue', '12', 'months per family', '30', 'day refund hold', 'Monthly payout'])
+            ->assertSee('Currencies: CAD and USD')
+            ->assertSee('By PayPal, Interac e-Transfer (Canada) and bank transfer')
+            ->assertDontSee('Minimum payout');
+
+        $this->get('/partners?lang=fr')->assertOk()->assertSee("25\u{00A0}%")->assertSee('mois par famille');
+
+        config()->set('billing.affiliates.commission_rate', 0.125);
+        config()->set('billing.affiliates.commission_months', 18);
+        config()->set('billing.affiliates.refund_window_days', 45);
+        config()->set('billing.affiliates.payout.currencies', ['CAD']);
+        config()->set('billing.affiliates.payout.minimum', ['CAD' => '50']);
+        config()->set('billing.affiliates.payout.methods', ['paypal']);
+
+        $this->get('/partners')
+            ->assertOk()
+            ->assertSeeInOrder(['12.5%', 'of net revenue', '18', 'months per family', '45', 'day refund hold'])
+            ->assertSee('Currencies: CAD (the currency of the sale)')
+            ->assertSee('Minimum payout: 50.00 CAD')
+            ->assertSee('By PayPal, sent by hand')
+            ->assertDontSee('25%')
+            ->assertDontSee('Interac');
+
+        $this->get('/partners?lang=fr')->assertOk()->assertSee("12,5\u{00A0}%");
+    });
+
+    it('leaves out the terms that are not configured', function () {
+        config()->set('billing.affiliates.commission_rate', null);
+        config()->set('billing.affiliates.commission_months', null);
+        config()->set('billing.affiliates.refund_window_days', null);
+        config()->set('billing.affiliates.payout', []);
+
+        $html = (string) $this->get('/partners')->assertOk()->getContent();
+
+        expect($html)->not->toContain('id="term-')
+            ->not->toContain('of net revenue')
+            ->not->toContain('months per family')
+            ->not->toContain('day refund hold')
+            ->not->toContain('Monthly payout')
+            ->not->toContain('Currencies:')
+            ->not->toContain('(once a month)')
+            ->toContain('A commission becomes payable after the refund window, then it is paid with the next payout.');
+    });
+
+    it('mentions the web discount only while web checkout is open', function () {
+        expect((string) $this->get('/partners')->getContent())->not->toContain('when they subscribe on brainyclan.com');
+
+        config()->set('billing.paddle.api_key', 'pdl_test_key');
+        config()->set('billing.paddle.webhook_secret', 'whsec');
+        config()->set('billing.paddle.price_ids', ['monthly' => 'pri_1', 'semiannual' => 'pri_2', 'annual' => 'pri_3']);
+
+        expect((string) $this->get('/partners')->getContent())->toContain('when they subscribe on brainyclan.com');
+    });
+
+    it('loads nothing from other hosts and keeps the strict script-free CSP without cookies', function () {
+        $response = $this->get('/partners')->assertOk();
+        $html = (string) $response->getContent();
+
+        expect($html)->not->toContain('<script')
+            ->not->toMatch('/\s(src|srcset)="(https?:)?\/\//i')
+            ->not->toMatch('/url\(\s*["\']?(https?:)?\/\//i')
+            ->not->toContain('@import')
+            ->not->toMatch('/\son[a-z]+="/i')
+            ->not->toContain(' style="')
+            ->and($response->headers->get('Content-Security-Policy'))
+            ->toBe("default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+            ->and($response->headers->getCookies())->toBe([]);
+
+        foreach (array_unique(array_column(landingImages($html), 'src')) as $src) {
+            expect(file_exists(public_path(ltrim($src, '/'))))->toBeTrue($src);
+        }
+    });
+
+    it('is linked from the footer, the support page and the help center, and listed in the sitemap', function () {
+        $partners = route('website.partners', ['lang' => 'fr']);
+
+        expect((string) $this->get('/?lang=fr')->getContent())->toContain('href="'.$partners.'"')
+            ->and((string) $this->get('/support?lang=fr')->getContent())->toContain('href="'.$partners.'"')
+            ->and((string) $this->get('/help?lang=fr')->getContent())->toContain('href="'.$partners.'"')
+            ->and((string) $this->get('/sitemap.xml')->getContent())->toContain('<loc>'.e(route('website.partners', ['lang' => 'en'])).'</loc>');
+
+        $this->get('/help?lang=fr')->assertSee('id="partner-program"', false);
     });
 });
 

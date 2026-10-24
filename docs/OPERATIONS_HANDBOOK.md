@@ -738,12 +738,30 @@ item, English only when no French translation is published.
 10. Re-read every item to fact-check the answer **and each distractor** (a true distractor is a bug).
 Avoid topics: pop culture, celebrities, brands, current events, religion.
 
+**Mission and neutrality (binding, PLAN.md decisions "Mission" and "Content neutrality rules",
+Moe 2026-10-24).** The app's world is clean and happy; its one mission is that kids use screens to
+learn and grow rather than waste their time and mind. Every item (seed bank, AI batch, wisdom card,
+word list, nonogram title, help page) also passes this checklist — the same list is shown on the
+Filament **Review batch** page and sent to the AI generator:
+
+- Neutral: no ideological or activist messaging from any side; no moralising or persuasion toward
+  a worldview; facts, not judgments.
+- No current politics or politicians, elections, parties or culture-war topics; no religion.
+- No sexual content; nothing about sexuality or gender identity topics.
+- No hate: nothing demeaning about any group, nationality, culture, body or ability.
+- No misinformation (rules 1, 2, 10).
+- Plain, well-established historical facts are fine when stated neutrally (who, what, when).
+- Positive, calm, encouraging tone; the explanation teaches something.
+
+Borderline items go to Moe as a list (id + reason); content ops never deletes or rewrites them
+alone. Last full audit: `docs/CONTENT_AUDIT_2026-10-24.md`.
+
 ### 8.4 AI batch workflow (generator + human review)
 
 1. **Generate** (Content ops agent, alone): category path, type, difficulty range, ages, language,
    count ≤ 50, optional note. Batch goes `queued` → `running` (1–3 min) → `review` (or `failed`
    with the error → fix → **Retry** once).
-2. **Pre-review** (Content ops agent): open **Review**; check each draft against §8.3; **Reject**
+2. **Pre-review** (Content ops agent): open **Review**; check each draft against §8.3 (including the mission and neutrality checklist); **Reject**
    (= archive, never generated again) anything doubtful; list items needing a fact source.
 3. **Fact-check:** for each remaining item note one reliable source for the answer (encyclopedia,
    official body) in the review log; quote attributions must match the public-domain text.
@@ -823,6 +841,16 @@ children's details. Never confirm whether an email has an account.
 generation plays at its own level, with shared goals and a private family space. **Audience =
 parents** (25–55, families with kids 6–17, grandparents as a secondary audience). Tone: warm,
 encouraging, honest. Bilingual (English/French, Canada first; North America).
+
+**Mission and content rules apply to every message** (PLAN.md decisions "Mission" and "Content
+neutrality rules", Moe 2026-10-24): store listings, landing page, ads, social posts, emails,
+influencer and partner material present Brainy Clan as screen time spent learning and growing, in
+a clean, happy, positive tone. No political, ideological, religious, sexual, sexuality or
+gender-identity topics, no culture-war hooks, nothing demeaning about any group, no moralising, no
+misinformation (claims only from §10.3). No ads, partner content or co-marketing that touches these
+topics; decline partners whose channels centre on them (borderline cases → [Moe]). Never use guilt,
+fear of missing out, streak pressure or "more screen time" as a selling point — sell learning,
+family time and calm.
 
 ### 10.2 Store listing and landing page assets
 
@@ -917,6 +945,14 @@ Thanks, <name> for Brainy Clan — support@brainyclan.com
 Affiliate codes, Attributions, Commission entries, Monthly payouts (how-to: README "Affiliate program —
 admin guide"). The app's "Have a code?" screen is F8 (app). Do not promise codes, links or commissions to
 anyone before Moe confirms launch.
+
+**Partner instructions (2026-10-24):** public page `https://brainyclan.com/partners` (en/fr; how it works,
+what the audience gets, commission terms read from `config/billing.php` `billing.affiliates` incl.
+`payout.schedule/currencies/minimum/methods`, rules, brand kit, FAQ, how to apply, agreement summary marked
+[DRAFT FOR LAWYER REVIEW]). For email, send [docs/PARTNER_GUIDE.md](PARTNER_GUIDE.md) (English) or
+[docs/PARTNER_GUIDE.fr.md](PARTNER_GUIDE.fr.md) (French) — same content; check its numbers against the config
+and the partner's agreement before sending. Applications arrive at `support@` with the subject
+"Partner application"; Moe approves each partner before the admin creates the affiliate and code.
 
 Rules as decided:
 

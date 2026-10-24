@@ -52,6 +52,23 @@ return [
 - Run `docker compose exec app php -l database/seeders/data/questions/<file>.php` from the backend repo root to
   syntax-check (no PHP on the Windows host; Docker only).
 
+## Mission and neutrality (binding, Moe 2026-10-24)
+
+The world of this app is clean and happy, with one mission: kids use screen devices to learn and grow rather than
+waste their time and mind. Every item should teach something and leave the player in a good mood. Tone: positive,
+curious, calm; present facts, never lecture. Applies to every item (seed bank, AI batches, wisdom cards, word lists,
+nonogram titles) — see `docs/PLAN.md` decisions "Mission" and "Content neutrality rules":
+
+- No ideological or activist messaging from any side; no persuasion or moralising toward a worldview.
+- No political or cultural bias: facts, not judgments. No current politics, politicians, elections or parties; no
+  culture-war topics.
+- No hate: nothing demeaning or mocking about any group, nationality, culture, body or ability.
+- No misinformation (rules 1, 2 and 10 below).
+- No sexual content and no content about sexuality or gender identity topics.
+- No religion (beliefs, practices or figures are not quiz topics).
+- Plain, well-established historical facts stay allowed when stated neutrally (who, what, when), without praise or
+  condemnation. Borderline items are listed for Moe, not silently deleted.
+
 ## Content rules (all mandatory)
 
 1. **Only well-established facts** you are certain of. No records that change ("tallest building", "most
