@@ -116,7 +116,7 @@ path is in-app (App Store / Google Play through RevenueCat). Setup: README "Web 
 | Horizon queue dashboard (staff role `admin` only) | `https://api.brainyclan.com/horizon` |
 | API reference (Scramble) | `https://api.brainyclan.com/docs/api` — **closed outside the local environment** (`viewApiDocs` gate); use `docs/API.md` |
 | Support email (receiving) | `support@brainyclan.com` |
-| App email sender | `no-reply@brainyclan.com` |
+| App email sender | `no-reply@brainyclan.com` — every app email (password reset, password changed, sign-in attempts, account deletion, web checkout, child data export, staff alerts) uses one branded template: owl logo + "Brainy Clan" header, footer with `support@` and the website (README "Emails") |
 | Store IDs | iOS bundle ID and Android package `app.brainyclan` |
 
 All production hosts are **(server)**: DNS and HTTPS are not set up yet.
@@ -556,6 +556,9 @@ Always: open an incident note (time, symptom, severity), take no destructive act
 ### 5.7 Configuration changes
 
 Any `.env.prod` change is [Moe]. Applying it: `$C up -d` (containers re-cache config on start).
+The domain lives in one line, `CENTRAL_DOMAIN`; hosts, URLs and the `no-reply@` / `support@` /
+alert addresses are derived from it with `${CENTRAL_DOMAIN}` (DEPLOY.md §5). Check what the
+containers will get with `$C config | grep -E 'DOMAIN|_URL|EMAIL|ADDRESS'` before `$C up -d`.
 
 ### 5.8 Cost monitoring
 

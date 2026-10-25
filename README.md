@@ -48,6 +48,7 @@ error until its keys are in `.env`.
 | Error monitoring | [Error monitoring (Sentry)](#error-monitoring-sentry) | `SENTRY_LARAVEL_DSN` |
 | Production server, HTTPS, backups | [docs/DEPLOY.md](docs/DEPLOY.md) | `.env.prod` (from `.env.prod.example`) |
 | Antivirus breaking HTTPS in Docker | [TLS-inspecting antivirus](#tls-inspecting-antivirus-on-the-dev-machine) | - |
+| Domain, emails in a Mailtrap inbox, logo | [Environment](#environment-central_domain), [Emails](#emails), [Brand and logo](#brand-and-logo) | `CENTRAL_DOMAIN`, `MAIL_*` |
 
 ## Prerequisites
 
@@ -169,10 +170,99 @@ stay on `https://api.brainyclan.com`): landing page `/`, `/support`, `/privacy`,
 `/account/delete`, `/password/reset`, `robots.txt`, `sitemap.xml`. Plain Blade pages in
 `resources/views/website/` (and `legal/`, `account/`): English and French (`?lang=fr`, otherwise the
 browser's language), light/dark, inline CSS, no JavaScript, no cookies, no analytics, no external
-fonts or CDNs. The owl mascot is `public/images/owl.svg` (copied from the app repo's
-`assets/brand/owl.svg`). Plan limits on the landing page come from the same policy settings as the
+fonts or CDNs. The owl mascot/logo is `public/images/brand/logo.svg` (see [Brand and logo](#brand-and-logo)).
+Plan limits on the landing page come from the same policy settings as the
 app. Routes: `routes/web.php`; host routing: `WEBSITE_URL` / `WEBSITE_HOST` (empty locally, so every
 page works on `http://localhost:8080`; production setup in [docs/DEPLOY.md](docs/DEPLOY.md) section 4).
+
+## Environment (`CENTRAL_DOMAIN`)
+
+The product's domain is **one line** in `.env` / `.env.prod`: `CENTRAL_DOMAIN=brainyclan.com`.
+Everything domain-bearing is derived from it with `${CENTRAL_DOMAIN}`:
+
+```dotenv
+CENTRAL_DOMAIN=brainyclan.com
+API_DOMAIN=api.${CENTRAL_DOMAIN}            # production (Caddy)
+WEBSITE_HOST=${CENTRAL_DOMAIN}              # production
+APP_URL=https://api.${CENTRAL_DOMAIN}       # production; dev keeps http://localhost:8080
+WEBSITE_URL=https://${CENTRAL_DOMAIN}       # production; dev: "${APP_URL}"
+MAIL_FROM_ADDRESS=no-reply@${CENTRAL_DOMAIN}
+LEGAL_SUPPORT_EMAIL=support@${CENTRAL_DOMAIN}   # unset = the same default
+OPS_ALERT_EMAIL=support@${CENTRAL_DOMAIN}
+```
+
+- Laravel's dotenv (vlucas/phpdotenv 5.7) and Docker Compose (v2+, both `--env-file` and
+  `env_file:`) expand `${VAR}` from **earlier lines of the same file**; tested with Compose 5.6. Keep
+  the line unquoted or in double quotes — single quotes switch expansion off. A secret that
+  contains `$` must therefore be single-quoted.
+- `config('app.central_domain')` holds it; the config defaults of the support/contact/alert/from
+  addresses (`config/legal.php`, `ops.php`, `mail.php`) fall back to it, and code uses
+  `App\Modules\Core\Support\Brand::domain()` instead of a hard-coded domain.
+- After changing it: `docker compose exec app php artisan config:cache`, then
+  `docker compose restart horizon scheduler`.
+
+## Brand and logo
+
+One logo, one place: `config/brand.php` points at `public/images/brand/logo.svg` (web: website
+header + favicon, legal/account/password pages, Filament admin logo + favicon) and
+`public/images/brand/logo.png` (192×192, transparent; emails — Gmail/Outlook don't show SVG — and
+the touch icon). Everything reads them through `App\Modules\Core\Support\Brand`
+(`logoUrl()`, `pngLogoUrl()`, `emailLogoUrl()` — absolute on `WEBSITE_URL`); every URL carries a
+`?v=` fingerprint of the file's modification time, so a new logo is never served from a cache.
+
+**Swapping the logo** (it is the app's owl "Ollie"): the app repo's `assets/brand/owl.svg` is the
+master (the app icon, splash and favicon are rendered from it with `npm run brand:render`). When it
+changes, update the backend together:
+
+```powershell
+Copy-Item ../Brainy-Clan-Frontend/assets/brand/owl.svg public/images/brand/logo.svg
+# re-render the PNG with the app repo's resvg (dev dependency); run from the backend folder:
+node -e "const {Resvg}=require('../Brainy-Clan-Frontend/node_modules/@resvg/resvg-js');const fs=require('fs');fs.writeFileSync('public/images/brand/logo.png',new Resvg(fs.readFileSync('public/images/brand/logo.svg','utf8'),{fitTo:{mode:'width',value:192}}).render().asPng())"
+```
+
+Keep both file names; nothing else changes.
+
+## Emails
+
+Every email is a **Markdown mailable in one template**: Laravel's mail components customised in
+`resources/views/vendor/mail/` (`html/layout`, `html/header` — PNG owl + "Brainy Clan" —,
+`html/message` — footer with why the reader got the mail, `support@`, the website link and © —, a
+`link` component that prints the button's URL for copying, and the plain-text `text/message`),
+themed by `resources/views/vendor/mail/html/themes/brand.css` (website palette: cream page, navy
+text, owl-orange button, blue links; system fonts; a cheap dark mode). The bodies live in
+`resources/views/mail/*.blade.php` (English and French in each; the mailable's locale sets the
+footer language). Horizon's own "long wait" notification uses the same frame. No tracking pixels;
+the only image is our logo.
+
+| Mail | Class | Sent |
+| --- | --- | --- |
+| Password reset link | `Identity\Mail\PasswordResetLink` | queued |
+| Password changed | `Identity\Mail\PasswordChanged` | queued |
+| Sign-in attempts notice | `Identity\Mail\SignInAttemptsNotice` | queued |
+| Account deletion confirmation | `Family\Mail\AccountDeletionConfirmation` | queued |
+| Child data export (JSON attached) | `Family\Mail\ChildDataExport` | synchronous (never in a queue) |
+| Web checkout link / why not | `Billing\Mail\WebCheckoutMail` | queued |
+| Ops alert (failed job) | `Core\Mail\OpsAlertMail` | synchronous |
+| Horizon long wait | Horizon's `LongWaitDetected` notification | queued by Horizon |
+
+Write a new mail as `new Content(markdown: 'mail.<name>', ...)` with `<x-mail::message reason="…">`,
+call `$this->locale($locale)` in the constructor, keep the Markdown lines at column 0 (indented = code
+block) and put user-chosen text (nicknames) in a `<p>…</p>` HTML block so it is never read as
+Markdown. Add it to `everyMailable()` in `tests/Feature/Api/BrandAndMailTest.php` and to
+`mail:preview`.
+
+**Dev inbox.** By default mails land in Mailpit (http://localhost:8026). To see them in a
+**Mailtrap sandbox** (closer to real clients, HTML check, spam score): in `.env` set
+`MAIL_HOST=sandbox.smtp.mailtrap.io`, `MAIL_PORT=2525`, `MAIL_USERNAME` / `MAIL_PASSWORD` from
+Mailtrap → Sandboxes → your inbox → SMTP, then `php artisan config:cache` and
+`docker compose restart horizon`. The sandbox captures everything; nothing is delivered. SMTP on
+port 2525 is not HTTPS, so a TLS-inspecting antivirus (Norton) does not break it as long as it lets
+outbound port 2525 through (STARTTLS to Mailtrap is verified against the container's CA bundle).
+
+**Preview every mail:** `docker compose exec app php artisan mail:preview you@example.com` (and
+`--locale=fr`) sends one sample of each mail type above with made-up data (no real user, fake
+tokens, a sample JSON attachment) synchronously, so SMTP errors show in the console; `--pause=2`
+(seconds between mails) keeps under the sandbox rate limit. Refused in production.
 
 ## API documentation
 

@@ -17,7 +17,7 @@
         : ['paypal' => 'PayPal', 'interac' => 'Interac e-Transfer (Canada)', 'bank' => 'bank transfer'];
     $methods = array_map(fn (string $method): string => $methodLabels[$method], $terms['methods']);
     $applyUrl = 'mailto:'.$supportEmail.'?subject='.rawurlencode('Partner application');
-    $refLink = 'brainyclan.com/r/'.($fr ? 'VOTRECODE' : 'YOURCODE');
+    $refLink = \App\Modules\Core\Support\Brand::domain().'/r/'.($fr ? 'VOTRECODE' : 'YOURCODE');
     $toc = $fr
         ? [['how', 'Fonctionnement'], ['commission', 'Commission'], ['rules', 'Règles'], ['brand', 'Trousse de marque'], ['faq', 'FAQ'], ['apply', 'Postuler']]
         : [['how', 'How it works'], ['commission', 'Commission'], ['rules', 'Rules'], ['brand', 'Brand kit'], ['faq', 'FAQ'], ['apply', 'Apply']];
@@ -178,8 +178,8 @@
                     : 'an App Store or Google Play offer code, redeemed when buying in the app;' }}</li>
                 @if ($webCheckout)
                     <li>{{ $fr
-                        ? 'un rabais appliqué automatiquement quand ils s’abonnent sur brainyclan.com avec votre lien ou votre code.'
-                        : 'a discount applied automatically when they subscribe on brainyclan.com through your link or code.' }}</li>
+                        ? 'un rabais appliqué automatiquement quand ils s’abonnent sur '.\App\Modules\Core\Support\Brand::domain().' avec votre lien ou votre code.'
+                        : 'a discount applied automatically when they subscribe on '.\App\Modules\Core\Support\Brand::domain().' through your link or code.' }}</li>
                 @endif
             </ul>
             <p class="note">{{ $fr

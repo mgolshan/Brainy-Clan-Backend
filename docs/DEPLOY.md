@@ -103,8 +103,8 @@ Two addresses, two different services:
 - **`support@brainyclan.com` (receiving)** — a real mailbox at your mail provider (e.g. Google
   Workspace, Fastmail, Zoho, or the registrar's email forwarding). Add the **MX** records the provider
   gives you for `brainyclan.com` (name `@`), plus its SPF include. Test by sending a mail to it.
-- **`no-reply@brainyclan.com` (sending)** — the app's emails (account deletion and password reset
-  links) go out through the SMTP provider in `.env.prod` (`MAIL_*`, e.g. Postmark, Mailgun, Amazon
+- **`no-reply@brainyclan.com` (sending)** — the app's emails (password reset, account deletion,
+  web checkout links, staff alerts; one branded template, README "Emails") go out through the SMTP provider in `.env.prod` (`MAIL_*`, e.g. Postmark, Mailgun, Amazon
   SES). In the provider add the domain `brainyclan.com` (or a subdomain it suggests) and create the
   DNS records it shows:
   - **SPF**: one `TXT` record on `@`, e.g. `v=spf1 include:<mail provider> include:<smtp provider> ~all`
@@ -129,12 +129,20 @@ nano .env.prod
 
 **Production `.env.prod` checklist** — every `CHANGE_ME` replaced:
 
-- [ ] `API_DOMAIN` (`api.brainyclan.com`), `WEBSITE_HOST` (`brainyclan.com`), `APP_URL` (`https://api.brainyclan.com`), `WEBSITE_URL` (`https://brainyclan.com`), `ACME_EMAIL` (section 4)
+- [ ] `CENTRAL_DOMAIN=brainyclan.com` — the root domain, first line of the domains block. Every
+  domain-bearing value is derived from it with `${CENTRAL_DOMAIN}` and needs no edit: `API_DOMAIN`
+  (`api.${CENTRAL_DOMAIN}`), `WEBSITE_HOST` (`${CENTRAL_DOMAIN}`), `APP_URL` (`https://api.${CENTRAL_DOMAIN}`),
+  `WEBSITE_URL` (`https://${CENTRAL_DOMAIN}`), `ACME_EMAIL`, `MAIL_FROM_ADDRESS`, `LEGAL_SUPPORT_EMAIL`,
+  `LEGAL_CONTACT_EMAIL`, `OPS_ALERT_EMAIL` (section 4). Docker Compose (v2+, `--env-file` and
+  `env_file:`) and Laravel's dotenv both expand `${VAR}` from earlier lines of the same file; keep
+  those lines unquoted or in double quotes (single quotes switch expansion off). Because of that
+  expansion a **secret containing `$`** must be wrapped in single quotes. Check the result with
+  `docker compose -f docker-compose.prod.yml --env-file .env.prod config | grep -E 'DOMAIN|_URL|EMAIL|ADDRESS'`.
 - [ ] `APP_KEY` — generate after the first build: `docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --no-deps --entrypoint php app artisan key:generate --show`
 - [ ] `APP_ENV=production`, `APP_DEBUG=false` (the containers refuse to start with `APP_DEBUG=true`)
 - [ ] `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `REDIS_PASSWORD` — `openssl rand -base64 32` each
-- [ ] Mail (SMTP provider) — needed for account deletion and password reset emails; `MAIL_FROM_ADDRESS=no-reply@brainyclan.com` (SPF/DKIM/DMARC: section 4 "Email DNS")
-- [ ] `LEGAL_SUPPORT_EMAIL` / `LEGAL_CONTACT_EMAIL` (`support@brainyclan.com`, shown on the website and the legal pages)
+- [ ] Mail (SMTP provider) — needed for every app email (password reset, account deletion, web checkout, alerts); `MAIL_FROM_ADDRESS=no-reply@${CENTRAL_DOMAIN}` (SPF/DKIM/DMARC: section 4 "Email DNS"). After the first deploy, look at the template once: on a staging copy run `php artisan mail:preview you@example.com` (refused in production; README "Emails")
+- [ ] `LEGAL_SUPPORT_EMAIL` / `LEGAL_CONTACT_EMAIL` (`support@${CENTRAL_DOMAIN}`, shown on the website, the legal pages and the footer of every email)
 - [ ] `LEGAL_*` company details; `LEGAL_DRAFT=true` until the lawyer review is done
 - [ ] `SENTRY_LARAVEL_DSN` (section 10)
 - [ ] Google / Facebook / Apple sign-in keys — README "Google and Facebook sign-in — setup" and "Sign in with Apple — setup"

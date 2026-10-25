@@ -388,10 +388,11 @@ monitor on `https://brainyclan.com/`.
 
 | Service | Keys | Required at launch? | Setup guide |
 | --- | --- | --- | --- |
-| Hosts / TLS | `API_DOMAIN`, `WEBSITE_HOST`, `ACME_EMAIL`, `APP_URL`, `WEBSITE_URL`, `APP_IMAGE_TAG` | yes | DEPLOY.md §4–5 |
+| Central domain | `CENTRAL_DOMAIN=brainyclan.com` — every host, URL and address below is derived from it with `${CENTRAL_DOMAIN}` (Compose and Laravel both expand it; a secret containing `$` goes in single quotes) | yes | DEPLOY.md §5 |
+| Hosts / TLS | `API_DOMAIN`, `WEBSITE_HOST`, `ACME_EMAIL`, `APP_URL`, `WEBSITE_URL` (derived), `APP_IMAGE_TAG` | yes | DEPLOY.md §4–5 |
 | Laravel core | `APP_KEY` (+ `APP_PREVIOUS_KEYS` only during rotation), `APP_ENV=production`, `APP_DEBUG=false`, `LOG_LEVEL`, `CORS_ALLOWED_ORIGINS` (empty: native apps need none) | yes | DEPLOY.md §5 |
 | MySQL / Redis | `DB_*`, `DB_ROOT_PASSWORD`, `REDIS_*`, `CACHE_STORE=redis`, `SESSION_DRIVER=redis`, `QUEUE_CONNECTION=redis` | yes | DEPLOY.md §5 |
-| SMTP | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS=no-reply@brainyclan.com` | yes (deletion + password reset + alerts) | DEPLOY.md §4 "Email DNS" |
+| SMTP | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS=no-reply@${CENTRAL_DOMAIN}` | yes (every app email: password reset, deletion, web checkout, alerts — one branded template, README "Emails") | DEPLOY.md §4 "Email DNS" |
 | Legal | `LEGAL_DRAFT` (true until lawyer review), `LEGAL_COMPANY_NAME`, `LEGAL_POSTAL_ADDRESS`, `LEGAL_PRIVACY_OFFICER`, `LEGAL_CONTACT_EMAIL`, `LEGAL_SUPPORT_EMAIL` | yes | README "Legal, consent and privacy" |
 | Sentry | `SENTRY_LARAVEL_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` | yes | DEPLOY.md §10 |
 | Monitoring | `HEALTH_DEEP_TOKEN`, `OPS_ALERT_EMAIL` (default support@), `OPS_ALERT_WEBHOOK_URL` (optional) | yes / optional | DEPLOY.md §8 |

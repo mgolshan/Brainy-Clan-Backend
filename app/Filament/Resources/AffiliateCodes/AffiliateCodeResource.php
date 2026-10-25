@@ -5,6 +5,7 @@ namespace App\Filament\Resources\AffiliateCodes;
 use App\Filament\Resources\AffiliateCodes\Pages\ManageAffiliateCodes;
 use App\Filament\Support\ReadOnlyForSupport;
 use App\Modules\Billing\Models\AffiliateCode;
+use App\Modules\Core\Support\Brand;
 use BackedEnum;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
@@ -49,7 +50,7 @@ class AffiliateCodeResource extends Resource
             TextInput::make('code')->required()->maxLength(20)->regex(AffiliateCode::PATTERN)
                 ->unique(ignoreRecord: true)
                 ->dehydrateStateUsing(fn (?string $state): string => AffiliateCode::normalize((string) $state))
-                ->helperText('Letters, digits and dashes, up to 20; case-insensitive. Link: brainyclan.com/r/CODE'),
+                ->helperText(fn (): string => 'Letters, digits and dashes, up to 20; case-insensitive. Link: '.Brand::domain().'/r/CODE'),
             Select::make('affiliate_id')->relationship('affiliate', 'name')->searchable()->preload()->required(),
             TagsInput::make('store_offer_codes')->label('Store offer codes')->columnSpanFull()
                 ->helperText('Apple Offer Codes / Google Play promo codes exactly as RevenueCat reports them in `offer_code`. A store purchase with one of them attributes the family to this code.'),

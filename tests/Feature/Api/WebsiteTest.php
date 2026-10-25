@@ -6,6 +6,7 @@ use App\Modules\Family\Mail\AccountDeletionConfirmation;
 use App\Modules\Identity\Models\User;
 use App\Modules\Policy\Models\Setting;
 use App\Modules\Policy\Models\ThemeWorld;
+use Dotenv\Dotenv;
 use Illuminate\Support\Facades\Mail;
 
 /**
@@ -38,7 +39,7 @@ describe('pages', function () {
             ->assertSee('No ads for children, ever.')
             ->assertSee('World Geography')
             ->assertSee('Vocabulary &amp; Spelling', false)
-            ->assertSee('/images/owl.svg', false)
+            ->assertSee('/images/brand/logo.svg?v=', false)
             ->assertSee(route('legal.privacy', ['lang' => 'en']), false)
             ->assertSee(route('legal.terms', ['lang' => 'en']), false)
             ->assertSee(route('website.support', ['lang' => 'en']), false)
@@ -140,13 +141,14 @@ describe('pages', function () {
             ->and(substr_count((string) $sitemap, '<url>'))->toBe(14);
     });
 
-    it('ships the owl mascot as a static file', function () {
-        expect(file_get_contents(public_path('images/owl.svg')))->toContain('<svg');
+    it('ships the owl mascot as the brand logo file', function () {
+        expect(file_get_contents(public_path(config('brand.logo'))))->toContain('<svg');
     });
 });
 
 /**
- * Every <img> of a page: src, alt (null when missing) and the whole tag.
+ * Every <img> of a page: src (without a `?v=` cache-busting query), alt (null when missing) and
+ * the whole tag.
  *
  * @return list<array{src: string, alt: string|null, tag: string}>
  */
@@ -158,7 +160,7 @@ function landingImages(string $html): array
         preg_match('/\ssrc="([^"]*)"/', $tag, $src);
         preg_match('/\salt="([^"]*)"/', $tag, $alt);
 
-        return ['src' => $src[1] ?? '', 'alt' => $alt[1] ?? null, 'tag' => $tag];
+        return ['src' => (string) preg_replace('/[?#].*$/', '', $src[1] ?? ''), 'alt' => $alt[1] ?? null, 'tag' => $tag];
     }, $tags[0]);
 }
 
@@ -635,12 +637,14 @@ describe('configuration', function () {
             ->and(config('legal.support_email'))->toBe('support@brainyclan.com')
             ->and(config('app.website_host'))->toBeNull();
 
-        $prod = (string) file_get_contents(base_path('.env.prod.example'));
-        expect($prod)->toContain('APP_URL=https://api.brainyclan.com')
-            ->toContain('WEBSITE_URL=https://brainyclan.com')
-            ->toContain('WEBSITE_HOST=brainyclan.com')
-            ->toContain('MAIL_FROM_ADDRESS=no-reply@brainyclan.com')
-            ->not->toContain('brainyclan.app');
+        // Values as Laravel's dotenv resolves them (${CENTRAL_DOMAIN} expanded).
+        $prod = Dotenv::parse((string) file_get_contents(base_path('.env.prod.example')));
+        expect($prod['CENTRAL_DOMAIN'])->toBe('brainyclan.com')
+            ->and($prod['APP_URL'])->toBe('https://api.brainyclan.com')
+            ->and($prod['WEBSITE_URL'])->toBe('https://brainyclan.com')
+            ->and($prod['WEBSITE_HOST'])->toBe('brainyclan.com')
+            ->and($prod['MAIL_FROM_ADDRESS'])->toBe('no-reply@brainyclan.com')
+            ->and(implode(' ', $prod))->not->toContain('brainyclan.app');
     });
 });
 

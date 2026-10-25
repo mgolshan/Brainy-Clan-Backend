@@ -21,7 +21,9 @@ class AccountDeletionConfirmation extends Mailable implements ShouldQueue
     public function __construct(
         public readonly string $confirmUrl,
         public readonly string $pageLocale,
-    ) {}
+    ) {
+        $this->locale($pageLocale);
+    }
 
     public function envelope(): Envelope
     {
@@ -32,7 +34,7 @@ class AccountDeletionConfirmation extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        return new Content(text: 'account.confirmation-mail', with: [
+        return new Content(markdown: 'mail.account-deletion-confirmation', with: [
             'confirmUrl' => $this->confirmUrl,
             'locale' => $this->pageLocale,
             'minutes' => AccountDeletionRequest::TTL_MINUTES,

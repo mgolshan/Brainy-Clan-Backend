@@ -2,14 +2,15 @@
 
 namespace App\Modules\Core\Support;
 
+use App\Modules\Core\Mail\OpsAlertMail;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 /**
- * Operational alerts (docs/OPERATIONS_HANDBOOK.md §6.2): a plain-text mail to `ops.alert_email`
- * and, when configured, a JSON `{"text": "..."}` POST to `ops.alert_webhook_url` (Slack incoming
+ * Operational alerts (docs/OPERATIONS_HANDBOOK.md §6.2): a mail to `ops.alert_email` (`OpsAlertMail`,
+ * in the shared email frame) and, when configured, a JSON `{"text": "..."}` POST to `ops.alert_webhook_url` (Slack incoming
  * webhooks accept that body). Each alert key is sent at most once per cooldown. Alerts never
  * contain personal data: callers pass class names, queue names and counts only. Delivery failures
  * are reported (Sentry) but never thrown, so an alert can't break the job or request that raised it.
@@ -27,7 +28,7 @@ class OpsAlert
 
         if (is_string($email) && $email !== '') {
             try {
-                Mail::raw($body, fn ($message) => $message->to($email)->subject($subject));
+                Mail::to($email)->send(new OpsAlertMail($subject, $body));
             } catch (Throwable $exception) {
                 report($exception);
             }

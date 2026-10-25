@@ -12,7 +12,7 @@ return [
     /*
      * Where Horizon's "long wait" notifications and the failed-job alerts are mailed. Empty = no mail.
      */
-    'alert_email' => env('OPS_ALERT_EMAIL', 'support@brainyclan.com'),
+    'alert_email' => env('OPS_ALERT_EMAIL', 'support@'.env('CENTRAL_DOMAIN', 'brainyclan.com')),
 
     /*
      * Optional incoming-webhook URL (Slack "Incoming Webhooks", or anything accepting a JSON

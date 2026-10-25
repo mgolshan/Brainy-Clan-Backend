@@ -111,8 +111,28 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
+        'address' => env('MAIL_FROM_ADDRESS', 'no-reply@'.env('CENTRAL_DOMAIN', 'brainyclan.com')),
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Markdown Mail Settings (the one email template)
+    |--------------------------------------------------------------------------
+    |
+    | Every Brainy Clan email is a Markdown mailable rendered with the components customised in
+    | resources/views/vendor/mail (owl logo + name header, footer with the support address and
+    | the website) and the "brand" theme (resources/views/vendor/mail/html/themes/brand.css,
+    | inlined). Horizon's own notifications use the same frame. README "Emails".
+    |
+    */
+
+    'markdown' => [
+        'theme' => env('MAIL_MARKDOWN_THEME', 'brand'),
+
+        'paths' => [
+            resource_path('views/vendor/mail'),
+        ],
     ],
 
 ];

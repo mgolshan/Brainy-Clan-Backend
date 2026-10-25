@@ -25,7 +25,9 @@ class WebCheckoutMail extends Mailable implements ShouldQueue
         public readonly ?string $checkoutUrl,
         public readonly ?string $reason,
         public readonly ?string $store,
-    ) {}
+    ) {
+        $this->locale($pageLocale);
+    }
 
     public function envelope(): Envelope
     {
@@ -40,7 +42,7 @@ class WebCheckoutMail extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        return new Content(text: 'subscribe.mail', with: [
+        return new Content(markdown: 'mail.web-checkout', with: [
             'locale' => $this->pageLocale,
             'checkoutUrl' => $this->checkoutUrl,
             'reason' => $this->reason,

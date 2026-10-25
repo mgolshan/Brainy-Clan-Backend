@@ -21,7 +21,9 @@ class PasswordResetLink extends Mailable implements ShouldQueue
         public readonly string $resetUrl,
         public readonly string $mailLocale,
         public readonly int $minutes,
-    ) {}
+    ) {
+        $this->locale($mailLocale);
+    }
 
     public function envelope(): Envelope
     {
@@ -32,7 +34,7 @@ class PasswordResetLink extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        return new Content(text: 'password.reset-link-mail', with: [
+        return new Content(markdown: 'mail.password-reset-link', with: [
             'resetUrl' => $this->resetUrl,
             'locale' => $this->mailLocale,
             'minutes' => $this->minutes,

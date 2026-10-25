@@ -651,7 +651,7 @@
                         : 'You can download your data or delete your account at any time.' }}</li>
                 </ul>
             </div>
-            <img class="owl" src="/images/owl.svg" width="240" height="240" loading="lazy" alt="{{ $fr ? 'Ollie, la chouette de Brainy Clan' : 'Ollie, the Brainy Clan owl' }}">
+            <img class="owl" src="{{ \App\Modules\Core\Support\Brand::logoUrl() }}" width="240" height="240" loading="lazy" alt="{{ $fr ? 'Ollie, la chouette de Brainy Clan' : 'Ollie, the Brainy Clan owl' }}">
         </div>
     </section>
 

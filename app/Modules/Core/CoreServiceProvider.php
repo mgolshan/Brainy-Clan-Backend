@@ -3,6 +3,7 @@
 namespace App\Modules\Core;
 
 use App\Modules\Core\Console\FlushReferenceCachesCommand;
+use App\Modules\Core\Console\MailPreviewCommand;
 use App\Modules\Core\Console\SchedulerHeartbeatCommand;
 use App\Modules\Core\Listeners\ForwardLongWaitToWebhook;
 use App\Modules\Core\Listeners\SendFailedJobAlert;
@@ -21,7 +22,8 @@ use Laravel\Horizon\Events\LongWaitDetected;
  * Shared API plumbing: health endpoints, rate limiters
  * (`auth/*` 10/min per IP and per email, everything else 120/min per token), the reference
  * cache plumbing (ReferenceCache, `reference-cache:flush`) and ops monitoring (B11): failed-job
- * and long-wait alerts, the scheduler heartbeat and `horizon:snapshot`.
+ * and long-wait alerts, the scheduler heartbeat and `horizon:snapshot`; the brand (logo) and
+ * `mail:preview`.
  */
 class CoreServiceProvider extends ModuleServiceProvider
 {
@@ -74,7 +76,7 @@ class CoreServiceProvider extends ModuleServiceProvider
         Event::listen(MigrationsEnded::class, fn () => ReferenceCache::flush(...ReferenceCache::ALL));
 
         if ($this->app->runningInConsole()) {
-            $this->commands([FlushReferenceCachesCommand::class, SchedulerHeartbeatCommand::class]);
+            $this->commands([FlushReferenceCachesCommand::class, SchedulerHeartbeatCommand::class, MailPreviewCommand::class]);
 
             $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
                 // Heartbeat for the deep health check (no onOneServer: every scheduler should beat).

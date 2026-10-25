@@ -34,7 +34,8 @@
     <meta property="og:locale" content="{{ $fr ? 'fr_CA' : 'en_CA' }}">
     <meta property="og:locale:alternate" content="{{ $fr ? 'en_CA' : 'fr_CA' }}">
     <meta name="twitter:card" content="summary">
-    <link rel="icon" href="/images/owl.svg" type="image/svg+xml">
+    <link rel="icon" href="{{ \App\Modules\Core\Support\Brand::logoUrl() }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ \App\Modules\Core\Support\Brand::pngLogoUrl() }}">
     <style>
         :root {
             --bg: #fffaf3; --surface: #ffffff; --fg: #1b2a4a; --muted: #4a5873; --accent: #1d5fc0;
@@ -100,7 +101,7 @@
 <header class="site">
     <div class="wrap">
         <a class="logo" href="{{ route('website.home', $lang) }}">
-            <img src="/images/owl.svg" alt="" width="44" height="44">
+            <img src="{{ \App\Modules\Core\Support\Brand::logoUrl() }}" alt="" width="44" height="44">
             <span>Brainy Clan</span>
         </a>
         <nav class="top" aria-label="{{ $fr ? 'Navigation principale' : 'Main navigation' }}">

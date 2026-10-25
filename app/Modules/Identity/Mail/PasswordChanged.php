@@ -17,7 +17,10 @@ class PasswordChanged extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public readonly string $mailLocale) {}
+    public function __construct(public readonly string $mailLocale)
+    {
+        $this->locale($mailLocale);
+    }
 
     public function envelope(): Envelope
     {
@@ -28,7 +31,7 @@ class PasswordChanged extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        return new Content(text: 'password.changed-mail', with: [
+        return new Content(markdown: 'mail.password-changed', with: [
             'locale' => $this->mailLocale,
             'supportEmail' => (string) config('legal.support_email'),
         ]);

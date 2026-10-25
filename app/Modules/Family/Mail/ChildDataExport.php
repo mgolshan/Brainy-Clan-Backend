@@ -20,7 +20,9 @@ class ChildDataExport extends Mailable
         public readonly User $child,
         public readonly string $nickname,
         public readonly string $mailLocale,
-    ) {}
+    ) {
+        $this->locale($mailLocale);
+    }
 
     public function envelope(): Envelope
     {
@@ -31,7 +33,7 @@ class ChildDataExport extends Mailable
 
     public function content(): Content
     {
-        return new Content(text: 'account.child-export-mail', with: [
+        return new Content(markdown: 'mail.child-data-export', with: [
             'locale' => $this->mailLocale,
             'nickname' => $this->nickname,
             'supportEmail' => (string) config('legal.support_email'),

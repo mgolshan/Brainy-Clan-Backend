@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="{{ ($draft ?? false) ? 'noindex' : 'index' }}">
     <title>@yield('title') — Brainy Clan</title>
+    <link rel="icon" href="{{ \App\Modules\Core\Support\Brand::logoUrl() }}" type="image/svg+xml">
     <style>
         :root { --bg: #ffffff; --fg: #1f2933; --muted: #52606d; --accent: #4c51bf; --banner-bg: #fff4e5; --banner-fg: #8a4b00; --border: #e4e7eb; }
         @media (prefers-color-scheme: dark) {
@@ -33,6 +34,8 @@
         button.primary { background: #4c51bf; }
         label.spaced { margin-top: 12px; }
         .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+        .brand { display: inline-flex; align-items: center; gap: 8px; color: var(--fg); text-decoration: none; font-weight: 800; margin-bottom: 16px; }
+        .brand img { width: 36px; height: 36px; }
         .notice { border-left: 4px solid var(--accent); padding: 8px 12px; margin: 16px 0; }
         .error { color: #c81e1e; }
         html { scroll-behavior: auto; }
@@ -44,6 +47,7 @@
 </head>
 <body id="top">
 <main>
+    <a class="brand" href="{{ \App\Modules\Core\Support\Website::route('website.home', ['lang' => $locale]) }}"><img src="{{ \App\Modules\Core\Support\Brand::logoUrl() }}" alt="" width="36" height="36"><span>Brainy Clan</span></a>
     @if ($draft ?? false)
         <div class="banner" role="note">{{ $locale === 'fr' ? 'Ébauche — en cours de révision juridique. Ce texte n’est pas encore définitif.' : 'Draft — under legal review. This text is not final yet.' }}</div>
     @endif

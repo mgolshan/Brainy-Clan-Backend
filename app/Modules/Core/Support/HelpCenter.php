@@ -270,7 +270,7 @@ class HelpCenter
             'lock_third' => self::duration((int) ($lockout[2] ?? 86400), $fr),
             'reset_minutes' => (string) (int) config('auth.passwords.users.expire', 60),
             // Empty (the step is dropped) until web checkout (Paddle) is configured.
-            'web_checkout' => PaddleConfig::webCheckoutAvailable() ? 'brainyclan.com/subscribe' : '',
+            'web_checkout' => PaddleConfig::webCheckoutAvailable() ? Brand::domain().'/subscribe' : '',
         ];
     }
 

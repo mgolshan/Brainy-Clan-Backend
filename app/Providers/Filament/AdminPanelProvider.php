@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Modules\Core\Support\Brand;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -27,6 +28,10 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('Brainy Clan Admin')
+            // The logo comes from config/brand.php only (README "Brand and logo").
+            ->brandLogo(fn () => view('filament.partials.brand-logo'))
+            ->brandLogoHeight('2rem')
+            ->favicon(fn (): string => Brand::logoUrl())
             ->colors([
                 'primary' => Color::Indigo,
             ])

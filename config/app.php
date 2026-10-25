@@ -61,6 +61,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Central domain (CENTRAL_DOMAIN)
+    |--------------------------------------------------------------------------
+    |
+    | The product's root domain. `.env` derives the domain-bearing settings from it with
+    | `${CENTRAL_DOMAIN}` (APP_URL, WEBSITE_URL/HOST, API_DOMAIN, MAIL_FROM_ADDRESS, the support,
+    | contact and alert addresses), and the config defaults below and in legal.php, mail.php and
+    | ops.php fall back to it, so a new domain is one line in `.env`.
+    |
+    */
+
+    'central_domain' => env('CENTRAL_DOMAIN', 'brainyclan.com'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Public website (docs/DEPLOY.md "Website and hosts")
     |--------------------------------------------------------------------------
     |

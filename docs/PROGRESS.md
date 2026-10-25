@@ -28,7 +28,7 @@ Milestones are defined in `docs/PLAN.md`.
 
 ## Next up
 
-**Start of next session (2026-10-24 wrap-up):** run the full backend suite first — the last full run was cut short when Docker stopped. One possibly order-dependent failure to check: `WebCheckoutTest` "answers the same for every email…" failed once when run right after `WebsiteTest` but passes on its own. Moe's open items: content audit decisions (docs/CONTENT_AUDIT_2026-10-24.md, 36 items), lawyer review (terms/privacy 2026-10-24, partner agreement), server region, accounts weekend, when /partners goes public.
+**Start of next session (2026-10-24 wrap-up):** run the full backend suite first — the last full run was cut short when Docker stopped. The order-dependent `WebCheckoutTest` / `AccountDeletionPageTest` failure after `WebsiteTest` is fixed (2026-10-25: Livewire's static "component rendered" flag leaked between tests; `TestCase` now calls `Livewire::flushState()`). Moe's open items: content audit decisions (docs/CONTENT_AUDIT_2026-10-24.md, 36 items), lawyer review (terms/privacy 2026-10-24, partner agreement), server region, accounts weekend, when /partners goes public.
 0. **State at last stop (session 17, 2026-10-17, launch question bank + French content):** done (see log). Dev DB:
    `migrate` (1 migration, `add_translation_fields_to_content_items`) + `ContentSeeder` and `WordPuzzleSeeder` re-run
    (idempotent via `source_ref`; no fresh). Expo receipts check done. **Next:**
@@ -379,6 +379,52 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-10-25 central domain, brand, email template
+
+- **`CENTRAL_DOMAIN`** (Moe): `.env.example`, `.env.prod.example` and the dev `.env` start with
+  `CENTRAL_DOMAIN=brainyclan.com`; `API_DOMAIN`, `WEBSITE_HOST`, `ACME_EMAIL`, `APP_URL`,
+  `WEBSITE_URL`, `MAIL_FROM_ADDRESS`, `LEGAL_SUPPORT_EMAIL`/`LEGAL_CONTACT_EMAIL`, `OPS_ALERT_EMAIL`
+  are `${CENTRAL_DOMAIN}`-derived (dev keeps `APP_URL=http://localhost:8080`). Verified: phpdotenv
+  5.7 (`Dotenv::parse`) and Docker Compose 5.6 (`docker compose -f docker-compose.prod.yml
+  --env-file <copy of .env.prod.example> config`: Caddy `environment:` and every `env_file:`
+  service) both expand it; single quotes switch expansion off (documented, plus "quote secrets that
+  contain `$`"). `config('app.central_domain')`; defaults in `legal.php`, `ops.php`, `mail.php`
+  (from: `no-reply@…` instead of `hello@example.com`) fall back to it; `Brand::domain()` replaces
+  the hard-coded `brainyclan.com` in HelpCenter, the partners page and the affiliate-code admin hint.
+- **Brand, one logo source:** `config/brand.php` + `App\Modules\Core\Support\Brand`
+  (pattern from Moe's backgammon project, adapted: root-relative web URLs because the website CSP /
+  image tests require same-origin paths; email URL absolute on `WEBSITE_URL`; `?v=` mtime
+  fingerprint). `public/images/owl.svg` moved to `public/images/brand/logo.svg` (same file as the app
+  repo's `assets/brand/owl.svg`) + `logo.png` 192×192 rendered with the app repo's resvg. Used by the
+  website header/favicon/apple-touch-icon/home owl, a new small brand link on the legal layout
+  (terms, privacy, account deletion, password reset), Filament `brandLogo` (view
+  `filament/partials/brand-logo`) + `favicon`, and every email. README "Brand and logo" has the swap
+  steps (copy the app's owl, re-render the PNG).
+- **One email template:** customised `resources/views/vendor/mail/{html/layout,html/header,
+  html/message,html/link,text/message,text/link}` + theme `html/themes/brand.css` (website palette,
+  system fonts, owl-orange button with navy text, blue links, cheap `prefers-color-scheme` dark
+  mode, no tracking, only our logo image); `config/mail.php` `markdown.theme = brand`. Footer: per-mail
+  "why you got this" line (`<x-mail::message reason>`), support address, website link, ©. Every
+  mail converted to a Markdown mailable with bodies in `resources/views/mail/` (en + fr, wording kept,
+  a button + copyable link for link mails): PasswordResetLink, PasswordChanged, SignInAttemptsNotice,
+  AccountDeletionConfirmation, ChildDataExport (nickname in an escaped HTML block, never Markdown),
+  WebCheckoutMail; ops alerts moved from `Mail::raw` to `Core\Mail\OpsAlertMail` (sync, plain lines
+  in the same frame); Horizon's long-wait notification picks the frame up automatically. Mailables
+  set `->locale()` so the frame/footer follow the mail language. Old text views removed.
+- **`mail:preview {email} {--locale=en} {--pause=2}`** (Core): one sample of every mail type with
+  made-up data, sent synchronously; refused in production. Ran it to Moe's Mailtrap sandbox
+  (recipient mgolshan@gmail.com, captured, not delivered): en 9 mails (7 user mails incl. the
+  web-checkout "store plan active" variant, ops alert, Horizon long wait) + fr 7 mails, all accepted
+  by sandbox.smtp.mailtrap.io:2525 (STARTTLS) with no SMTP error; one extra queued PasswordChanged
+  went through Horizon (DONE, no failed jobs). Norton did not interfere with SMTP on 2525.
+- Tests: new `BrandAndMailTest` (16: config derivation from CENTRAL_DOMAIN, both env examples
+  expanded, no domain literal in code/views, logo files + 192×192 PNG, versioned relative/absolute
+  URLs + fingerprint change, logo on website/legal/admin, every mailable en+fr in the frame with logo
+  URL/footer/lang/one image/plain text, escaping, Horizon notification, preview command incl.
+  production refusal and coverage of every Mailable class); `WebsiteTest` updated (logo path, env
+  example parsed with Dotenv); `TestCase` flushes Livewire state per test (fixes the known
+  order-dependent failure). Affected files, pint and phpstan green; full suite left to the coordinator.
 
 ### 2026-10-24 audit rewordings + push localization
 

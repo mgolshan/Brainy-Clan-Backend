@@ -125,6 +125,15 @@ as written there; if something must change, update `docs/API.md` first and note 
     locked-out or forgetful adult can always get back in. Replaces the "per-email throttle"
     trade-off question.
   - **Devices:** iPhone and iPad (app milestone; layouts get a max content width on tablets).
+- **Central domain, brand and emails (2026-10-25, Moe):** the domain is one env line,
+  `CENTRAL_DOMAIN`; every domain-bearing env value (`APP_URL`, `WEBSITE_URL/HOST`, `API_DOMAIN`,
+  `ACME_EMAIL`, `MAIL_FROM_ADDRESS`, support/contact/alert addresses) is `${CENTRAL_DOMAIN}`-derived
+  and config defaults fall back to it. The logo has one source of truth (`config/brand.php` →
+  `public/images/brand/logo.svg` for the web/admin, `logo.png` for emails, via `Core\Support\Brand`
+  with `?v=` fingerprints); it is a copy of the app's `assets/brand/owl.svg` and is updated together.
+  Every email uses one template: Markdown mailables in Laravel's customised mail components (owl +
+  name header, website palette, footer with the reason, support address, website, ©; en/fr; plain
+  text; no tracking). `mail:preview` sends every type to a sandbox inbox (Mailtrap in dev).
 - **Mission (2026-10-24, Moe):** "The world of this application should be clean and happy. It
   focuses on one mission: kids use screen devices to learn and grow rather than waste their time
   and mind." Every feature, content item, design and marketing message is checked against it:

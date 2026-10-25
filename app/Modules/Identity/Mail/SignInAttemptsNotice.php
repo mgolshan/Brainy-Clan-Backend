@@ -20,7 +20,9 @@ class SignInAttemptsNotice extends Mailable implements ShouldQueue
     public function __construct(
         public readonly string $mailLocale,
         public readonly int $lockMinutes,
-    ) {}
+    ) {
+        $this->locale($mailLocale);
+    }
 
     public function envelope(): Envelope
     {
@@ -31,7 +33,7 @@ class SignInAttemptsNotice extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        return new Content(text: 'password.sign-in-attempts-mail', with: [
+        return new Content(markdown: 'mail.sign-in-attempts', with: [
             'locale' => $this->mailLocale,
             'minutes' => $this->lockMinutes,
             'supportEmail' => (string) config('legal.support_email'),
