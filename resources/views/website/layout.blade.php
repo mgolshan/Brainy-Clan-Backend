@@ -55,11 +55,23 @@
         .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
         .skip { position: absolute; left: -10000px; }
         .skip:focus { left: 16px; top: 8px; background: var(--surface); padding: 8px 12px; border-radius: 8px; z-index: 2; }
-        header.site { padding: 14px 0; }
-        header.site .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        header.site { position: sticky; top: 0; z-index: 10; padding: 10px 0; background: var(--bg); border-bottom: 1px solid var(--border); box-shadow: 0 2px 10px rgba(0, 0, 0, .05); }
+        header.site .wrap { display: flex; align-items: center; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
         .logo { display: flex; align-items: center; gap: 10px; color: var(--fg); text-decoration: none; font-weight: 800; font-size: 1.2rem; }
-        .logo img { width: 44px; height: 44px; }
+        .logo img { width: 40px; height: 40px; }
         nav.top { display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: 0.95rem; }
+        /* Section menu (pages that define a sectionNav section): one row of pills; scrolls sideways on phones. */
+        nav.sections { flex-basis: 100%; min-width: 0; }
+        nav.sections ul { display: flex; gap: 6px; margin: 0; padding: 2px 0 4px; list-style: none; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        nav.sections ul::-webkit-scrollbar { display: none; }
+        nav.sections a { display: block; white-space: nowrap; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--fg); font-size: 0.88rem; font-weight: 600; text-decoration: none; }
+        nav.sections a:hover { border-color: var(--brand); background: var(--brand-soft); }
+        nav.sections a.cta { background: var(--brand); border-color: var(--brand); color: #1b2a4a; }
+        @media (min-width: 900px) { nav.sections ul { justify-content: safe center; } }
+        /* Anchored headings land below the sticky header. */
+        html { scroll-padding-top: 80px; }
+        html:has(nav.sections) { scroll-padding-top: 130px; }
+        @media (max-width: 540px) { header.site { padding: 8px 0; } .logo img { width: 34px; height: 34px; } .logo { font-size: 1.05rem; } nav.top { gap: 4px 12px; font-size: 0.85rem; } }
         h1 { font-size: clamp(1.9rem, 5vw, 3rem); line-height: 1.15; margin: 0 0 16px; letter-spacing: -0.01em; }
         h2 { font-size: clamp(1.4rem, 3.2vw, 2rem); line-height: 1.2; margin: 0 0 12px; }
         h3 { font-size: 1.1rem; margin: 0 0 6px; }
@@ -109,6 +121,11 @@
             <a href="{{ route('website.support', $lang) }}">{{ $fr ? 'Aide' : 'Support' }}</a>
             <a href="{{ request()->url() }}?lang={{ $other }}" hreflang="{{ $other }}" lang="{{ $other }}">{{ $fr ? 'English' : 'Français' }}</a>
         </nav>
+        @hasSection('sectionNav')
+            <nav class="sections" aria-label="{{ $fr ? 'Sur cette page' : 'On this page' }}">
+                <ul>@yield('sectionNav')</ul>
+            </nav>
+        @endif
     </div>
 </header>
 <main id="main">

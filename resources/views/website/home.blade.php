@@ -146,6 +146,26 @@
 @extends('website.layout')
 
 @section('backToTop', '1')
+
+{{-- Sticky "on this page" menu in the header (layout); one link per section below, in page order. --}}
+@section('sectionNav')
+    @foreach ([
+        'worlds' => ['Worlds', 'Mondes'],
+        'how' => ['How it works', 'Comment ça marche'],
+        'games' => ['Games', 'Jeux'],
+        'brain-games' => ['Brain games', 'Jeux de cerveau'],
+        'categories' => ['Categories', 'Catégories'],
+        'clan' => ['The Clan', 'Le Clan'],
+        'unlocks' => ['Rewards', 'Récompenses'],
+        'what' => ['About', 'À propos'],
+        'chat' => ['Family chat', 'Clavardage'],
+        'safety' => ['Safety', 'Sécurité'],
+        'plans' => ['Plans', 'Forfaits'],
+        'get' => ['Get the app', 'Obtenir l’app'],
+    ] as $anchor => [$en, $frLabel])
+        <li><a href="#{{ $anchor }}"@if ($anchor === 'get') class="cta"@endif>{{ $fr ? $frLabel : $en }}</a></li>
+    @endforeach
+@endsection
 @section('title', $fr ? 'Brainy Clan — Des défis d’apprentissage en famille' : 'Brainy Clan — Family learning challenges')
 @section('description', $fr
     ? 'Brainy Clan est une application de quiz et d’apprentissage pour toute la famille : de courts défis adaptés à chaque âge, des objectifs à atteindre ensemble et un espace sûr pour les enfants.'
