@@ -63,8 +63,8 @@ describe('pages', function () {
             ->assertSee('Up to 2 family members, you included')
             ->assertSee('Up to 7 family members, you included')
             ->assertSee('3 categories')
-            ->assertSee('All 17 categories')
-            ->assertSee('17 categories to start with')
+            ->assertSee('All 20 categories')
+            ->assertSee('20 categories to start with')
             ->assertSee('1 active family goal')
             ->assertSee('Unlimited family goals')
             ->assertSee('3 free second chances per member per day')
@@ -215,7 +215,7 @@ describe('landing page v2', function () {
         $en = (string) $this->get('/?lang=en')->assertOk()->getContent();
         $fr = (string) $this->get('/?lang=fr')->assertOk()->getContent();
 
-        expect($seeded)->toHaveCount(17)
+        expect($seeded)->toHaveCount(20)
             ->and($en)->toContain(count($seeded).' categories to start with')
             ->and($fr)->toContain(count($seeded).' catégories pour commencer')
             ->and(substr_count($en, '<li class="cat">'))->toBe(count($seeded));
@@ -257,11 +257,11 @@ describe('landing page v2', function () {
         expect($siteImages)->toBeLessThan(2 * 1024 * 1024);
     });
 
-    it('shows the four brain games and the family chat with their screenshots', function (string $lang, array $alts) {
+    it('shows the four brain games, the level-up puzzles and the family chat with their screenshots', function (string $lang, array $alts) {
         $html = (string) $this->get("/?lang={$lang}")->assertOk()->getContent();
         $images = collect(landingImages($html))->keyBy('src');
 
-        foreach (['brain-memory', 'brain-pattern', 'brain-nonogram', 'brain-spot', 'chat-family'] as $i => $name) {
+        foreach (['brain-memory', 'brain-pattern', 'brain-nonogram', 'brain-spot', 'chat-family', 'puzzle-cross-math', 'puzzle-maze', 'puzzle-code-breaker'] as $i => $name) {
             $image = $images->get("/images/site/screens/{$name}.webp");
 
             expect($image)->not->toBeNull("{$name} missing")
@@ -270,10 +270,11 @@ describe('landing page v2', function () {
                 ->and($image['tag'])->toContain('loading="lazy"');
         }
 
-        expect(substr_count($html, '<div class="shot">'))->toBe(4);
+        expect(substr_count($html, '<div class="shot">'))->toBe(7)
+            ->and($html)->toContain('id="level-up-puzzles"');
     })->with([
-        'en' => ['en', ['Memory Match', 'Pattern &amp; Sequence', 'nonogram', 'Spot the Difference', 'family chat']],
-        'fr' => ['fr', ['jeu de mémoire', 'jeu de suites', 'logimage', 'jeu des différences', 'clavardage familial']],
+        'en' => ['en', ['Memory Match', 'Pattern &amp; Sequence', 'nonogram', 'Spot the Difference', 'family chat', 'Cross Math grid', 'maze', 'Code Breaker']],
+        'fr' => ['fr', ['jeu de mémoire', 'jeu de suites', 'logimage', 'jeu des différences', 'clavardage familial', 'maths croisés', 'labyrinthe', 'casse-code']],
     ]);
 
     it('tells the chat retention of each plan from the tier settings, in the chat section and the plans', function () {

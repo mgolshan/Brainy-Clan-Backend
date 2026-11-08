@@ -123,6 +123,7 @@
             <ul class="checks">
                 @foreach ($fr ? [
                     'Quiz, sudoku (de 4x4 à 9x9), sprint de maths, jeux de mots (anagrammes, lettre manquante, mots cachés) et jeux de cerveau (mémoire, suites, logimages, jeu des différences).',
+                    'Des casse-têtes à niveaux, des enfants aux adultes : maths croisés, labyrinthes et casse-code, quatre niveaux chacun.',
                     'Chacun joue à son niveau : les questions s’adaptent au groupe d’âge et à la difficulté de chaque joueur.',
                     'Objectifs familiaux (quotidiens, hebdomadaires, mensuels) : faites la course ou faites équipe pour une récompense dans la vraie vie.',
                     'Les enfants s’inscrivent avec un simple surnom : pas de courriel, pas de mot de passe, pas de vrai nom, pas de photo. Un parent donne son consentement pour chaque enfant.',
@@ -130,6 +131,7 @@
                     'Chaque question est révisée avant d’être publiée. En anglais et en français, sur iPhone, iPad et Android.',
                 ] : [
                     'Quizzes, Sudoku (4×4 to 9×9), Math Sprint, word puzzles (anagrams, missing letters, word search) and brain games (memory match, pattern sequence, nonograms, spot the difference).',
+                    'Level-up puzzles from kids to adults: Cross Math, Mazes and Code Breaker, four levels each.',
                     'Everyone plays at their own level: questions adapt to each player’s age group and difficulty.',
                     'Family goals (daily, weekly, monthly): race each other or team up for a real-world reward.',
                     'Kids join with just a nickname — no email, no password, no real name, no photo. A parent gives consent for each child.',

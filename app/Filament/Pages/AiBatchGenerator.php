@@ -89,9 +89,9 @@ class AiBatchGenerator extends Page implements HasTable
             ->columns(4)
             ->disabled(fn () => ! $this->isConfigured())
             ->components([
-                Select::make('category_id')->label('Category')->options(fn () => CategoryResource::parentOptions())
+                Select::make('category_id')->label('Category')->options(fn () => self::categoryOptions())
                     ->searchable()->required()->columnSpan(2)
-                    ->helperText('The prompt uses the full path (World Geography → Capitals → Europe).'),
+                    ->helperText('The prompt uses the full path (World Geography → Capitals → Europe). Generated-only categories (Sudoku, Math Sprint, Brain Games, Cross Math, Mazes, Code Breaker) are not listed.'),
                 Select::make('generation_type')->label('Type')->options(fn () => app(GenerationTypes::class)->options())->required()->columnSpan(2),
                 TextInput::make('min_difficulty')->label('Difficulty from')->numeric()->minValue(1)->maxValue(10)->required(),
                 TextInput::make('max_difficulty')->label('Difficulty to')->numeric()->minValue(1)->maxValue(10)->required()->gte('min_difficulty'),
@@ -104,6 +104,18 @@ class AiBatchGenerator extends Page implements HasTable
                     ->placeholder('e.g. focus on rivers and mountains; avoid capitals'),
             ])
             ->statePath('data');
+    }
+
+    /**
+     * Categories that can take AI content: every category except the generated-only ones.
+     *
+     * @return array<int, string>
+     */
+    public static function categoryOptions(): array
+    {
+        $tree = app(CategoryTree::class);
+
+        return array_filter(CategoryResource::parentOptions(), fn (int $id) => ! $tree->isGeneratedOnly($id), ARRAY_FILTER_USE_KEY);
     }
 
     public function generate(): void

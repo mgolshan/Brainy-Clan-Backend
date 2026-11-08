@@ -72,6 +72,22 @@ class CategoryTree
     }
 
     /**
+     * Whether every leaf of the subtree generates its items (Sudoku, Math Sprint, brain games,
+     * level-up puzzles): such categories never take content items, so the AI batch generator
+     * leaves them out.
+     */
+    public function isGeneratedOnly(int $id): bool
+    {
+        $children = $this->childrenOf($id);
+
+        if ($children->isEmpty()) {
+            return ($this->find($id)?->generatorSpecs() ?? []) !== [];
+        }
+
+        return $children->every(fn (Category $child) => $this->isGeneratedOnly($child->id));
+    }
+
+    /**
      * Names from the root down to this category, e.g. ["World Geography", "Capitals", "Europe"].
      *
      * @return list<string>

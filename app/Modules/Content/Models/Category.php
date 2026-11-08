@@ -41,7 +41,10 @@ class Category extends Model implements InvalidatesReferenceCache
     use HasFactory, LogsActivity;
 
     /** Icon keys the app knows how to render (docs/API.md). */
-    public const array ICONS = ['grid', 'puzzle', 'quote', 'globe', 'landmark', 'leaf', 'calculator', 'book'];
+    public const array ICONS = [
+        'grid', 'puzzle', 'quote', 'globe', 'landmark', 'leaf', 'calculator', 'book', 'bulb', 'language', 'rocket', 'earth',
+        'palette', 'restaurant', 'football', 'shield', 'sparkles', 'crossmath', 'maze', 'lock',
+    ];
 
     protected function casts(): array
     {

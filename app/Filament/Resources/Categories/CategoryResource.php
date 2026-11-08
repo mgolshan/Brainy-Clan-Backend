@@ -69,12 +69,12 @@ class CategoryResource extends Resource
                 Toggle::make('is_active')->default(true),
             ]),
             Section::make('Generated items')
-                ->description('Sudoku and Math Sprint items are generated per session from these generators (sessions in this category or a parent include them). The difficulty range says which members it suits.')
+                ->description('Sudoku, Math Sprint, brain game and level-up puzzle items are generated per session from these generators (sessions in this category or a parent include them). The difficulty range says which members it suits.')
                 ->collapsible()
                 ->schema([
                     Repeater::make('generators')->hiddenLabel()->defaultItems(0)->columns(4)->schema([
                         Select::make('type')->options(fn () => self::generatorTypes())->required(),
-                        KeyValue::make('options')->helperText('sudoku: size = 4 | 6 | 9 · math_sprint: mode = times_tables | mental | fractions · brain games (memory_match, pattern_sequence, nonogram, spot_difference): no options, the difficulty sets the size')
+                        KeyValue::make('options')->helperText('sudoku: size = 4 | 6 | 9 · math_sprint: mode = times_tables | mental | fractions · brain games (memory_match, pattern_sequence, nonogram, spot_difference) and level-up puzzles (cross_math, maze, code_breaker): no options, the difficulty sets the size')
                             ->rules([fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
                                 $registry = app(ChallengeTypeRegistry::class);
                                 $type = (string) $get('type');

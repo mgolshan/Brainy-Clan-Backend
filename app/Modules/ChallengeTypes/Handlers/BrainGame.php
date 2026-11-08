@@ -8,8 +8,9 @@ use App\Modules\Content\Models\ContentItem;
 
 /**
  * Shared plumbing of the brain games (memory_match, pattern_sequence, nonogram,
- * spot_difference): server-generated skill games whose payload gives the app everything it
- * needs to play; the server replays/verifies the submitted moves (docs/API.md "Brain games").
+ * spot_difference) and the level-up puzzles (cross_math, maze, code_breaker): server-generated
+ * skill games whose payload gives the app everything it needs to play; the server
+ * replays/verifies the submitted moves (docs/API.md "Brain games", "Level-up puzzles").
  * They take no generator options: the difficulty decides the size.
  */
 abstract class BrainGame implements ChallengeType, GeneratesItems

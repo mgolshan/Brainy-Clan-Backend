@@ -26,4 +26,7 @@ return [
     'notifications' => ['images/site/help/notifications.webp', 480, 898],
     'family-tab' => ['images/site/help/family-tab.webp', 480, 652],
     'lockout' => ['images/site/help/lockout.webp', 480, 812],
+    'cross-math' => ['images/site/help/cross-math.webp', 480, 1188],
+    'maze' => ['images/site/help/maze.webp', 480, 1193],
+    'code-breaker' => ['images/site/help/code-breaker.webp', 480, 1404],
 ];

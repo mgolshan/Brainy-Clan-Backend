@@ -6,7 +6,7 @@ use App\Modules\Content\Models\Category;
 use Illuminate\Database\Seeder;
 
 /**
- * The 8 launch categories and their sub-scopes (database/seeders/data/categories.php).
+ * The category tree (20 top-level categories) and their sub-scopes (database/seeders/data/categories.php).
  * Matched on slug, so re-running updates names, icons, ages, order and generators.
  */
 class CategorySeeder extends Seeder

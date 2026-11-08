@@ -85,7 +85,7 @@ return [
     [
         'id' => 'playing',
         'title' => 'Jouer',
-        'summary' => 'Catégories, types de questions, jeux de cerveau, vies et deuxièmes chances.',
+        'summary' => 'Catégories, types de questions, jeux de cerveau, casse-têtes à niveaux, vies et deuxièmes chances.',
         'icon' => 'art/world-geography.svg',
         'articles' => [
             [
@@ -147,6 +147,51 @@ return [
                 'image' => 'brain-memory',
                 'alt' => 'Le jeu de mémoire dans le monde Aventure dans la jungle : une paire de renards trouvée, 3 essais sur 12.',
                 'keywords' => ['mémoire', 'memory', 'suite', 'séquence', 'logimage', 'nonogramme', 'différences', 'logique', 'cartes'],
+            ],
+            [
+                'id' => 'cross-math',
+                'title' => 'Maths croisés',
+                'summary' => 'Complétez la grille de nombres pour que chaque ligne soit juste.',
+                'steps' => [
+                    'Chaque ligne et chaque colonne de la grille est un petit calcul, comme 4 + 5 = 9. Lisez de gauche à droite et de haut en bas.',
+                    'Placez chaque nombre des tuiles sous la grille dans une case vide. Chaque tuile sert une seule fois.',
+                    '× et ÷ passent avant + et −, comme à l’école : 2 + 3 × 4 = 14.',
+                    'Quand toutes les cases sont remplies et que chaque ligne est juste, c’est gagné. Toute disposition qui rend chaque ligne juste compte.',
+                ],
+                'tip' => 'Quatre niveaux, de Débutant (de petites additions) à Maître (les quatre opérations sur une plus grande grille). Chaque grille est créée à neuf.',
+                'image' => 'cross-math',
+                'alt' => 'Les maths croisés dans le monde Aventure dans la jungle : deux lignes d’une grille 5×5 sont justes et le nombre 5 est choisi.',
+                'keywords' => ['maths croisés', 'mots croisés de maths', 'grille de nombres', 'calcul', 'équations', 'addition', 'soustraction', 'multiplication', 'division', 'cross math'],
+            ],
+            [
+                'id' => 'mazes',
+                'title' => 'Labyrinthes',
+                'summary' => 'Trouvez le chemin jusqu’à l’arrivée en ramassant toutes les étoiles.',
+                'steps' => [
+                    'Partez du coin en haut à gauche et trouvez le chemin jusqu’à l’arrivée.',
+                    'Ramassez toutes les étoiles en route : le labyrinthe est réussi quand vous arrivez avec toutes les étoiles.',
+                    'Les murs bloquent le passage. Vous pouvez revenir sur vos pas autant de fois que vous voulez.',
+                    'Plus le niveau est élevé, plus le labyrinthe est grand et plus il y a d’étoiles.',
+                ],
+                'tip' => 'Il n’y a qu’un seul chemin entre deux cases : un cul-de-sac veut toujours dire faire demi-tour.',
+                'image' => 'maze',
+                'alt' => 'Un labyrinthe 10×10 dans le monde Aventure dans la jungle : le renard suit le chemin, 1 étoile sur 2 ramassée, avec les flèches en dessous.',
+                'keywords' => ['labyrinthe', 'dédale', 'chemin', 'sortie', 'étoiles', 'arrivée', 'murs', 'cul-de-sac', 'maze'],
+            ],
+            [
+                'id' => 'code-breaker',
+                'title' => 'Casse-code',
+                'summary' => 'Découvrez le code secret des amis du Clan, indice après indice.',
+                'steps' => [
+                    'Les amis du Clan cachent un code secret. Proposez un essai en choisissant un ami pour chaque place.',
+                    'Après chaque essai, les indices disent combien d’amis sont à la bonne place, et combien sont dans le code mais à une autre place.',
+                    'Servez-vous des indices pour l’essai suivant et trouvez le code avant d’avoir épuisé vos essais.',
+                    'Aux niveaux plus élevés, le code est plus long, il y a plus d’amis au choix et un ami peut revenir plusieurs fois.',
+                ],
+                'tip' => 'Changez seulement un ou deux amis à la fois pour tirer le plus d’informations de chaque indice.',
+                'image' => 'code-breaker',
+                'alt' => 'Le casse-code dans le monde Pays des bonbons : trois essais d’amis du Clan avec leurs indices ✓ et ↔, et un quatrième essai en cours.',
+                'keywords' => ['casse-code', 'code secret', 'mastermind', 'cadenas', 'indices', 'essai', 'logique', 'déduction', 'code breaker'],
             ],
             [
                 'id' => 'second-chances',

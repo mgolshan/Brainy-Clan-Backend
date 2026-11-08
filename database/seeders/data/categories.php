@@ -1,7 +1,8 @@
 <?php
 
 /*
- * The 8 launch categories and their sub-scopes (design doc: "Launch categories").
+ * The category tree: the 8 launch categories (design doc: "Launch categories"), the 2026-10-23
+ * additions and the 2026-11-08 level-up puzzles (20 top-level categories), with their sub-scopes.
  * Shape: slug => [name, icon, min_age, children[slug => name | [name, min_age, max_age, children]]].
  * Optional `generators`: generated challenge types the node offers (GeneratorSpec shape:
  * type, options, min_difficulty, max_difficulty), e.g. Sudoku sizes and Math Sprint modes.
@@ -212,6 +213,42 @@ return [
             'first-aid' => ['name' => ['en' => 'First-Aid Basics', 'fr' => 'Premiers soins'], 'min_age' => 8],
             'online-safety' => ['name' => ['en' => 'Online Safety', 'fr' => 'Sécurité en ligne'], 'min_age' => 8],
             'everyday-manners' => ['name' => ['en' => 'Everyday Manners', 'fr' => 'Bonnes manières']],
+        ],
+    ],
+
+    // Added 2026-11-08 (PLAN "Categories 18–20: level-up puzzles"): generated puzzles with four
+    // levels each, from a first easy round to puzzles that challenge adults.
+    'cross-math' => [
+        'name' => ['en' => 'Cross Math', 'fr' => 'Maths croisés'],
+        'icon' => 'crossmath',
+        'min_age' => 6,
+        'children' => [
+            'cross-math-starter' => ['name' => ['en' => 'Starter', 'fr' => 'Débutant'], 'generators' => [['type' => 'cross_math', 'options' => [], 'min_difficulty' => 1, 'max_difficulty' => 3]]],
+            'cross-math-explorer' => ['name' => ['en' => 'Explorer', 'fr' => 'Explorateur'], 'generators' => [['type' => 'cross_math', 'options' => [], 'min_difficulty' => 4, 'max_difficulty' => 6]]],
+            'cross-math-expert' => ['name' => ['en' => 'Expert', 'fr' => 'Expert'], 'min_age' => 8, 'generators' => [['type' => 'cross_math', 'options' => [], 'min_difficulty' => 7, 'max_difficulty' => 8]]],
+            'cross-math-master' => ['name' => ['en' => 'Master', 'fr' => 'Maître'], 'min_age' => 10, 'generators' => [['type' => 'cross_math', 'options' => [], 'min_difficulty' => 9, 'max_difficulty' => 10]]],
+        ],
+    ],
+    'mazes' => [
+        'name' => ['en' => 'Mazes', 'fr' => 'Labyrinthes'],
+        'icon' => 'maze',
+        'min_age' => 4,
+        'children' => [
+            'mazes-starter' => ['name' => ['en' => 'Starter', 'fr' => 'Débutant'], 'generators' => [['type' => 'maze', 'options' => [], 'min_difficulty' => 1, 'max_difficulty' => 3]]],
+            'mazes-explorer' => ['name' => ['en' => 'Explorer', 'fr' => 'Explorateur'], 'generators' => [['type' => 'maze', 'options' => [], 'min_difficulty' => 4, 'max_difficulty' => 6]]],
+            'mazes-expert' => ['name' => ['en' => 'Expert', 'fr' => 'Expert'], 'min_age' => 8, 'generators' => [['type' => 'maze', 'options' => [], 'min_difficulty' => 7, 'max_difficulty' => 8]]],
+            'mazes-master' => ['name' => ['en' => 'Master', 'fr' => 'Maître'], 'min_age' => 10, 'generators' => [['type' => 'maze', 'options' => [], 'min_difficulty' => 9, 'max_difficulty' => 10]]],
+        ],
+    ],
+    'code-breaker' => [
+        'name' => ['en' => 'Code Breaker', 'fr' => 'Casse-code'],
+        'icon' => 'lock',
+        'min_age' => 6,
+        'children' => [
+            'code-breaker-starter' => ['name' => ['en' => 'Starter', 'fr' => 'Débutant'], 'generators' => [['type' => 'code_breaker', 'options' => [], 'min_difficulty' => 1, 'max_difficulty' => 3]]],
+            'code-breaker-explorer' => ['name' => ['en' => 'Explorer', 'fr' => 'Explorateur'], 'generators' => [['type' => 'code_breaker', 'options' => [], 'min_difficulty' => 4, 'max_difficulty' => 6]]],
+            'code-breaker-expert' => ['name' => ['en' => 'Expert', 'fr' => 'Expert'], 'min_age' => 8, 'generators' => [['type' => 'code_breaker', 'options' => [], 'min_difficulty' => 7, 'max_difficulty' => 8]]],
+            'code-breaker-master' => ['name' => ['en' => 'Master', 'fr' => 'Maître'], 'min_age' => 10, 'generators' => [['type' => 'code_breaker', 'options' => [], 'min_difficulty' => 9, 'max_difficulty' => 10]]],
         ],
     ],
 ];

@@ -7,6 +7,7 @@ use App\Modules\Content\Generation\GenerationTypes;
 use App\Modules\Content\Jobs\GenerateContentBatchJob;
 use App\Modules\Content\Models\Category;
 use App\Modules\Content\Models\ContentBatch;
+use App\Modules\Content\Support\CategoryTree;
 use App\Modules\Identity\Models\User;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -14,10 +15,14 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Records an AI batch request (status `queued`) and dispatches the generation job to Horizon.
+ * Generated-only categories (CategoryTree::isGeneratedOnly) are refused.
  */
 class QueueContentBatch
 {
-    public function __construct(private readonly GenerationTypes $types) {}
+    public function __construct(
+        private readonly GenerationTypes $types,
+        private readonly CategoryTree $tree,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data  category_id, generation_type, locale, min_difficulty, max_difficulty, min_age, max_age, count, note
@@ -42,6 +47,10 @@ class QueueContentBatch
             'count' => ['required', 'integer', 'between:1,'.(int) config('content_generator.max_items', 50)],
             'note' => ['nullable', 'string', 'max:1000'],
         ])->validate();
+
+        if ($this->tree->isGeneratedOnly((int) $valid['category_id'])) {
+            throw ValidationException::withMessages(['category_id' => 'This category only has generated puzzles (no questions); pick another category.']);
+        }
 
         [$typeKey, $variant] = GenerationTypes::split($valid['generation_type']);
 

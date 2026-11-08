@@ -858,7 +858,8 @@ its real token counts in the table and on the review screen.
 ### Workflow
 
 1. **Generate:** pick the category (the full path, e.g. *World Geography → Capitals → Europe*, goes
-   into the prompt), type (multiple choice, wisdom card, anagram, missing letter, word search),
+   into the prompt; generated-only categories such as Sudoku, Math Sprint, Brain Games, Cross Math,
+   Mazes and Code Breaker are not offered), type (multiple choice, wisdom card, anagram, missing letter, word search),
    difficulty range, ages, language, number of items (max 50) and an optional note
    ("focus on rivers"). Click **Generate drafts**. The batch is `queued`, then `running` (1–3 minutes).
 2. **What the generator does:** sends the content rules (age-appropriate, factual, an explanation on

@@ -27,6 +27,9 @@
         ['sports-games', 'Sports et jeux', 'Règles et équipement, Jeux olympiques, jeux de société et de cartes.'],
         ['brain-games', 'Jeux de cerveau', 'Jeu de mémoire, suites à répéter, logimages et jeu des différences.'],
         ['life-skills', 'Vie pratique et sécurité', 'Sécurité routière, premiers soins, sécurité en ligne et bonnes manières.'],
+        ['cross-math', 'Maths croisés', 'Des grilles de calcul à compléter, du premier plus aux quatre opérations.'],
+        ['mazes', 'Labyrinthes', 'Trouver la sortie et ramasser les étoiles, du petit labyrinthe au grand défi.'],
+        ['code-breaker', 'Casse-code', 'Deviner le code secret des amis du Clan, indice après indice.'],
     ] : [
         ['world-geography', 'World Geography', 'Capitals, flags, continents and landmarks.'],
         ['science-nature', 'Science & Nature', 'Animals, space and the human body.'],
@@ -45,6 +48,9 @@
         ['sports-games', 'Sports & Games', 'Rules and equipment, the Olympic Games, board and card games.'],
         ['brain-games', 'Brain Games', 'Memory match, repeat-the-pattern, picture logic puzzles and spot the difference.'],
         ['life-skills', 'Life Skills & Safety', 'Road safety, first aid, online safety and everyday manners.'],
+        ['cross-math', 'Cross Math', 'Number grids to complete, from the first plus to all four operations.'],
+        ['mazes', 'Mazes', 'Find the way out and collect the stars, from little mazes to big challenges.'],
+        ['code-breaker', 'Code Breaker', 'Crack the Clan friends’ secret code, clue by clue.'],
     ];
     $free = $plans['free'];
     $family = $plans['family'];
@@ -115,6 +121,16 @@
         ['brain-pattern', 336, 463, 'Pattern & Sequence', 'Watch the Clan friends light up, with sound, then repeat the pattern in the same order.', 'Pattern & Sequence in the Neon Arcade world: four Clan friends to tap in the same order.'],
         ['brain-nonogram', 333, 514, 'Nonograms', 'Fill in the grid from the number clues to reveal a hidden picture, from 5×5 up to 10×10.', 'A solved 10×10 nonogram in the Jungle Adventure world: the hidden picture is a sailing boat.'],
         ['brain-spot', 344, 673, 'Spot the Difference', 'Two pictures, a few small changes: find them all before you run out of misses.', 'Spot the Difference in the Neon Arcade world: two pictures with 2 of 5 differences circled.'],
+    ];
+    /** Level-up puzzles: [image, width, height, name, text, alt] (crops of the app's game screens). */
+    $levelUpPuzzles = $fr ? [
+        ['puzzle-cross-math', 340, 803, 'Maths croisés', 'Placez les tuiles de nombres pour que chaque ligne et chaque colonne soit un calcul juste, des petites additions aux quatre opérations.', 'Une grille de maths croisés 7×7 : des additions, soustractions et multiplications, avec les tuiles de nombres à placer dessous.'],
+        ['puzzle-maze', 340, 854, 'Labyrinthes', 'Guidez votre ami du Clan jusqu’au drapeau en ramassant toutes les étoiles, du petit labyrinthe au 16×16.', 'Un labyrinthe 16×16 dans un monde sombre : 2 étoiles sur 4 ramassées, avec les flèches pour se déplacer.'],
+        ['puzzle-code-breaker', 340, 785, 'Casse-code', 'Devinez la combinaison secrète des amis du Clan, indice après indice, avant d’épuiser vos essais.', 'Le casse-code : trois essais avec leurs indices (bonne place, mauvaise place) et les amis du Clan à choisir.'],
+    ] : [
+        ['puzzle-cross-math', 340, 803, 'Cross Math', 'Place the number tiles so every row and every column is a true sum, from small additions to all four operations.', 'A 7×7 Cross Math grid with additions, subtractions and multiplications, and the number tiles to place below.'],
+        ['puzzle-maze', 340, 854, 'Mazes', 'Guide your Clan friend to the flag and collect every star, from little mazes up to 16×16.', 'A 16×16 maze in a dark world: 2 of 4 stars collected, with the arrow buttons to move.'],
+        ['puzzle-code-breaker', 340, 785, 'Code Breaker', 'Guess the secret line of Clan friends, clue by clue, before you run out of guesses.', 'Code Breaker: three guesses with their clues (right spot, wrong spot) and the Clan friends to pick from.'],
     ];
     $clanFamily = $fr ? [
         ['fox', 'Enfant', 'Renard, version enfant'], ['cat-teen', 'Ado', 'Chat, version ado avec casque'],
@@ -259,6 +275,13 @@
     .brain .shot img { position: absolute; inset: var(--pad); margin: auto; max-width: calc(100% - 2 * var(--pad)); max-height: calc(100% - 2 * var(--pad)); width: auto; height: auto; border-radius: 12px; box-shadow: 0 8px 20px rgba(27, 42, 74, .22); }
     .brain h3 { margin: 12px 4px 4px; font-size: 1.05rem; line-height: 1.25; }
     .brain p { margin: 0 4px; color: var(--muted); font-size: .9rem; line-height: 1.4; }
+    /* Level-up puzzles: 3 tall game screens under the brain games (2 + 1 centred on phones). */
+    .brain.puzzles { margin-top: 18px; justify-content: center; }
+    @media (min-width: 600px) { .brain.puzzles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (min-width: 900px) { .brain.puzzles { grid-template-columns: repeat(3, minmax(0, 260px)); } }
+    @media (max-width: 599px) { .brain.puzzles li:last-child { grid-column: 1 / -1; justify-self: center; width: calc(50% - 6px); } }
+    .puzzles-title { margin: 40px 0 6px; text-align: center; font-size: 1.35rem; }
+    .puzzles-lead { margin: 0 auto; max-width: 620px; text-align: center; color: var(--muted); }
     @media (max-width: 599px) { .brain { gap: 12px; } .brain .shot { --pad: 8px; } .brain h3 { font-size: .95rem; } .brain p { font-size: .82rem; } }
 
     /* Family chat */
@@ -280,10 +303,10 @@
     .perks span:last-child { color: var(--muted); font-size: .93rem; }
 
     /* Categories */
-    /* Compact tiles in centred rows (17 categories: 2 per row on phones, 3 on tablets, 6 on desktop -> 6/6/5). */
+    /* Compact tiles in centred rows (20 categories: 2 per row on phones, 4 on tablets, 5 on desktop -> full rows everywhere). */
     .cats { --cols: 2; --gap: 12px; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); list-style: none; padding: 0; margin: 0; }
-    @media (min-width: 600px) { .cats { --cols: 3; --gap: 16px; } }
-    @media (min-width: 1000px) { .cats { --cols: 6; } }
+    @media (min-width: 600px) { .cats { --cols: 4; --gap: 16px; } }
+    @media (min-width: 1000px) { .cats { --cols: 5; } }
     .cat { flex: 0 0 calc((100% - (var(--cols) - 1) * var(--gap)) / var(--cols)); min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 10px 10px 14px; box-shadow: var(--card-shadow); transition: transform .2s; }
     @media (prefers-reduced-motion: no-preference) { .cat:hover { transform: translateY(-4px) rotate(-1deg); } }
     .cat img { display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 14px; background: var(--tile, #ffe9d6); }
@@ -488,6 +511,19 @@
             </div>
             <ul class="brain">
                 @foreach ($brainGames as [$image, $width, $height, $name, $text, $alt])
+                    <li>
+                        <div class="shot"><img src="{{ $screen($image) }}" width="{{ $width }}" height="{{ $height }}" loading="lazy" decoding="async" alt="{{ $alt }}"></div>
+                        <h3>{{ $name }}</h3>
+                        <p>{{ $text }}</p>
+                    </li>
+                @endforeach
+            </ul>
+            <h3 id="level-up-puzzles" class="puzzles-title">{{ $fr ? 'Nouveau : des casse-têtes à niveaux, des enfants aux adultes' : 'New: level-up puzzles, from kids to adults' }}</h3>
+            <p class="puzzles-lead">{{ $fr
+                ? 'Maths croisés, labyrinthes et casse-code : trois catégories à quatre niveaux, de Débutant à Maître.'
+                : 'Cross Math, Mazes and Code Breaker: three categories with four levels each, from Starter to Master.' }}</p>
+            <ul class="brain puzzles">
+                @foreach ($levelUpPuzzles as [$image, $width, $height, $name, $text, $alt])
                     <li>
                         <div class="shot"><img src="{{ $screen($image) }}" width="{{ $width }}" height="{{ $height }}" loading="lazy" decoding="async" alt="{{ $alt }}"></div>
                         <h3>{{ $name }}</h3>

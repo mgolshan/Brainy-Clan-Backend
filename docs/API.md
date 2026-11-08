@@ -367,7 +367,7 @@ Codes: 8 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no 0/O/1/I), valid 
   `is_locked` is true for top-level categories beyond the tier's `max_categories` (free tier) — the
   app shows them with an upgrade hint instead of hiding them. `icon` is a short key
   (`grid, puzzle, quote, globe, landmark, leaf, calculator, book, bulb, language, rocket, earth,
-  palette, restaurant, football, shield, sparkles`; unknown keys → a generic icon) the app maps to an icon.
+  palette, restaurant, football, shield, sparkles, crossmath, maze, lock`; unknown keys → a generic icon) the app maps to an icon.
 
 ### Play
 Session:
@@ -489,6 +489,59 @@ verifies the submitted moves and decides correctness and points. Positions are z
   flips only on asymmetric props. An empty pattern `input` is a wrong answer (not 422); a tap on an
   already-found change is neither a find nor a miss. Response caps: `attempts` ≤ 200, `input` ≤ 20,
   `taps` ≤ 60 (422 beyond).
+
+**Level-up puzzles (2026-11-08)** — three more server-generated types, each with its own top-level
+category whose four levels take a kid from a first easy round to puzzles that challenge adults.
+Same rules as the brain games: the app gets what it needs to play (skill games, not secrets), the
+server verifies the submitted moves and decides correctness and points. Positions are zero-based,
+`[row, col]`.
+
+| category (icon) | type | levels (children, difficulty) |
+| --- | --- | --- |
+| `cross-math` Cross Math / Maths croisés (`crossmath`), min age 6 | `cross_math` | `cross-math-starter` Starter / Débutant 1–3 · `cross-math-explorer` Explorer / Explorateur 4–6 · `cross-math-expert` Expert 7–8 (min age 8) · `cross-math-master` Master / Maître 9–10 (min age 10) |
+| `mazes` Mazes / Labyrinthes (`maze`), min age 4 | `maze` | `mazes-starter` … `mazes-master` (same names, ranges and ages) |
+| `code-breaker` Code Breaker / Casse-code (`lock`), min age 6 | `code_breaker` | `code-breaker-starter` … `code-breaker-master` (same names, ranges and ages) |
+
+The three categories go at the end of the top-level order (after Life Skills), so the free tier is
+unchanged (first 3 top-level categories). Difficulty is chosen like Sudoku: the member's difficulty
+range intersected with the level's range.
+
+| type | payload | response | correct_response | points |
+| --- | --- | --- | --- | --- |
+| `cross_math` | `{ "rows": 5, "cols": 5, "cells": [[4,"+","?","=",9],["-",null,"*",null,"-"],…], "bank": [3,5,6] }` — `cells` row-major; a cell is a number (given), `"?"` (a blank to fill), an operator `"+"`, `"-"`, `"*"`, `"/"`, `"="`, or `null` (empty square). The app shows `*` as ×, `/` as ÷. `bank` = the numbers to place, one per blank, sorted ascending (may repeat) | `{ "fills": [[0,2,5],…] }` — `[row, col, value]` per blank | `{ "fills": [ …the generator's solution ] }` | 2 (difficulty 1–3), 3 (4–6), 5 (7–8), 8 (9–10) |
+| `maze` | `{ "rows": 8, "cols": 8, "cells": [[9,5,3,…],…], "start": [0,0], "goal": [7,7], "stars": [[2,5],…] }` — `cells[r][c]` is a wall bitmask: 1 north, 2 east, 4 south, 8 west (outer border always walled; neighbours agree). Perfect maze: exactly one route between any two cells. `stars` (0–4) must all be collected | `{ "path": [[0,0],[0,1],[1,1],…] }` — every cell the member walked through, in order, revisits allowed | `{ "path": [ …a shortest route through all stars ] }` | 1 (≤ 7×7), 2 (8–10), 3 (11–12), 5 (14+) |
+| `code_breaker` | `{ "pegs": ["fox","owl","frog","panda"], "length": 3, "repeats": false, "max_guesses": 10, "code": [2,0,3] }` — `pegs` are Clan **kid** avatar keys (4–8); `code` = indices into `pegs`, distinct when `repeats` is false. The app scores every guess itself (feedback below) | `{ "guesses": [[0,1,2],[2,0,1],…] }` — every guess, in order (indices into `pegs`) | `{ "guesses": null, "code": [ … ] }` | 2 (length 3), 3 (length 4), 5 (length 5) |
+
+- **cross_math:** the grid is a lattice: numbers on even rows and even columns, operators and `=`
+  between them, `null` on odd row + odd column. Every even row and every even column is one
+  equation, `a op b = c` (5×5 cells, difficulty 1–6) or `a op b op c = d` (7×7 cells, 7–10),
+  evaluated with normal precedence (× and ÷ before + and −, then left to right). Every number in
+  the grid (given, blank, result and any intermediate value) is a whole number from 0 up to the
+  level's maximum; every division is exact and never by 0. Correct when every blank is filled,
+  the filled values are exactly the `bank` (same multiset) and every equation holds — any
+  arrangement that does is correct, even if it differs from the generator's. Fewer fills than
+  blanks → wrong answer. A fill on a cell that is not `"?"`, out of range, the same cell twice, or
+  more fills than blanks → 422 `validation_failed`.
+  Generator (informative): 1: + only, ≤ 10, 3 blanks · 2: + −, ≤ 10, 4 · 3: + −, ≤ 20, 5 ·
+  4: + − ×, ≤ 20, 5 · 5: + − ×, ≤ 50, 6 · 6: + − × ÷, ≤ 50, 7 · 7: 7×7, + −, ≤ 50, 8 ·
+  8: 7×7, + − ×, ≤ 100, 10 · 9: 7×7, + − × ÷, ≤ 100, 12 · 10: 7×7, + − × ÷, ≤ 200, 14.
+  The generator only emits puzzles where blanks can be deduced (it checks the solution count of
+  the blank arrangement and keeps the puzzle when it is unique).
+- **maze:** `path[0]` must equal `start`; each next cell must be an orthogonal neighbour with no
+  wall between them. Correct when the path ends on `goal` and has visited every star. A path that
+  stops early is a wrong answer. Not starting at `start`, a step through a wall or to a
+  non-neighbour, a cell out of range, or more than `rows × cols × 4` entries → 422.
+  Generator (informative): square mazes 5, 6, 7, 8, 9, 10, 11, 12, 14, 16 for difficulty 1–10;
+  stars 0 (1–4), 1 (5), 2 (6), 3 (7–8), 4 (9–10); `start` top-left, `goal` the cell farthest from
+  `start`.
+- **code_breaker:** feedback for a guess (standard Mastermind): `exact` = positions where guess and
+  code agree; `near` = (for each peg, min(count in guess, count in code)) summed, minus `exact`.
+  Correct when a guess equals `code` within `max_guesses`. Each guess must have `length` entries,
+  each `0 ≤ i < pegs.length` (repeats allowed in a guess even when the code has none); more than
+  `max_guesses` guesses, or any guess after the one that matched → 422. Not solved → wrong answer.
+  Generator (informative): (length, pegs, repeats, max_guesses) = 1: 3,4,no,10 · 2: 3,5,no,10 ·
+  3: 4,4,no,10 · 4: 4,5,no,10 · 5: 4,6,no,10 · 6: 4,6,yes,10 · 7: 5,6,no,10 · 8: 5,7,yes,10 ·
+  9: 5,8,yes,10 · 10: 5,8,yes,8.
 
 **Sessions and generated items:** Sudoku and Math Sprint items are generated by the server from a
 seed when a session starts (they are not content rows); the API shape is the same, and an
@@ -820,3 +873,5 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-24 — Chat report: `POST /family/chat/messages/{id}/report` (to family admins only), Message `reported` (admins), push/preference `family_chat_report`.
 - 2026-10-24 — Chat report clarifications (backend built, no shape change): reporting an already deleted message → 204 no-op; a message past retention → 404; own message → 422 `validation_failed` (`errors.message`); the push goes to active admins with chat on, except the reporter; deleting a message (tombstone) clears its reports (`reported` false); reports are deleted with the message (retention, erasure, family deletion) and with the reporter's account; `types.family_chat_report` is in every member's preferences (only admins receive it). Message examples show `reported`.
 - 2026-10-24 — Push texts for `goal_reached`, `period_closed`, `family_activity` and `daily_reminder` now follow the recipient's `locale` (en/fr), like the chat pushes; reworded `daily_reminder` / `family_activity` texts (content audit). No shape change.
+- 2026-11-08 — Level-up puzzles: types `cross_math`, `maze`, `code_breaker` (server-generated), categories `cross-math` (icon `crossmath`), `mazes` (icon `maze`), `code-breaker` (icon `lock`), each with 4 level subcategories; 20 top-level categories.
+- 2026-11-08 — Level-up puzzles clarifications (backend built, no shape change): **cross_math** — "out of range" means a fill whose `[row, col]` is outside the grid; a fill value that is not a JSON whole number → 422, a whole number that does not fit the bank → wrong answer; an equation holds when it is true in exact arithmetic with normal precedence (÷ 0 never holds) — the "whole numbers 0..max, exact division" rule is what the generator guarantees for its own grid, a member's other arrangement only has to make every equation true; the points follow the difficulty even when the generator had to use fewer blanks (rare; at least 2 on 5×5, 3 on 7×7). **maze** — an empty `path` → 422 (it does not start on `start`); a step to the same cell → 422 (not a neighbour); walking through the goal before the end is fine. **code_breaker** — an empty `guesses` list is a wrong answer; `repeats: true` means the code *may* repeat a peg. Request caps (422 beyond, the per-item limits still apply): `fills` ≤ 50, `path` ≤ 1024, `guesses` ≤ 20. Category `icon` keys list gains `crossmath, maze, lock`.

@@ -25,6 +25,12 @@ class SubmitAnswerRequest extends FormRequest
             'response.input' => ['sometimes', 'array', 'max:20'],
             /** Spot the difference: taps as [x, y], normalized 0–1 within the tapped picture (at most 60). */
             'response.taps' => ['sometimes', 'array', 'max:60'],
+            /** Cross Math: [row, col, value] per blank (at most one per blank; at most 50). */
+            'response.fills' => ['sometimes', 'array', 'max:50'],
+            /** Maze: every cell walked through, in order, as [row, col] (at most rows × cols × 4, 1024). */
+            'response.path' => ['sometimes', 'array', 'max:1024'],
+            /** Code Breaker: every guess, in order, as peg positions (at most max_guesses, 20). */
+            'response.guesses' => ['sometimes', 'array', 'max:20'],
             'time_ms' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:3600000'],
         ];
     }

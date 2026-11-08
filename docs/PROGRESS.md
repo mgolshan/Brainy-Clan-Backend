@@ -380,6 +380,42 @@ curl http://localhost:8080/api/v1/health
 
 ## Log
 
+### 2026-11-08 categories 18–20 (Cross Math, Mazes, Code Breaker)
+- **Three generated types** (docs/API.md "Level-up puzzles", PLAN "Categories 18–20"), handlers on the
+  `BrainGame` base: `CrossMath` (+ `Generators/CrossMathGenerator`, `CrossMathSolver`), `Maze`
+  (+ `Generators/MazeGenerator`), `CodeBreaker`. Registered in `config/challenge_types.php`.
+- **Cross Math generator:** samples the n×n core (often small products so ÷ finds partners), picks a
+  valid operator per core row/column (the level's newest operator first half the time), scans the last
+  core cell (≤ 30 values) until the last row and column agree on the corner; strict rules: every number
+  and intermediate 0..max, exact ÷, no ×/÷ with 0 or 1. Blanks are kept only when `CrossMathSolver`
+  proves the bank's arrangement unique (fixed schedule: givens first, staircase order, results forced
+  from the bank, exact arithmetic like the answer check). Bounds: 40 grids × 3 blank sets, 30 000 nodes
+  per check, 60 000 nodes per puzzle; later attempts use fewer blanks; last resort = the core rows'
+  results (always unique). Measured (dev container): avg ≤ 10 ms at difficulty 10 (≤ 1 ms at 1–7), max
+  ~50 ms, theoretical worst ~170 ms; ≥ 90 % of puzzles have the full blank count; the newest operator
+  appears in ≥ 85 %. Nearly empty grids (difficulty 10) keep their few givens in the core (much faster
+  proof). `answer.difficulty` is stored so points follow the level.
+- **Maze generator:** seeded recursive backtracker (perfect maze), goal = farthest cell (row-major
+  ties), stars on off-route dead ends first; answer = shortest walk through all stars (≤ 4! orders over
+  BFS distances); tests check it equals 2·|Steiner tree| − d(start, goal).
+- **Code Breaker:** contract table, kid avatar pegs (`ClanArt::kidAvatars()`), Mastermind `feedback()`.
+- **Categories:** `cross-math` (`crossmath`), `mazes` (`maze`), `code-breaker` (`lock`) after Life
+  Skills, 4 levels each (Starter 1–3, Explorer 4–6, Expert 7–8 age 8+, Master 9–10 age 10+). No
+  migration: rolled out like the brain games by re-running `CategorySeeder` + `ChallengeTypeSeeder`
+  (idempotent, updateOrCreate). `Category::ICONS` now lists every key in use (was 8).
+- **Admin:** content preview samples + renderings for the three types; category helper texts; the AI
+  batch generator hides generated-only categories (`CategoryTree::isGeneratedOnly`: every leaf has
+  generators — also Sudoku, Math Sprint, Brain Games) and `QueueContentBatch` refuses them.
+- **Website/help:** 20 category tiles (2 / 4 / 5 per row), art `public/images/site/art/{cross-math,
+  mazes,code-breaker}.svg` exported byte-identical from the app's `categoryArt.generated.ts` (owl with
+  number tiles, rabbit with hedge maze, raccoon with padlock); landing `#brain-games` gains a
+  "level-up puzzles" row (`#level-up-puzzles`, screens `puzzle-{cross-math,maze,code-breaker}.webp`
+  from the app agent, en/fr alts, lazy); partners claims; help articles `cross-math`, `mazes`,
+  `code-breaker` (en/fr, screenshots added by the app agent in `help/` + `images.php`).
+- Request caps: `response.fills` ≤ 50, `path` ≤ 1024, `guesses` ≤ 20. API.md clarification line added.
+- Tests: `tests/Feature/Actions/LevelUpPuzzlesTest.php`, `tests/Feature/Api/LevelUpPuzzlesPlayTest.php`;
+  17 → 20 in ContentActionsTest/WebsiteTest, type keys in ChallengeTypesTest.
+
 ### 2026-10-25 central domain, brand, email template
 
 - **`CENTRAL_DOMAIN`** (Moe): `.env.example`, `.env.prod.example` and the dev `.env` start with

@@ -91,7 +91,7 @@ return [
     [
         'id' => 'playing',
         'title' => 'Playing',
-        'summary' => 'Categories, question types, brain games, lives and second chances.',
+        'summary' => 'Categories, question types, brain games, level-up puzzles, lives and second chances.',
         'icon' => 'art/world-geography.svg',
         'articles' => [
             [
@@ -153,6 +153,51 @@ return [
                 'image' => 'brain-memory',
                 'alt' => 'Memory Match in the Jungle Adventure world: a pair of foxes found, 3 of 12 attempts used.',
                 'keywords' => ['memory', 'pattern', 'sequence', 'nonogram', 'picture puzzle', 'spot the difference', 'logic', 'cards'],
+            ],
+            [
+                'id' => 'cross-math',
+                'title' => 'Cross Math',
+                'summary' => 'Fill the number grid so every line is true.',
+                'steps' => [
+                    'Every row and every column of the grid is a small sum, such as 4 + 5 = 9. Read across and down.',
+                    'Put each number from the tiles under the grid into an empty square. Every tile is used once.',
+                    '× and ÷ come before + and −, like at school: 2 + 3 × 4 = 14.',
+                    'When every square is filled and every line is true, the puzzle is solved. Any arrangement that makes every line true counts.',
+                ],
+                'tip' => 'Four levels, from Starter (adding small numbers) to Master (all four operations on a bigger grid). Each puzzle is made fresh.',
+                'image' => 'cross-math',
+                'alt' => 'Cross Math in the Jungle Adventure world: two lines of a 5×5 grid are true and the number tile 5 is picked.',
+                'keywords' => ['cross math', 'math crossword', 'number grid', 'sums', 'equations', 'addition', 'subtraction', 'multiplication', 'division', 'arithmetic'],
+            ],
+            [
+                'id' => 'mazes',
+                'title' => 'Mazes',
+                'summary' => 'Find the way to the goal and collect every star.',
+                'steps' => [
+                    'Start in the top-left corner and find your way to the goal.',
+                    'Collect every star on the way: the maze is solved when you reach the goal with all the stars.',
+                    'Walls block the way. You can walk back along a path as often as you like.',
+                    'Higher levels have bigger mazes and more stars.',
+                ],
+                'tip' => 'There is only one route between any two squares, so a dead end always means turning back.',
+                'image' => 'maze',
+                'alt' => 'A 10×10 maze in the Jungle Adventure world: the fox walks the path, 1 of 2 stars collected, with the arrow buttons below.',
+                'keywords' => ['maze', 'labyrinth', 'path', 'way out', 'stars', 'goal', 'walls', 'dead end'],
+            ],
+            [
+                'id' => 'code-breaker',
+                'title' => 'Code Breaker',
+                'summary' => 'Crack the secret code of the Clan friends, clue by clue.',
+                'steps' => [
+                    'The Clan friends hide a secret code. Make a guess by picking a friend for each spot.',
+                    'After each guess, the clues tell how many friends are in the right spot, and how many are in the code but in another spot.',
+                    'Use the clues for your next guess and crack the code before you run out of guesses.',
+                    'At higher levels the code is longer, there are more friends to choose from, and a friend can appear more than once.',
+                ],
+                'tip' => 'Change only one or two friends at a time to learn the most from each clue.',
+                'image' => 'code-breaker',
+                'alt' => 'Code Breaker in the Candy Land world: three guesses of Clan friends with their ✓ and ↔ clues and a fourth guess being built.',
+                'keywords' => ['code breaker', 'mastermind', 'secret code', 'lock', 'clues', 'guess', 'logic', 'deduction'],
             ],
             [
                 'id' => 'second-chances',

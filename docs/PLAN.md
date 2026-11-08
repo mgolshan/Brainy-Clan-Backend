@@ -205,6 +205,17 @@ as written there; if something must change, update `docs/API.md` first and note 
   `docs/API.md` "Brain games"). Free tier still unlocks the first 3 top-level categories; new
   categories go at the end. Avoided on purpose: pop culture, celebrities, brands, current events,
   religion.
+- **Categories 18–20: level-up puzzles (2026-11-08, Moe: "I'd like to have 20… variable
+  difficulty… from kids to adults"; suggested math crosswords, the rest left to Claude):**
+  Cross Math (number-lattice math crossword, + − × ÷ with normal precedence), Mazes (perfect
+  mazes 5×5 → 16×16 with stars to collect) and Code Breaker (Mastermind-style deduction with Clan
+  avatar pegs). Each is a top-level category with four levels (Starter 1–3, Explorer 4–6, Expert
+  7–8, Master 9–10), all server-generated and server-verified (contract in `docs/API.md`
+  "Level-up puzzles"). Chosen because they scale cleanly from a 4–6-year-old to an adult, need no
+  written content (no translation or content-audit load) and train different skills from the
+  existing games: arithmetic fluency, spatial planning, logical deduction. Placed after Life
+  Skills, so the free tier is unchanged. Considered and left out: KenKen (overlaps Sudoku + Cross
+  Math), sliding tiles (little learning value), word ladders (needs per-language dictionaries).
 - **Landing page v2 (2026-10-23, Moe: "too simple, not motivational… show what the game is and
   how it looks without reading"):** visual-first page: hero with real app screenshots in phone
   frames (several worlds), a swipeable worlds gallery (CSS scroll-snap, works without JS; tiny

@@ -24,6 +24,8 @@ aujourd'hui.
 
 - Quiz, sudoku (de 4x4 à 9x9), sprint de maths, jeux de mots (anagrammes, lettre manquante, mots
   cachés) et jeux de cerveau (mémoire, suites, logimages, jeu des différences).
+- Des casse-têtes à niveaux, des enfants aux adultes : maths croisés, labyrinthes et casse-code,
+  quatre niveaux chacun.
 - Chacun joue à son niveau : les questions s'adaptent au groupe d'âge et à la difficulté de chaque
   joueur.
 - Objectifs familiaux (quotidiens, hebdomadaires, mensuels) : faites la course ou faites équipe pour

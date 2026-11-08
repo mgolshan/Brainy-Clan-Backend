@@ -22,6 +22,7 @@ A family learning app. Here is what you can say about it — every point is true
 
 - Quizzes, Sudoku (4×4 to 9×9), Math Sprint, word puzzles (anagrams, missing letters, word search)
   and brain games (memory match, pattern sequence, nonograms, spot the difference).
+- Level-up puzzles from kids to adults: Cross Math, Mazes and Code Breaker, four levels each.
 - Everyone plays at their own level: questions adapt to each player's age group and difficulty.
 - Family goals (daily, weekly, monthly): race each other or team up for a real-world reward.
 - Kids join with just a nickname — no email, no password, no real name, no photo. A parent gives

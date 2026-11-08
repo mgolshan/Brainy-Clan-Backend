@@ -16,8 +16,8 @@ use UnitEnum;
 /**
  * Shows an item exactly as a member of the chosen age band would receive it: the client payload
  * (no answer), a rough rendering, the answer the app gets after answering, and whether the item
- * would be served to that band at all. Generated types (Sudoku, Math Sprint) can be previewed
- * as a sample: pick a generator, a difficulty and a seed.
+ * would be served to that band at all. Generated types (Sudoku, Math Sprint, brain games,
+ * level-up puzzles) can be previewed as a sample: pick a generator, a difficulty and a seed.
  */
 class ContentPreview extends Page
 {
@@ -33,6 +33,9 @@ class ContentPreview extends Page
         'pattern_sequence' => ['pattern_sequence', [], 'Brain games: pattern sequence'],
         'nonogram' => ['nonogram', [], 'Brain games: nonogram'],
         'spot_difference' => ['spot_difference', [], 'Brain games: spot the difference'],
+        'cross_math' => ['cross_math', [], 'Level-up: Cross Math'],
+        'maze' => ['maze', [], 'Level-up: maze'],
+        'code_breaker' => ['code_breaker', [], 'Level-up: Code Breaker'],
     ];
 
     protected string $view = 'filament.pages.content-preview';

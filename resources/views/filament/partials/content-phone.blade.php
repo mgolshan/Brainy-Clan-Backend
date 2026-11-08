@@ -119,6 +119,49 @@
         <div style="font-size:.75rem; opacity:.7;">Red outline = changed object · max {{ $p['max_misses'] }} misses.</div>
     @endif
 
+    @if (isset($p['cells'], $p['bank']))
+        @php $fills = []; foreach ($preview['correct_response']['fills'] ?? [] as $f) { $fills[$f[0].':'.$f[1]] = $f[2]; } $symbols = ['*' => '×', '/' => '÷', '-' => '−']; @endphp
+        <div style="display:inline-block; background:{{ $t['card'] }}; border-radius:8px; padding:.25rem; margin-bottom:.5rem;">
+            @foreach ($p['cells'] as $r => $row)
+                <div style="display:flex;">
+                    @foreach ($row as $c => $value)
+                        <span style="{{ $cell }} {{ $value === null ? '' : 'border:1px solid #D1D5DB;' }} {{ $value === '?' ? 'color:#16A34A;' : '' }}">{{ $value === '?' ? ($fills[$r.':'.$c] ?? '?') : ($symbols[$value] ?? $value) }}</span>
+                    @endforeach
+                </div>
+            @endforeach
+        </div>
+        <div>Bank: <strong>{{ implode(' · ', $p['bank']) }}</strong></div>
+        <div style="font-size:.75rem; opacity:.7;">Green = blanks with the generator's solution.</div>
+    @endif
+
+    @if (isset($p['cells'], $p['start'], $p['goal']))
+        @php $route = $preview['correct_response']['path'] ?? []; @endphp
+        <svg viewBox="-0.1 -0.1 {{ $p['cols'] + 0.2 }} {{ $p['rows'] + 0.2 }}" style="width:100%; max-width:320px; background:{{ $t['card'] }}; border-radius:8px; margin-bottom:.5rem;">
+            @if ($route !== [])
+                <polyline points="{{ implode(' ', array_map(fn ($cellAt) => ($cellAt[1] + 0.5).','.($cellAt[0] + 0.5), $route)) }}" fill="none" stroke="#16A34A" stroke-width="0.25" stroke-linecap="round" stroke-linejoin="round" opacity="0.6" />
+            @endif
+            @foreach ($p['cells'] as $r => $row)
+                @foreach ($row as $c => $walls)
+                    @if ($walls & 1)<line x1="{{ $c }}" y1="{{ $r }}" x2="{{ $c + 1 }}" y2="{{ $r }}" stroke="#374151" stroke-width="0.08" stroke-linecap="round" />@endif
+                    @if ($walls & 2)<line x1="{{ $c + 1 }}" y1="{{ $r }}" x2="{{ $c + 1 }}" y2="{{ $r + 1 }}" stroke="#374151" stroke-width="0.08" stroke-linecap="round" />@endif
+                    @if ($walls & 4)<line x1="{{ $c }}" y1="{{ $r + 1 }}" x2="{{ $c + 1 }}" y2="{{ $r + 1 }}" stroke="#374151" stroke-width="0.08" stroke-linecap="round" />@endif
+                    @if ($walls & 8)<line x1="{{ $c }}" y1="{{ $r }}" x2="{{ $c }}" y2="{{ $r + 1 }}" stroke="#374151" stroke-width="0.08" stroke-linecap="round" />@endif
+                @endforeach
+            @endforeach
+            <circle cx="{{ $p['start'][1] + 0.5 }}" cy="{{ $p['start'][0] + 0.5 }}" r="0.3" fill="{{ $t['accent'] }}" />
+            <rect x="{{ $p['goal'][1] + 0.2 }}" y="{{ $p['goal'][0] + 0.2 }}" width="0.6" height="0.6" fill="#DC2626" />
+            @foreach ($p['stars'] as $star)
+                <circle cx="{{ $star[1] + 0.5 }}" cy="{{ $star[0] + 0.5 }}" r="0.25" fill="#F59E0B" />
+            @endforeach
+        </svg>
+        <div style="font-size:.75rem; opacity:.7;">{{ $p['rows'] }}×{{ $p['cols'] }} · {{ count($p['stars']) }} {{ count($p['stars']) === 1 ? 'star' : 'stars' }} · green = shortest route ({{ count($route) }} cells).</div>
+    @endif
+
+    @if (isset($p['pegs'], $p['code']))
+        <div style="display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:.5rem;">@foreach ($p['pegs'] as $i => $peg)<span style="background:{{ $t['card'] }}; border:1px solid {{ $t['accent'] }}; border-radius:8px; padding:.25rem .5rem;">{{ $i }}: {{ $peg }}</span>@endforeach</div>
+        <div>Code: <strong>{{ implode(' · ', array_map(fn ($i) => $p['pegs'][$i] ?? '?', $p['code'])) }}</strong> <span style="opacity:.7;">· length {{ $p['length'] }}, {{ $p['repeats'] ? 'repeats allowed' : 'no repeats' }}, {{ $p['max_guesses'] }} guesses</span></div>
+    @endif
+
     @foreach ($preview['payload']['choices'] ?? [] as $choice)
         @php $isCorrect = ($preview['correct_response']['choice_id'] ?? null) === $choice['id']; @endphp
         <div style="background:{{ $t['card'] }}; border-radius:{{ $t['radius'] }}; padding:.75rem 1rem; margin-bottom:.5rem; border:2px solid {{ $isCorrect ? '#16A34A' : 'transparent' }};">
