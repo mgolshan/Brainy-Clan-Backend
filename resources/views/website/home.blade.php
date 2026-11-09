@@ -69,6 +69,9 @@
         'lofi' => ['world-lofi', 'Lo-fi Dusk', 'Crépuscule lo-fi', 'Pastel sunset and soft rain', 'Coucher de soleil pastel et pluie douce'],
         'nature' => ['world-nature', 'Calm Nature', 'Nature paisible', 'Soft green hills, calm and easy to read', 'Collines vertes, calme et facile à lire'],
         'midnight' => ['world-midnight', 'Midnight', 'Minuit', 'Deep blue night, moon and gold', 'Nuit bleu profond, lune et or'],
+        'castle' => ['world-castle', 'Fairy-Tale Castle', 'Château enchanté', 'Towers, banners and a friendly dragon', 'Tours, bannières et un gentil dragon'],
+        'arctic' => ['world-arctic', 'Polar Lights', 'Aurores polaires', 'Icy blues, aurora and penguin friends', 'Bleus glacés, aurores et amis pingouins'],
+        'robot' => ['world-robot', 'Robot Lab', 'Labo des robots', 'Friendly robots, circuits and gears', 'Gentils robots, circuits et engrenages'],
     ];
     $worldNames = [
         'playful' => $fr ? 'Pays des bonbons' : 'Candy Land', 'sleek' => $fr ? 'Verre' : 'Glass',

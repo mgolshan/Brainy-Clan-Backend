@@ -302,14 +302,41 @@ describe('landing page v2', function () {
             ->assertSee('75 points to unlock')
             ->assertSee('Jungle Adventure (75 points)')
             ->assertSee('3-day streak to unlock')
-            ->assertSee('Exclusive worlds: Dino Valley, Midnight')
+            ->assertSee('Exclusive worlds: Dino Valley, Midnight, Fairy-Tale Castle, Polar Lights, Robot Lab')
             ->assertDontSee('id="world-neon"', false)
             ->assertSee('id="world-sea"', false);
 
         $this->get('/?lang=fr')->assertOk()
             ->assertSee('Série de 3 jours pour débloquer', false)
-            ->assertSee('Forfait Famille');
+            ->assertSee('Forfait Famille')
+            ->assertSee('Mondes exclusifs : Vallée des dinos, Minuit, Château enchanté, Aurores polaires, Labo des robots', false);
     });
+
+    it('shows castle, arctic and robot in the worlds gallery with their screenshots and dots', function (string $lang, array $names) {
+        $html = (string) $this->get("/?lang={$lang}")->assertOk()->getContent();
+        $images = collect(landingImages($html))->keyBy('src');
+        $gallery = ThemeWorld::query()->where('active', true)->whereNotIn('key', ['modern', 'classic'])->count(); // no capture for these two
+
+        expect($gallery)->toBe(14)
+            ->and(substr_count($html, '<li id="world-'))->toBe($gallery)
+            ->and(substr_count($html, '<a href="#world-'))->toBe($gallery)
+            ->and(substr_count($html, '<span class="tag family_plan">'))->toBe(7); // 6 slides + the unlocks list
+
+        foreach (['castle', 'arctic', 'robot'] as $i => $key) {
+            $image = $images->get("/images/site/screens/world-{$key}.webp");
+
+            expect($image)->not->toBeNull("world-{$key} missing")
+                ->and(is_file(public_path("images/site/screens/world-{$key}.webp")))->toBeTrue()
+                ->and($image['alt'])->toContain($names[$i])
+                ->and($image['tag'])->toContain('width="480"')->toContain('height="1039"')->toContain('loading="lazy"')
+                ->and($html)->toContain('<li id="world-'.$key.'">')
+                ->toContain('<a href="#world-'.$key.'">')
+                ->toContain('<h3>'.e($names[$i]).'</h3>');
+        }
+    })->with([
+        'en' => ['en', ['Fairy-Tale Castle', 'Polar Lights', 'Robot Lab']],
+        'fr' => ['fr', ['Château enchanté', 'Aurores polaires', 'Labo des robots']],
+    ]);
 });
 
 /**
@@ -404,7 +431,7 @@ describe('help center', function () {
             ->toContain('Family plan: up to 7 members, all categories, unlimited goals and chat kept 1 year.')
             ->toContain('Free from the start: Candy Land, Glass, Modern and Classic.')
             ->toContain('Jungle Adventure (75 points)')
-            ->toContain('Included with the Family plan: Dino Valley, Neon Arcade and Midnight.')
+            ->toContain('Included with the Family plan: Dino Valley, Neon Arcade, Midnight, Fairy-Tale Castle, Polar Lights and Robot Lab.')
             ->toContain('After 5 wrong passwords in a row, sign-in pauses for 5 minutes, then 1 hour, then 24 hours.')
             ->toContain('Open the link within 60 minutes')
             // No streak world is active, so that step is left out instead of reading "…: .".

@@ -18,6 +18,9 @@
         'lofi' => ['bg' => '#2A2238', 'card' => '#3A3050', 'accent' => '#F9A8D4', 'font' => '1rem', 'radius' => '14px'],
         'nature' => ['bg' => '#F1F5EE', 'card' => '#FFFFFF', 'accent' => '#4D7C0F', 'font' => '1rem', 'radius' => '16px'],
         'midnight' => ['bg' => '#05070F', 'card' => '#111827', 'accent' => '#818CF8', 'font' => '1rem', 'radius' => '14px'],
+        'castle' => ['bg' => '#FBF3E4', 'card' => '#FFFCF6', 'accent' => '#7339B0', 'font' => '1.1rem', 'radius' => '22px'],
+        'arctic' => ['bg' => '#EEF6FB', 'card' => '#FFFFFF', 'accent' => '#0A6AA8', 'font' => '1.1rem', 'radius' => '24px'],
+        'robot' => ['bg' => '#F2F6F7', 'card' => '#FFFFFF', 'accent' => '#00716F', 'font' => '1rem', 'radius' => '10px'],
     ];
     $compact ??= false;
     $t = $themes[$preview['ui_theme']] ?? $themes['modern'];

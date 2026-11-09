@@ -105,6 +105,9 @@ it('seeds the contract catalog in display order', function () {
         ['dino', 'family_plan', null, true],
         ['neon', 'family_plan', null, true],
         ['midnight', 'family_plan', null, true],
+        ['castle', 'family_plan', null, true],
+        ['arctic', 'family_plan', null, true],
+        ['robot', 'family_plan', null, true],
     ])->and(array_keys(ThemeWorld::DEFAULT_CATALOG))->toEqualCanonicalizing(AgeBand::THEMES);
 });
 
@@ -116,9 +119,39 @@ it('re-runs the seeder and the migration without overwriting admin changes', fun
     $this->seed(ThemeWorldSeeder::class);
     (require database_path('migrations/2026_10_23_200000_create_theme_worlds_table.php'))->up();
 
-    expect(ThemeWorld::query()->count())->toBe(13)
+    expect(ThemeWorld::query()->count())->toBe(16)
         ->and(ThemeWorld::query()->where('key', 'jungle')->value('required'))->toBe(10)
         ->and(ThemeWorld::query()->where('key', 'midnight')->value('unlock_type'))->toBe('family_plan');
+});
+
+it('adds castle, arctic and robot to an existing catalog after the last world, once, keeping admin edits', function () {
+    $migration = fn () => (require database_path('migrations/2026_11_08_200000_add_castle_arctic_robot_theme_worlds.php'))->up();
+
+    // A database migrated before 2026-11-08: 13 worlds, one reordered by an admin.
+    ThemeWorld::query()->whereIn('key', ['castle', 'arctic', 'robot'])->delete();
+    ThemeWorld::query()->where('key', 'dino')->update(['sort' => 500]);
+
+    $migration();
+    $migration();
+
+    $rows = ThemeWorld::query()->whereIn('key', ['castle', 'arctic', 'robot'])->orderBy('sort')->get()
+        ->map(fn (ThemeWorld $world) => [$world->key, $world->sort, $world->unlock_type, $world->required, $world->active])->all();
+
+    expect($rows)->toBe([
+        ['castle', 510, 'family_plan', null, true],
+        ['arctic', 520, 'family_plan', null, true],
+        ['robot', 530, 'family_plan', null, true],
+    ])->and(ThemeWorld::query()->count())->toBe(16)
+        ->and(ThemeWorld::query()->where('key', 'dino')->value('sort'))->toBe(500)
+        ->and(array_slice(array_keys(freshCatalog()), -3))->toBe(['castle', 'arctic', 'robot']);
+
+    // An admin edit to a new world (deactivated, moved) survives another run.
+    ThemeWorld::query()->where('key', 'arctic')->update(['active' => false, 'sort' => 5]);
+    $migration();
+
+    $arctic = ThemeWorld::query()->where('key', 'arctic')->firstOrFail();
+    expect([$arctic->sort, $arctic->active])->toBe([5, false])
+        ->and(ThemeWorld::query()->count())->toBe(16);
 });
 
 it('serves the catalog from the cache and invalidates it on every write', function () {
@@ -156,6 +189,33 @@ it('returns the catalog for a new free member', function () {
         ->and(worldsByKey($data)['jungle'])->toBe(['key' => 'jungle', 'unlock' => ['type' => 'points', 'required' => 50, 'progress' => 0], 'unlocked' => false])
         ->and(worldsByKey($data)['sea'])->toBe(['key' => 'sea', 'unlock' => ['type' => 'streak', 'required' => 3, 'progress' => 0], 'unlocked' => false])
         ->and(worldsByKey($data)['dino'])->toBe(['key' => 'dino', 'unlock' => ['type' => 'family_plan'], 'unlocked' => false]);
+});
+
+it('lists 16 worlds with castle, arctic and robot locked on the free plan and unlocked on the Family plan', function () {
+    $owner = familyOwner();
+    actingAsMember($owner);
+    $new = ['castle', 'arctic', 'robot'];
+
+    $data = $this->getJson('/api/v1/me/worlds')->assertOk()->json('data');
+
+    expect($data)->toHaveCount(16)
+        ->and(array_slice(array_column($data, 'key'), -3))->toBe($new);
+
+    foreach ($new as $key) {
+        expect(worldsByKey($data)[$key])->toBe(['key' => $key, 'unlock' => ['type' => 'family_plan'], 'unlocked' => false]);
+        $this->patchJson('/api/v1/me/accessibility', ['theme' => $key])->assertStatus(403)->assertJsonPath('code', 'world_locked');
+    }
+
+    applySubscription($owner->family, 'active');
+    actingAsMember($owner->refresh()); // a new request loads the family again
+    $data = worldsByKey($this->getJson('/api/v1/me/worlds')->assertOk()->json('data'));
+
+    foreach ($new as $key) {
+        expect($data[$key]['unlocked'])->toBeTrue();
+        $this->patchJson('/api/v1/me/accessibility', ['theme' => $key])->assertOk()
+            ->assertJsonPath('data.accessibility.theme', $key)
+            ->assertJsonPath('data.theme_unlocked', true);
+    }
 });
 
 it('unlocks points worlds at the threshold of lifetime points', function () {
@@ -216,7 +276,7 @@ it('unlocks family plan worlds while the plan is active, in a trial or in grace'
 
     $worlds = worldsByKey($this->getJson('/api/v1/me/worlds')->assertOk()->json('data'));
 
-    expect(collect($worlds)->only(['dino', 'neon', 'midnight'])->pluck('unlocked')->unique()->all())->toBe([$unlocked]);
+    expect(collect($worlds)->only(['dino', 'neon', 'midnight', 'castle', 'arctic', 'robot'])->pluck('unlocked')->unique()->all())->toBe([$unlocked]);
 })->with([
     'active' => ['active', true],
     'trial' => ['trial', true],
@@ -287,7 +347,7 @@ it('rejects a locked theme with 403 world_locked and always allows null', functi
     $this->patchJson('/api/v1/me/accessibility', ['theme' => null])->assertOk()
         ->assertJsonPath('data.accessibility.theme', null)
         ->assertJsonPath('data.theme_unlocked', true);
-})->with(['jungle', 'sea', 'dino']);
+})->with(['jungle', 'sea', 'dino', 'castle', 'arctic', 'robot']);
 
 it('still answers 422 for an unknown theme key', function () {
     actingAsMember(familyOwner());

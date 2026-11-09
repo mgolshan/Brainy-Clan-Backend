@@ -129,7 +129,8 @@ and add a line to the changelog at the bottom.
   worlds lock again when the plan ends.
 - Seeded catalog (editable in the admin; thresholds and types are server data, the app never
   hard-codes them): free `playful`, `sleek`, `modern`, `classic`; points `jungle` 50, `sticker`
-  100, `space` 150, `nature` 200; streak `sea` 3, `lofi` 7; family plan `dino`, `neon`, `midnight`.
+  100, `space` 150, `nature` 200; streak `sea` 3, `lofi` 7; family plan `dino`, `neon`,
+  `midnight`, `castle`, `arctic`, `robot`.
 - `PATCH /me/accessibility` and the admin member PATCH reject a locked `theme` with 403
   `world_locked` (`null` always allowed). An admin can only pick worlds unlocked for that member:
   `GET /family/members/{member}/worlds` (admin) returns the same catalog for that member.

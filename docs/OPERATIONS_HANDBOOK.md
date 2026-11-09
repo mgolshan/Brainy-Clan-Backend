@@ -51,7 +51,7 @@ family cheer each other on.
 | --- | --- |
 | **Audiences** | Children (age band `child`, 0–12), teens (`teen`, 13–17), adults (`adult`, 18–64, includes parents), seniors (`senior`, 65+, grandparents). The buyer and marketing audience is **parents (adults)**. Google Play target audience: 6–8, 9–12, 13–15, 16–17, 18+ (mixed audience, Families Policy). Apple: not in the Kids Category, category Education, age rating 4+. |
 | **Content** | 20 top-level categories: World Geography, Science & Nature, Wisdom Cards (these 3 are free), Math Sprint, Sudoku, Word Puzzles, History, Vocabulary & Spelling, Logic & Riddles, Language Swap (EN↔FR), Inventions & Technology, Our Planet, Art & Music, Food Around the World, Sports & Games, Brain Games (memory match, pattern sequence, nonogram, spot the difference), Life Skills & Safety, Cross Math, Mazes, Code Breaker (these 3 are generated puzzles with four levels each, Starter → Master). Avoided on purpose: pop culture, celebrities, brands, current events, religion. |
-| **Look** | 13 theme "worlds" (Candy Land, Glass, Modern, Classic, Jungle, Space, Neon, Sea, Dino, Sticker, Lo-fi, Nature, Midnight); default per age band; some unlock with points/streaks or the Family plan. 132 "Clan" avatars (22 animal species × kid/teen/mom/dad/grandma/grandpa). Mascot: Ollie the owl (**awaiting Moe's approval**). |
+| **Look** | 16 theme "worlds" (Candy Land, Glass, Modern, Classic, Jungle, Space, Neon, Sea, Dino, Sticker, Lo-fi, Nature, Midnight, Fairy-Tale Castle, Polar Lights, Robot Lab); default per age band; some unlock with points/streaks or the Family plan. 132 "Clan" avatars (22 animal species × kid/teen/mom/dad/grandma/grandpa). Mascot: Ollie the owl (**awaiting Moe's approval**). |
 | **Languages** | English and French (app, website, legal pages, content). Content falls back to English when no French version exists. |
 | **Platforms** | iOS (iPhone + iPad), Android. Public website on the backend. A public web version of the app is **(not built yet)**. |
 
@@ -68,7 +68,7 @@ admin under Policy → Settings & flags):
 | Free second chances | 0 per day | 3 per member per day |
 | Rewarded ads | teens/adults may opt in to a rewarded video for a second chance; **children never** | none |
 | Chat history | 7 days | 1 year (365 days) |
-| Worlds | free + earned worlds | also the Family-plan worlds (Dino, Neon, Midnight) |
+| Worlds | free + earned worlds | also the Family-plan worlds (Dino, Neon, Midnight, Fairy-Tale Castle, Polar Lights, Robot Lab) |
 
 **Prices — decided by Moe 2026-10-24 (PLAN.md B10); in `config/billing.php` (website, `GET /api/v1/pricing`), not yet in any store, RevenueCat
 or Paddle:**
@@ -841,7 +841,7 @@ never publish `support@` as a link again.
 | **What does the Family plan add?** | Up to 7 members (free: 2), all categories (free: 3), unlimited goals (free: 1), 3 free second chances per member per day, no ads, chat history kept 1 year (free: 7 days), special worlds. Prices: show what the store shows; do not quote planned prices. |
 | **Chat: who can see it, how long is it kept?** | Only your family's members — not other families and not our staff. Text and emoji only. Messages are deleted after **7 days** on the free plan and **1 year** on the Family plan; after a downgrade the shorter period applies. Parents can turn chat off for any member and delete any message. We cannot recover, read or send you chat messages. |
 | **Chat: how do I report a message? / Someone reported a message — what now? / Can you look at a reported message?** | Open the menu of another member's message in the chat (long-press) → **Report**. The report goes **only to the family's parents/admins** (a push "Sam reported a message in the family chat", without the message text) and the message shows as reported to them. It never comes to us: our staff cannot see chat messages or reports. The admin then deletes the message and/or turns chat off for that member (the member's settings in the family screen). Reporting the same message twice changes nothing; you cannot report your own message. Reports disappear with the message (deletion, the 7-day / 1-year retention, account deletion). A real safety concern about a child → M10 (escalate, never ask for the chat text). |
-| **Why is a world locked? / How do I unlock it?** | Some worlds are free, some unlock with lifetime points or a daily streak, three come with the Family plan. Seeded values: free Candy Land, Glass, Modern, Classic; points Jungle 50, Sticker 100, Space 150, Nature 200; streak Sea 3 days, Lo-fi 7 days; Family plan Dino, Neon, Midnight (live values: Admin → Policy → Theme worlds). Earned worlds stay unlocked; Family-plan worlds lock again when the plan ends. |
+| **Why is a world locked? / How do I unlock it?** | Some worlds are free, some unlock with lifetime points or a daily streak, six come with the Family plan. Seeded values: free Candy Land, Glass, Modern, Classic; points Jungle 50, Sticker 100, Space 150, Nature 200; streak Sea 3 days, Lo-fi 7 days; Family plan Dino, Neon, Midnight, Fairy-Tale Castle, Polar Lights, Robot Lab (live values: Admin → Policy → Theme worlds). Earned worlds stay unlocked; Family-plan worlds lock again when the plan ends. |
 | **Why does my child never see the video option?** | Children never see ads. Teens/adults on the free plan can choose a short video for a second chance; the Family plan has no ads. |
 | **"Time for an update"** | The app version is too old for the service; update from the App Store / Google Play. |
 | **French questions show in English** | Content is published in English and French; when a question has no French version yet, the English one is shown. |
@@ -913,7 +913,7 @@ Use only these (or exact paraphrases). Each is true per the docs/code today:
 - Level-up puzzles from kids to adults: Cross Math, Mazes and Code Breaker, four levels each.
 - 20 categories, from geography and science to logic, art and music, food, life skills and puzzles.
 - Everyone plays at their own level: questions adapt to each player's age group and difficulty.
-- A look for every age: 13 worlds; playful for kids, sleek for teens, clear for adults, extra
+- A look for every age: 16 worlds; playful for kids, sleek for teens, clear for adults, extra
   readable for grandparents; adjustable text size and reduced motion.
 - Family goals (daily, weekly, monthly), race each other or team up for a real-world reward;
   family leaderboard and personal stats; gentle reminders with quiet hours.
@@ -1101,7 +1101,7 @@ alert mails, `horizon:snapshot`, AdMob SSV rejection counts on the dashboard.
 | **Family admin / owner** | Admins manage members, invites, codes, goals, chat switches; the owner (always an admin) created the family and is the only one who can delete it. |
 | **Invite code** | 8-character code (no 0/O/1/I), valid 7 days, single use, to join a family for the first time. |
 | **Sign-in code** | 8-character one-time code an admin issues for a member's new device; valid 15 minutes. How children sign in. |
-| **Worlds** | The 13 visual themes (keys `playful`, `sleek`, `modern`, `classic`, `jungle`, `space`, `neon`, `sea`, `dino`, `sticker`, `lofi`, `nature`, `midnight`); unlock types free / points / streak / family_plan. |
+| **Worlds** | The 16 visual themes (keys `playful`, `sleek`, `modern`, `classic`, `jungle`, `space`, `neon`, `sea`, `dino`, `sticker`, `lofi`, `nature`, `midnight`, `castle`, `arctic`, `robot`); unlock types free / points / streak / family_plan. |
 | **Clan avatars** | 132 avatar keys: 22 species × kid/teen/mom/dad/grandma/grandpa (e.g. `tiger`, `tiger-grandma`). |
 | **Ollie** | The owl mascot / app icon (awaiting approval). |
 | **Brain games** | Server-generated `memory_match`, `pattern_sequence`, `nonogram`, `spot_difference` in the Brain Games category. |

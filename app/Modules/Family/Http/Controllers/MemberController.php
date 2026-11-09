@@ -54,7 +54,7 @@ class MemberController
      *
      * Text scale, reduced motion, calm timers, theme (`null` = the band's default; keys `playful`,
      * `sleek`, `modern`, `classic`, `jungle`, `space`, `neon`, `sea`, `dino`, `sticker`, `lofi`,
-     * `nature`, `midnight`) and sound effects (`null` = the band's
+     * `nature`, `midnight`, `castle`, `arctic`, `robot`) and sound effects (`null` = the band's
      * `accessibility_defaults.sound_effects`). Never changes rules. The theme must be a world
      * unlocked for me (`GET /me/worlds`), else 403 `world_locked`; `null` always works.
      */

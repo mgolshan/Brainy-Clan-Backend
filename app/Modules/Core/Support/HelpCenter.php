@@ -50,6 +50,9 @@ class HelpCenter
         'lofi' => ['Lo-fi Dusk', 'Crépuscule lo-fi'],
         'nature' => ['Calm Nature', 'Nature paisible'],
         'midnight' => ['Midnight', 'Minuit'],
+        'castle' => ['Fairy-Tale Castle', 'Château enchanté'],
+        'arctic' => ['Polar Lights', 'Aurores polaires'],
+        'robot' => ['Robot Lab', 'Labo des robots'],
     ];
 
     /** Named routes an article may link to (`links`). */

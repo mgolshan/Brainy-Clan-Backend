@@ -381,6 +381,25 @@ curl http://localhost:8080/api/v1/health
 
 ## Log
 
+### 2026-11-08 worlds castle, arctic, robot (backend)
+- **Catalog** (docs/PLAN.md "Three more Family-plan worlds", API.md changelog 2026-11-08):
+  `ThemeWorld::DEFAULT_CATALOG` adds `castle`, `arctic`, `robot` as `family_plan` after `midnight`
+  (fresh databases: sort 140/150/160 via the catalog migration and `ThemeWorldSeeder`).
+  Migration `2026_11_08_200000_add_castle_arctic_robot_theme_worlds` inserts only the missing keys,
+  sorted after the current last world in steps of 10; never updates existing rows, idempotent;
+  reference caches flush after migrations. `AgeBand::THEMES` / `THEME_LABELS` (Fairy-Tale Castle,
+  Polar Lights, Robot Lab) feed the accessibility theme validation, the age band `ui_theme` select
+  and the Filament world catalog; content preview phone has their palettes; help center world names
+  en/fr (Château enchanté, Aurores polaires, Labo des robots).
+- **Website:** worlds gallery has 14 slides (+ dots) with `screens/world-{castle,arctic,robot}.webp`
+  (480×1039, lazy); unlock lists and the Family plan card read the live catalog. Landing page weight
+  1.09 MB (budget 2.5 MB); `public/images/site` 1.28 MB (budget 2 MB). Docs: 16 worlds in
+  OPERATIONS_HANDBOOK; API.md seeded catalog line.
+- Tests: `WorldUnlocksTest` (catalog order, migration idempotency + admin edits kept, `/me/worlds`
+  16 worlds locked/unlocked by plan, `world_locked` for the new keys), `WebsiteTest` (gallery slides,
+  dots, images, exclusive worlds en/fr, help center Family plan list). Dev: migrated, 16 worlds for
+  the demo family.
+
 ### 2026-11-08 support inbox
 
 Support channel without a public mailto (docs/PLAN.md decision, docs/API.md "Support messages").

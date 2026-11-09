@@ -64,6 +64,9 @@ class ThemeWorld extends Model implements InvalidatesReferenceCache
         'dino' => [self::UNLOCK_FAMILY_PLAN, null],
         'neon' => [self::UNLOCK_FAMILY_PLAN, null],
         'midnight' => [self::UNLOCK_FAMILY_PLAN, null],
+        'castle' => [self::UNLOCK_FAMILY_PLAN, null],
+        'arctic' => [self::UNLOCK_FAMILY_PLAN, null],
+        'robot' => [self::UNLOCK_FAMILY_PLAN, null],
     ];
 
     /**

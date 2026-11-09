@@ -41,6 +41,7 @@ class AgeBand extends Model implements InvalidatesReferenceCache
     public const array THEMES = [
         'playful', 'sleek', 'modern', 'classic', 'jungle', 'space', 'neon',
         'sea', 'dino', 'sticker', 'lofi', 'nature', 'midnight',
+        'castle', 'arctic', 'robot',
     ];
 
     /** Readable names for the admin (the app shows the same names). */
@@ -58,6 +59,9 @@ class AgeBand extends Model implements InvalidatesReferenceCache
         'lofi' => 'Lo-fi Dusk',
         'nature' => 'Calm Nature',
         'midnight' => 'Midnight',
+        'castle' => 'Fairy-Tale Castle',
+        'arctic' => 'Polar Lights',
+        'robot' => 'Robot Lab',
     ];
 
     /** AdMob max ad content ratings, strictest first. */
