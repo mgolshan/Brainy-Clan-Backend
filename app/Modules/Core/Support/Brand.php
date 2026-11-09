@@ -2,6 +2,8 @@
 
 namespace App\Modules\Core\Support;
 
+use Illuminate\Support\HtmlString;
+
 /**
  * The brand: name, root domain and the logo files configured in `config/brand.php`
  * (README "Brand and logo").
@@ -68,6 +70,26 @@ final class Brand
     public static function websiteLabel(): string
     {
         return (string) preg_replace('#^https?://#', '', rtrim(Website::url('/'), '/'));
+    }
+
+    /**
+     * An email address as plain text (no `mailto:` link) with light HTML-entity obfuscation, for
+     * the few pages that must show the support address (privacy policy, terms; docs/PLAN.md
+     * "Support channel without a public mailto"). Browsers show it normally and people can copy
+     * it; naive address harvesters that grep the HTML for `name@domain` don't see it. Every
+     * character becomes a numeric entity (decimal and hex alternating), so nothing typed into the
+     * address could ever become markup.
+     */
+    public static function obfuscatedEmail(string $email): HtmlString
+    {
+        $html = '';
+
+        foreach (mb_str_split($email) as $index => $character) {
+            $code = mb_ord($character);
+            $html .= $index % 2 === 0 ? '&#'.$code.';' : '&#x'.dechex((int) $code).';';
+        }
+
+        return new HtmlString('<span class="email">'.$html.'</span>');
     }
 
     /**

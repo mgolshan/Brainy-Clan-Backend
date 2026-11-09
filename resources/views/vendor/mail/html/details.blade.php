@@ -1,0 +1,3 @@
+{{-- Label/value rows (values may be typed by people): escaped, one line, never Markdown. Use with a blank line before and after. --}}
+@props(['rows' => []])
+<table class="details" role="presentation" style="width: 100%; margin: 0 0 16px; border-collapse: collapse; font-size: 14px;">@foreach ($rows as $label => $value)<tr><td style="padding: 3px 12px 3px 0; color: #5b6475; white-space: nowrap; vertical-align: top;">{!! \App\Modules\Core\Support\MailText::html((string) $label) !!}</td><td style="padding: 3px 0; color: #1b2a4a; overflow-wrap: anywhere;">{!! \App\Modules\Core\Support\MailText::html((string) $value) !!}</td></tr>@endforeach</table>

@@ -16,6 +16,8 @@ use App\Modules\Notifications\Models\NotificationPreference;
 use App\Modules\Play\Models\PlaySession;
 use App\Modules\Policy\PolicyResolver;
 use App\Modules\Scoring\Models\PointEntry;
+use App\Modules\Support\Models\SupportMessage;
+use App\Modules\Support\Models\SupportMessageReply;
 
 /**
  * `GET /me/export` (right of access: PIPEDA, Quebec Law 25, GDPR-style): everything we hold about
@@ -81,6 +83,13 @@ class ExportUserData
             ->whereNull('deleted_at')
             ->orderBy('id')
             ->get(['id', 'family_id', 'family_member_id', 'body', 'created_at']);
+
+        // Messages the user sent to support from the app, with the staff replies (text and time only).
+        $supportMessages = SupportMessage::query()
+            ->where('user_id', $user->id)
+            ->with(['replies' => fn ($query) => $query->select(['id', 'support_message_id', 'body', 'sent_at'])])
+            ->orderBy('id')
+            ->get();
 
         $consents = Consent::query()->where('user_id', $user->id)->orderBy('id')->get();
         $devices = Device::query()->where('user_id', $user->id)->orderBy('id')->get();
@@ -167,6 +176,22 @@ class ExportUserData
                 'member_id' => $message->family_member_id,
                 'body' => $message->body,
                 'created_at' => Iso::format($message->created_at),
+            ])->values()->all(),
+            'support_messages' => $supportMessages->map(fn (SupportMessage $message): array => [
+                'id' => $message->id,
+                'topic' => $message->topic,
+                'message' => $message->message,
+                'status' => $message->apiStatus(),
+                'app_version' => $message->app_version,
+                'platform' => $message->platform,
+                'device' => $message->device,
+                'created_at' => Iso::format($message->created_at),
+                'answered_at' => Iso::format($message->answered_at),
+                'closed_at' => Iso::format($message->closed_at),
+                'replies' => $message->replies->map(fn (SupportMessageReply $reply): array => [
+                    'body' => $reply->body,
+                    'sent_at' => Iso::format($reply->sent_at),
+                ])->values()->all(),
             ])->values()->all(),
             'consents' => $consents->map(fn (Consent $consent): array => [
                 'type' => $consent->type,

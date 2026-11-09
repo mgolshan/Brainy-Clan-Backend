@@ -25,6 +25,7 @@ Milestones are defined in `docs/PLAN.md`.
 | B9 Production | Done (needs a real server + lawyer) | **Session 14:** legal API (consents, `GET /legal`, terms/privacy pages en+fr drafts, `accept_terms`, `parental_consent`, invite preview, `me.legal`, legal acceptance, `/me/export`), account deletion web page `/account/delete`, Filament consents, Sentry (`sentry/sentry-laravel` 4.29, PII scrubber), production image (`docker/prod/Dockerfile`), `docker-compose.prod.yml` (Caddy HTTPS), encrypted off-site backups + restore drill, `docs/DEPLOY.md`, route security test. Not done on a real server: DNS/HTTPS, Storage Box upload, Sentry DSN. Texts need lawyer review |
 | B10 Pricing, affiliates, web checkout (Paddle) | Done (needs a Paddle account) | `GET /pricing`, website `/subscribe` + emailed one-time link → Paddle checkout, Paddle webhook (signature, idempotent, stale), subscriptions per provider, availability + manage-link, referral codes + `/r/{code}`, offer-code/Paddle attribution, commission ledger + monthly payouts (Filament), legal drafts 2026-10-24. Moe: Paddle sandbox → live (README) |
 | B11 Ops hardening | Done | Staff roles `admin`/`support` (read-only) replacing `is_staff`, staff child export/deletion actions, `/api/v1/health/deep` (token), scheduler heartbeat, Horizon long-wait + failed-job alert mails, `horizon:snapshot`, AdMob SSV rejection counts on the dashboard. Moe: set `HEALTH_DEEP_TOKEN`, uptime monitor, SMTP for alerts |
+| Support inbox (2026-11-08) | Done | In-app support messages (family admins), website contact form (no mailto), Filament Support inbox + dashboard card, export/erasure/retention. Moe: set up the `support@` mailbox |
 
 ## Next up
 
@@ -379,6 +380,45 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-11-08 support inbox
+
+Support channel without a public mailto (docs/PLAN.md decision, docs/API.md "Support messages").
+
+- **Module `app/Modules/Support`:** `support_messages` + `support_message_replies` (migration
+  `2026_11_08_100000`), `SupportMessage` / `SupportMessageReply`, factory. `POST/GET
+  /api/v1/support/messages` (family admins only → 403 before validation; idempotent `client_id`
+  unique per user → 200; 5/hour + 20/day counted on created messages only → 429 `rate_limited` with
+  `retry_after`; text normalized like chat, 10–5000 code points). New messages are mailed (queued,
+  ids only in the payload) to `LEGAL_SUPPORT_EMAIL` with Reply-To = the sender.
+- **Website form** on `/support#contact`: stateless (no session/cookies/CSRF, still no JavaScript),
+  honeypot + HMAC form-time token (3 s – 2 h) + 5 stored messages/hour/IP (+ 30 posts/hour flood
+  guard); bots get the same 303 to `/support?sent=1#contact`; expired token / limit / validation
+  errors re-render the form with the typed text and accessible errors (en/fr). CSP `:forms`.
+- **No more `mailto:` on the website:** footer, help center, partners (apply → form, topic "other"),
+  account deletion, password reset and subscribe pages link to the form (`Website::contactUrl()`).
+  Privacy policy and terms show the address as entity-obfuscated plain text
+  (`Brand::obfuscatedEmail()`). Our own mails keep the plain address in the footer.
+- **Privacy policy (en/fr):** new "Messages to support" bullet + retention line. No version bump
+  (no new purpose or recipient; text clarifies voluntary correspondence) — flag for the lawyer review.
+- **Filament "Support inbox"** (both staff roles; delete admin only): list with status/source/topic
+  filters + search, new-count navigation badge, view page (escaped text, details, reply history;
+  opening marks `new` → `open`), Reply (branded mail in the sender's language, Reply-To = inbox,
+  status answered), Close / Mark open. Dashboard card "Support messages" (new count in warning colour,
+  unanswered + oldest age, links to the inbox filtered to new; one uncached query).
+- **Privacy plumbing:** `/me/export` `support_messages` (+ replies text), `EraseUser` deletes the
+  user's app messages (website messages are not linked to accounts and are not deleted with one),
+  `support:prune` daily 03:40 (closed > 1 year, any > 2 years after last activity).
+- **Mails:** `SupportMessageReceived` (inbox, English) and `SupportReplyMail` (en/fr) in the shared
+  frame; new mail components `user-text` / `details` (`MailText::html()`) so typed text never becomes
+  Markdown/HTML. `mail:preview` gains both samples and `--only=`.
+- **Help center:** article "Contact support" (troubleshooting), "Contact support" links go to the
+  form anchor. In-app path written as **Profile → Contact support** (the app puts the entry on the
+  Profile screen, not Settings).
+- **Tests:** `SupportMessagesTest`, `SupportFormTest`, `Admin/SupportInboxTest`; updated
+  `WebsiteTest`, `BrandAndMailTest`, `DashboardTest`, `StaffRolesTest`, `ApiDocsTest`.
+- **Dev DB:** migrated; smoke messages #1 (app, Mom) and #2 (website, "Smoke Tester") left in the
+  inbox to look at.
 
 ### 2026-11-08 content round
 - **French for legacy seed files:** optional `data/multiple_choice_fr.php` (89 items, keyed by the English

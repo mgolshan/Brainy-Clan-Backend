@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\Auth;
  * - `admin`: everything (edits, actions, AI generator, settings and age bands, audit log, Horizon).
  * - `support`: read-only — families, members, devices, subscriptions, content, webhooks, account
  *   deletion requests and the dashboard; no create/edit/delete, no actions, no AI generator, no
- *   settings/policies, no audit log, no Horizon.
+ *   settings/policies, no audit log, no Horizon. Exception: the "Support inbox" — support staff
+ *   reply to messages and mark them open/closed there (only admins delete them).
  *
  * Family chat is never shown to anyone in the admin. Resources use {@see ReadOnlyForSupport} or
  * {@see AdminOnly}; custom actions and inline-editable columns check {@see self::isAdmin()}.

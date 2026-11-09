@@ -150,7 +150,7 @@
             <p class="notice" role="status">{{ $fr
                 ? 'Si cette adresse appartient à un compte Brainy Clan, nous venons d’y envoyer un courriel : soit votre lien de paiement (valide 30 minutes), soit la raison pour laquelle l’abonnement sur le Web n’est pas possible pour ce compte.'
                 : 'If this address belongs to a Brainy Clan account, we just sent it an email: either your checkout link (valid for 30 minutes) or the reason subscribing on the web isn’t possible for that account.' }}</p>
-            <p>{{ $fr ? 'Rien reçu ? Vérifiez vos courriels indésirables ou écrivez-nous à' : 'Nothing arrived? Check your spam folder or email us at' }} <a href="mailto:{{ $supportEmail }}">{{ $supportEmail }}</a>.</p>
+            <p>{{ $fr ? 'Rien reçu ? Vérifiez vos courriels indésirables ou' : 'Nothing arrived? Check your spam folder or' }} <a href="{{ \App\Modules\Core\Support\Website::contactUrl($locale, 'billing') }}">{{ $fr ? 'écrivez-nous' : 'write to us' }}</a>.</p>
         @elseif ($state === 'thanks')
             <h1>{{ $fr ? 'Merci !' : 'Thank you!' }}</h1>
             <p class="notice" role="status">{{ $fr

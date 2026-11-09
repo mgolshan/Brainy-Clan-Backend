@@ -50,6 +50,16 @@ final class Website
     }
 
     /**
+     * The contact form on the support page (`/support?lang=…#contact`, optionally with a
+     * preselected `topic`): every "contact us" on the website links here instead of a `mailto:`
+     * (docs/PLAN.md "Support channel without a public mailto").
+     */
+    public static function contactUrl(string $locale = 'en', ?string $topic = null): string
+    {
+        return self::route('website.support', [...($topic !== null ? ['topic' => $topic] : []), 'lang' => $locale]).'#contact';
+    }
+
+    /**
      * Page language: `?lang=` when supported, else the browser's Accept-Language (en or fr), else en.
      */
     public static function locale(Request $request): string

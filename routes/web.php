@@ -25,7 +25,6 @@ Route::middleware(RedirectToWebsiteHost::class)->group(function () {
     Route::withoutMiddleware(['web'])->middleware(SecurityHeaders::class)->group(function () {
         Route::get('/', [WebsiteController::class, 'home'])->name('website.home');
         Route::get('app-ads.txt', [WebsiteController::class, 'appAds'])->name('website.app-ads');
-        Route::get('support', [WebsiteController::class, 'support'])->name('website.support');
         // Partner (affiliate) program: how it works, commission terms from config, rules, brand kit.
         Route::get('partners', [WebsiteController::class, 'partners'])->name('website.partners');
         Route::get('sitemap.xml', [WebsiteController::class, 'sitemap'])->name('website.sitemap');
@@ -42,6 +41,16 @@ Route::middleware(RedirectToWebsiteHost::class)->group(function () {
         // Web checkout (B10): the emailed link (→ Paddle) and Paddle's return page.
         Route::get('subscribe/checkout', [SubscribePageController::class, 'checkout'])->middleware('throttle:web-checkout')->name('website.subscribe.checkout');
         Route::get('subscribe/thanks', [SubscribePageController::class, 'thanks'])->name('website.subscribe.thanks');
+    });
+
+    // Support page with the contact form (docs/PLAN.md "Support channel without a public mailto"):
+    // stateless like the landing page — no session, no cookies, no CSRF token (there is no session
+    // to hold one). The form is protected by a honeypot, a signed form-time token and a per-IP limit
+    // (WebsiteController::supportSubmit); `:forms` only allows posting to this site. POST → redirect
+    // to /support?sent=1#contact.
+    Route::withoutMiddleware(['web'])->middleware(SecurityHeaders::class.':forms')->group(function () {
+        Route::get('support', [WebsiteController::class, 'support'])->name('website.support');
+        Route::post('support', [WebsiteController::class, 'supportSubmit'])->middleware('throttle:support-form')->name('website.support.submit');
     });
 
     // "How to play" help center (docs/PLAN.md, 2026-10-24): stateless; one small same-origin search

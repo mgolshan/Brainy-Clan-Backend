@@ -527,7 +527,7 @@ return [
                     'Utilisez bien le même compte App Store ou Google Play que celui qui a acheté le forfait.',
                 ],
                 'tip' => 'Toujours au forfait gratuit ? Écrivez-nous en précisant la boutique utilisée.',
-                'links' => [['route' => 'website.support', 'label' => 'Nous joindre']],
+                'links' => [['route' => 'website.support', 'anchor' => 'contact', 'label' => 'Nous joindre']],
                 'keywords' => ['restaurer', 'payé', 'ne fonctionne pas', 'pas actif', 'achat manquant', 'nouveau téléphone'],
             ],
             [
@@ -585,7 +585,7 @@ return [
                     'Enregistrez le fichier. C’est possible une fois par heure.',
                     'Pour les données d’un enfant, écrivez-nous.',
                 ],
-                'links' => [['route' => 'website.support', 'label' => 'Nous joindre']],
+                'links' => [['route' => 'website.support', 'anchor' => 'contact', 'label' => 'Nous joindre']],
                 'keywords' => ['exporter', 'télécharger', 'copie', 'données', 'rgpd', 'mes données'],
             ],
             [
@@ -677,6 +677,20 @@ return [
                     'Les notifications fonctionnent dans les applications iPhone et Android, pas sur le Web.',
                 ],
                 'keywords' => ['notifications', 'push', 'rien reçu', 'rappel', 'silencieux'],
+            ],
+            [
+                'id' => 'contact-support',
+                'title' => 'Contacter l’assistance',
+                'summary' => 'Écrivez à l’équipe Brainy Clan depuis l’application ou le site Web.',
+                'steps' => [
+                    'Administrateurs de la famille : allez dans **Profil** → **Contacter l’assistance**, choisissez un sujet et écrivez votre message.',
+                    'Nous répondons par courriel, à l’adresse de votre compte. L’application affiche l’état de chaque message : ouvert, répondu ou fermé.',
+                    'Sans l’application, ou si vous n’êtes pas administrateur de la famille : utilisez le formulaire de contact de la page d’aide de ce site.',
+                    'Enfants et autres membres : demandez à un administrateur de la famille de nous écrire pour vous.',
+                ],
+                'tip' => 'N’envoyez jamais de mot de passe. Vous pouvez écrire en français ou en anglais.',
+                'links' => [['route' => 'website.support', 'anchor' => 'contact', 'label' => 'Formulaire de contact']],
+                'keywords' => ['contact', 'assistance', 'aide', 'soutien', 'courriel', 'question', 'problème', 'bogue', 'écrire'],
             ],
         ],
     ],

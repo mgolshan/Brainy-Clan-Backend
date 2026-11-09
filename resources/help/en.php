@@ -533,7 +533,7 @@ return [
                     'Make sure you use the same App Store or Google Play account that bought the plan.',
                 ],
                 'tip' => 'Still on the free plan? Write to us and tell us which store you used.',
-                'links' => [['route' => 'website.support', 'label' => 'Contact support']],
+                'links' => [['route' => 'website.support', 'anchor' => 'contact', 'label' => 'Contact support']],
                 'keywords' => ['restore', 'paid', 'not working', 'not active', 'purchase missing', 'new phone'],
             ],
             [
@@ -591,7 +591,7 @@ return [
                     'Save the file. You can do this once per hour.',
                     'For a child\'s data, write to us.',
                 ],
-                'links' => [['route' => 'website.support', 'label' => 'Contact support']],
+                'links' => [['route' => 'website.support', 'anchor' => 'contact', 'label' => 'Contact support']],
                 'keywords' => ['export', 'download', 'copy', 'data', 'gdpr', 'my data'],
             ],
             [
@@ -683,6 +683,20 @@ return [
                     'Notifications work in the iPhone and Android apps, not on the web.',
                 ],
                 'keywords' => ['notifications', 'push', 'not receiving', 'reminder', 'silent'],
+            ],
+            [
+                'id' => 'contact-support',
+                'title' => 'Contact support',
+                'summary' => 'Write to the Brainy Clan team from the app or the website.',
+                'steps' => [
+                    'Family admins: go to **Profile** → **Contact support**, pick a topic and write your message.',
+                    'We answer by email, at your account\'s address. The app shows each message\'s status: open, answered or closed.',
+                    'Without the app, or if you are not a family admin: use the contact form on this website\'s support page.',
+                    'Children and other members: ask a family admin to write to us for you.',
+                ],
+                'tip' => 'Never send a password. You can write in English or French.',
+                'links' => [['route' => 'website.support', 'anchor' => 'contact', 'label' => 'Contact form']],
+                'keywords' => ['contact', 'support', 'help', 'email', 'question', 'problem', 'bug', 'write to us'],
             ],
         ],
     ],

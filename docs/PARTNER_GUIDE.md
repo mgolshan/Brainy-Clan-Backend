@@ -175,7 +175,7 @@ payment is reversed and deducted from your next payout.
 
 ## How to apply
 
-Email **support@brainyclan.com** with the subject **"Partner application"** and:
+Use the contact form at **https://brainyclan.com/support#contact** (topic "Something else"), start the message with **"Partner application"**, and include:
 
 - links to your channels or website;
 - your audience size (followers, visits);

@@ -10,6 +10,7 @@ use App\Modules\Family\Models\SignInCode;
 use App\Modules\Identity\Models\SocialAccount;
 use App\Modules\Identity\Models\User;
 use App\Modules\Notifications\Models\NotificationPreference;
+use App\Modules\Support\Models\SupportMessage;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -23,7 +24,7 @@ use Laravel\Sanctum\PersonalAccessToken;
  * "Deleted player", email, password, birth data, avatar, staff role) and `erased_at` set. The user
  * row itself stays because the append-only points ledger references its memberships; their
  * nicknames become "Deleted player" and accessibility settings are cleared. Unused sign-in codes are
- * voided, notification preferences and family chat messages deleted, the invite they joined with and the unused invites they
+ * voided, notification preferences, family chat messages and app support messages deleted, the invite they joined with and the unused invites they
  * created (names + birth data of invitees) deleted. Membership status / `MemberRemoved` are the
  * caller's job. Subscriptions stay with the family. A fixed number of queries for any number of users.
  * The activity log gets one entry with user ids only.
@@ -83,6 +84,10 @@ class EraseUser
                 ChatMessage::query()->whereIn('family_member_id', $memberIds)->delete();
                 ChatMessageReport::query()->whereIn('reporter_member_id', $memberIds)->delete();
             }
+
+            // Support messages the user sent from the app (with the staff replies, FK cascade). Website
+            // form messages are not linked to an account and stay until their retention ends.
+            SupportMessage::query()->whereIn('user_id', $userIds)->delete();
 
             Invite::query()
                 ->where(fn ($query) => $query

@@ -55,12 +55,14 @@
         <p class="notice" role="status">{{ $fr ? 'Votre compte a été supprimé.' : 'Your account has been deleted.' }}</p>
     @elseif ($state === 'family_owner')
         <p class="notice" role="status">{{ $fr
-            ? 'Vous êtes propriétaire d’une famille qui compte d’autres membres. Supprimez la famille dans l’application (Profil → Confidentialité → Supprimer la famille) ou écrivez-nous à '.$contactEmail.'.'
-            : 'You own a family that has other members. Delete the family in the app (Profile → Privacy → Delete family) or email us at '.$contactEmail.'.' }}</p>
+            ? 'Vous êtes propriétaire d’une famille qui compte d’autres membres. Supprimez la famille dans l’application (Profil → Confidentialité → Supprimer la famille) ou'
+            : 'You own a family that has other members. Delete the family in the app (Profile → Privacy → Delete family) or' }}
+            <a href="{{ $contactUrl }}">{{ $fr ? 'écrivez-nous' : 'write to us' }}</a>.</p>
     @elseif ($state === 'child_account')
         <p class="notice" role="status">{{ $fr
-            ? 'Ce compte appartient à un jeune membre d’une famille : demandez à un administrateur de la famille de le retirer, ou écrivez-nous à '.$contactEmail.'.'
-            : 'This account belongs to a young family member: ask a family admin to remove it, or email us at '.$contactEmail.'.' }}</p>
+            ? 'Ce compte appartient à un jeune membre d’une famille : demandez à un administrateur de la famille de le retirer, ou'
+            : 'This account belongs to a young family member: ask a family admin to remove it, or' }}
+            <a href="{{ $contactUrl }}">{{ $fr ? 'écrivez-nous' : 'write to us' }}</a>.</p>
     @else
         <p class="notice" role="status">{{ $fr
             ? 'Ce lien n’est plus valide (déjà utilisé, remplacé ou expiré). Faites une nouvelle demande.'

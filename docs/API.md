@@ -104,7 +104,7 @@ and add a line to the changelog at the bottom.
 - `accessibility.theme`: `null` (use the policy default) or a theme key (see Policy). Lets a member
   pick another look; it never changes rules. **Theme keys ("worlds"):** `playful`
   (shown as "Candy Land"), `sleek` (shown as "Glass"), `modern`, `classic`, `jungle`, `space`,
-  `neon`, `sea`, `dino`, `sticker`, `lofi`, `nature`, `midnight`. Any member may pick any
+  `neon`, `sea`, `dino`, `sticker`, `lofi`, `nature`, `midnight`, `castle`, `arctic`, `robot`. Any member may pick any
   **unlocked** world (no age rule; see `GET /me/worlds`). Unknown key → 422 `validation_failed`;
   a locked world → 403 `world_locked`.
 - `theme_unlocked`: `false` when the stored `accessibility.theme` is no longer unlocked for this
@@ -783,6 +783,35 @@ most 1 push per member per 2 minutes, collapsed). The push **never contains mess
 through Expo/Apple/Google): title "Brainy Clan", body "Sam sent a message" (localized), `data`
 `{ "type": "family_chat", "message_id": 812 }`.
 
+### Support messages (2026-11-08)
+Signed-in **family admins** can write to the Brainy Clan support team from the app (children and
+other members cannot: support replies go to an email address, and we don't collect contact details
+from children). Staff reply by email from the admin panel; the app shows each message's status.
+
+SupportMessage:
+```json
+{ "id": 12, "topic": "billing", "message": "My Family plan shows Free after renewing.",
+  "status": "open", "created_at": "2026-11-08T14:03:00Z", "answered_at": null }
+```
+`topic`: `account`, `billing`, `bug`, `content` (a question or answer looks wrong), `privacy`,
+`idea`, `other`. `status`: `open` (received, not answered yet) · `answered` (staff replied by email) ·
+`closed`.
+
+- `POST /support/messages` (admins only; others 403 `forbidden`) body
+  `{ "topic": "bug", "message": "…", "client_id": "uuid", "app_version": "1.0.0", "platform": "ios" | "android" | "web", "device": "iPad (iPadOS 18.1)" }`
+  → 201 `{ "data": SupportMessage }`. `message` 10–5000 characters (Unicode code points, trimmed);
+  `app_version` ≤ 20, `device` ≤ 80 (optional; the app sends model + OS, nothing else). `client_id`
+  makes the call idempotent: sending the same `client_id` again returns the existing message (200).
+  The reply goes to the admin's account email (shown in the app before sending). Limit: 5 messages
+  per hour and 20 per day per user → 429 `rate_limited`.
+- `GET /support/messages` (admins only) → `{ "data": [SupportMessage, …] }`, the caller's own
+  messages, newest first, at most 50.
+- Support messages are part of `/me/export` (`support_messages`) and are deleted with the account.
+  Closed messages are deleted 1 year after closing; others 2 years after the last activity.
+
+The website has the same channel for people without the app: a contact form on `/support`
+(website only, not part of this API).
+
 ### Legal, consent and privacy (B9)
 Drafts of the privacy policy and terms are served by the backend and **must be reviewed by a lawyer
 before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=false`).
@@ -875,3 +904,6 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-10-24 — Push texts for `goal_reached`, `period_closed`, `family_activity` and `daily_reminder` now follow the recipient's `locale` (en/fr), like the chat pushes; reworded `daily_reminder` / `family_activity` texts (content audit). No shape change.
 - 2026-11-08 — Level-up puzzles: types `cross_math`, `maze`, `code_breaker` (server-generated), categories `cross-math` (icon `crossmath`), `mazes` (icon `maze`), `code-breaker` (icon `lock`), each with 4 level subcategories; 20 top-level categories.
 - 2026-11-08 — Level-up puzzles clarifications (backend built, no shape change): **cross_math** — "out of range" means a fill whose `[row, col]` is outside the grid; a fill value that is not a JSON whole number → 422, a whole number that does not fit the bank → wrong answer; an equation holds when it is true in exact arithmetic with normal precedence (÷ 0 never holds) — the "whole numbers 0..max, exact division" rule is what the generator guarantees for its own grid, a member's other arrangement only has to make every equation true; the points follow the difficulty even when the generator had to use fewer blanks (rare; at least 2 on 5×5, 3 on 7×7). **maze** — an empty `path` → 422 (it does not start on `start`); a step to the same cell → 422 (not a neighbour); walking through the goal before the end is fine. **code_breaker** — an empty `guesses` list is a wrong answer; `repeats: true` means the code *may* repeat a peg. Request caps (422 beyond, the per-item limits still apply): `fills` ≤ 50, `path` ≤ 1024, `guesses` ≤ 20. Category `icon` keys list gains `crossmath, maze, lock`.
+- 2026-11-08 — Support messages: `POST/GET /support/messages` (family admins), SupportMessage object, `/me/export` gains `support_messages`.
+- 2026-11-08 — Theme keys `castle` ("Fairy-Tale Castle"), `arctic` ("Polar Lights"), `robot` ("Robot Lab"): three more worlds, unlock type `family_plan`, sorted after `midnight`.
+- 2026-11-08 — Support messages clarifications (backend built, no shape change): `client_id` is required (UUID, case-insensitive) and unique per user — a retry returns the existing message with 200 and does not count against the limits; only created messages count (5 per rolling hour, 20 per rolling day) and the 429 `rate_limited` carries `retry_after` + `Retry-After`; the 403 check runs before validation (a non-admin gets 403 even with an invalid body), and a family admin whose account has no email also gets 403 `forbidden` (message says to add an email); `message` is normalized like chat text (NFC, CRLF → LF, control characters removed, at most 2 empty lines in a row, trimmed) before the 10–5000 code-point check; `app_version` / `device` are stored on one line (line breaks removed). `/me/export` `support_messages`: `[{ "id", "topic", "message", "status", "app_version", "platform", "device", "created_at", "answered_at", "closed_at", "replies": [{ "body", "sent_at" }] }]` (the user's app messages; staff names not included). Website form messages are not linked to an account: they are not in the export and not deleted with it (they follow the same retention).

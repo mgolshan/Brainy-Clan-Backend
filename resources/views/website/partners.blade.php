@@ -16,7 +16,7 @@
         ? ['paypal' => 'PayPal', 'interac' => 'virement Interac (Canada)', 'bank' => 'virement bancaire']
         : ['paypal' => 'PayPal', 'interac' => 'Interac e-Transfer (Canada)', 'bank' => 'bank transfer'];
     $methods = array_map(fn (string $method): string => $methodLabels[$method], $terms['methods']);
-    $applyUrl = 'mailto:'.$supportEmail.'?subject='.rawurlencode('Partner application');
+    $applyUrl = \App\Modules\Core\Support\Website::contactUrl($locale, 'other');
     $refLink = \App\Modules\Core\Support\Brand::domain().'/r/'.($fr ? 'VOTRECODE' : 'YOURCODE');
     $toc = $fr
         ? [['how', 'Fonctionnement'], ['commission', 'Commission'], ['rules', 'Règles'], ['brand', 'Trousse de marque'], ['faq', 'FAQ'], ['apply', 'Postuler']]
@@ -380,7 +380,7 @@
         <div class="wrap">
             <h2 id="apply-title">{{ $fr ? 'Comment postuler' : 'How to apply' }}</h2>
             <div class="card">
-                <p>{{ $fr ? 'Écrivez à' : 'Email' }} <a href="{{ $applyUrl }}">{{ $supportEmail }}</a> {{ $fr ? 'avec l’objet' : 'with the subject' }} <span class="mono">Partner application</span> {{ $fr ? 'et :' : 'and:' }}</p>
+                <p>{{ $fr ? 'Écrivez-nous avec le' : 'Write to us with the' }} <a href="{{ $applyUrl }}">{{ $fr ? 'formulaire de contact' : 'contact form' }}</a> {{ $fr ? '(sujet « Autre chose »), en commençant votre message par' : '(topic “Something else”), starting your message with' }} <span class="mono">Partner application</span>{{ $fr ? ', et indiquez :' : ', and include:' }}</p>
                 <ul class="checks">
                     <li>{{ $fr ? 'les liens vers vos chaînes ou votre site;' : 'links to your channels or website;' }}</li>
                     <li>{{ $fr ? 'la taille de votre public (abonnés, visites);' : 'your audience size (followers, visits);' }}</li>
@@ -389,7 +389,7 @@
                 <p class="note mt">{{ $fr
                     ? 'Si votre demande est acceptée, nous créons votre compte de partenaire et votre code, et nous vous envoyons l’entente.'
                     : 'If we accept, we create your partner account and code and send you the agreement.' }}</p>
-                <p><a class="cta" href="{{ $applyUrl }}">{{ $fr ? 'Postuler par courriel' : 'Apply by email' }}</a></p>
+                <p><a class="cta" href="{{ $applyUrl }}">{{ $fr ? 'Postuler avec le formulaire' : 'Apply with the form' }}</a></p>
             </div>
         </div>
     </section>

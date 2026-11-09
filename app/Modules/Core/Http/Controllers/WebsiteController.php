@@ -9,6 +9,10 @@ use App\Modules\Core\Support\HelpCenter;
 use App\Modules\Core\Support\Website;
 use App\Modules\Policy\PolicyResolver;
 use App\Modules\Policy\Support\ThemeWorldCatalog;
+use App\Modules\Support\Actions\SubmitWebsiteSupportMessage;
+use App\Modules\Support\Http\Requests\WebsiteSupportMessageRequest;
+use App\Modules\Support\Models\SupportMessage;
+use App\Modules\Support\Support\FormToken;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -74,11 +78,83 @@ class WebsiteController
         ]);
     }
 
+    /**
+     * The support page: FAQ and the contact form (docs/PLAN.md "Support channel without a public
+     * mailto"). `?topic=` preselects a topic; `?sent=1` shows the "message sent" panel instead of
+     * the form.
+     */
     public function support(Request $request, PolicyResolver $policy): Response
     {
-        return $this->page($request, 'website.support', [
+        $topic = $request->query('topic');
+
+        return $this->page($request, 'website.support', $this->supportData($policy, [
+            'sent' => $request->query('sent') === '1',
+            'old' => ['name' => '', 'email' => '', 'topic' => is_string($topic) && in_array($topic, SupportMessage::TOPICS, true) ? $topic : '', 'message' => ''],
+        ]));
+    }
+
+    /**
+     * The contact form's POST (stateless: no session, no CSRF token). Order of checks:
+     *
+     * 1. Honeypot filled, or a missing/tampered token, or posted within 3 s of showing the page →
+     *    bots: the same "sent" redirect, nothing stored or mailed.
+     * 2. Token older than 2 hours → the form again (with what was typed) and a "please send again"
+     *    note (a person who left the page open).
+     * 3. More than 5 stored messages per hour from this IP → the form again with a "try later" note (429).
+     * 4. Validation errors → the form again with the errors and what was typed (422).
+     * 5. Store + mail the support inbox, then POST-redirect-GET to `/support?sent=1#contact`.
+     */
+    public function supportSubmit(WebsiteSupportMessageRequest $request, SubmitWebsiteSupportMessage $submit, PolicyResolver $policy): Response|RedirectResponse
+    {
+        $locale = Website::locale($request);
+        $sent = redirect()->to(Website::route('website.support', ['sent' => 1, 'lang' => $locale]).'#contact', 303)
+            ->header('Cache-Control', 'no-store, private');
+        $token = $request->tokenState();
+
+        if ($request->isBot() || $token === FormToken::INVALID || $token === FormToken::TOO_FAST) {
+            return $sent;
+        }
+
+        $ip = (string) $request->ip();
+        $formError = match (true) {
+            $token === FormToken::EXPIRED => 'expired',
+            $submit->isRateLimited($ip) => 'rate_limited',
+            default => null,
+        };
+
+        if ($formError !== null || $request->formErrors() !== null) {
+            $status = match ($formError) {
+                'rate_limited' => 429,
+                default => 422,
+            };
+
+            return $this->page($request, 'website.support', $this->supportData($policy, [
+                'old' => $request->formInput(),
+                'fieldErrors' => $formError === null ? $request->formErrors() : null,
+                'formError' => $formError,
+            ]))->setStatusCode($status)->header('Cache-Control', 'no-store, private');
+        }
+
+        $submit->handle($request->formInput(), $locale, $ip);
+
+        return $sent;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function supportData(PolicyResolver $policy, array $data): array
+    {
+        return [
             'signInCodeMinutes' => $policy->signInCodeTtlMinutes(),
-        ]);
+            'topics' => SupportMessage::TOPIC_LABELS,
+            'formToken' => FormToken::issue(),
+            'sent' => false,
+            'fieldErrors' => null,
+            'formError' => null,
+            ...$data,
+        ];
     }
 
     /**

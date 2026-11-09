@@ -11,6 +11,10 @@ use App\Modules\Identity\Mail\PasswordChanged;
 use App\Modules\Identity\Mail\PasswordResetLink;
 use App\Modules\Identity\Mail\SignInAttemptsNotice;
 use App\Modules\Identity\Models\User;
+use App\Modules\Support\Mail\SupportMessageReceived;
+use App\Modules\Support\Mail\SupportReplyMail;
+use App\Modules\Support\Models\SupportMessage;
+use App\Modules\Support\Models\SupportMessageReply;
 use Illuminate\Console\Command;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
@@ -33,7 +37,8 @@ class MailPreviewCommand extends Command
     protected $signature = 'mail:preview
         {email : Address that receives the samples (use a sandbox inbox such as Mailtrap)}
         {--locale=en : en or fr (staff alerts are English only and are sent with en)}
-        {--pause=2 : Seconds to wait between two mails (sandbox inboxes rate-limit)}';
+        {--pause=2 : Seconds to wait between two mails (sandbox inboxes rate-limit)}
+        {--only= : Send only the samples whose label contains this text (case-insensitive), e.g. --only=support}';
 
     protected $description = 'Send a sample of every email type to one address (local/staging only)';
 
@@ -65,7 +70,20 @@ class MailPreviewCommand extends Command
         $failures = 0;
         $first = true;
 
-        foreach ($this->samples($locale) as $label => $send) {
+        $only = trim((string) $this->option('only'));
+        $samples = array_filter(
+            $this->samples($locale),
+            fn (string $label): bool => $only === '' || mb_stripos($label, $only) !== false,
+            ARRAY_FILTER_USE_KEY,
+        );
+
+        if ($samples === []) {
+            $this->error('No sample matches --only='.$only.'.');
+
+            return self::FAILURE;
+        }
+
+        foreach ($samples as $label => $send) {
             if (! $first) {
                 $this->pause();
             }
@@ -123,6 +141,7 @@ class MailPreviewCommand extends Command
             )),
             'Web checkout refused (store plan active)' => $mail(new WebCheckoutMail($locale, 'annual', null, 'store_plan_active', 'app_store')),
             'Child data export' => $mail($this->sampleChildExport($locale)),
+            'Support reply (to the sender)' => $mail(new SupportReplyMail($this->sampleSupportReply($locale))),
         ];
 
         if ($locale !== 'en') {
@@ -130,6 +149,7 @@ class MailPreviewCommand extends Command
         }
 
         return $samples + [
+            'Support message (to the support inbox)' => $mail(new SupportMessageReceived($this->sampleSupportMessage('en'))),
             'Ops alert (failed job)' => $mail(new OpsAlertMail(
                 '[Brainy Clan '.app()->environment().'] Queued job failed: SampleJob (preview)',
                 implode("\n", [
@@ -172,6 +192,46 @@ class MailPreviewCommand extends Command
                 return [Attachment::fromData(fn (): string => $json, 'brainy-clan-export-sample.json')->withMime('application/json')];
             }
         };
+    }
+
+    /**
+     * A made-up website message (not saved), with text that must stay plain (Markdown and HTML
+     * characters, several paragraphs).
+     */
+    private function sampleSupportMessage(string $locale): SupportMessage
+    {
+        $message = (new SupportMessage)->forceFill([
+            'id' => 12345,
+            'source' => SupportMessage::SOURCE_WEB,
+            'name' => 'Sample Parent',
+            'email' => 'parent@example.com',
+            'locale' => $locale,
+            'topic' => 'billing',
+            'message' => $locale === 'fr'
+                ? "Bonjour,\n\nMon forfait Famille affiche « gratuit » après le renouvellement. *Pas de gras*, <b>pas de HTML</b>, [pas de lien](https://example.com).\n\nMerci !"
+                : "Hello,\n\nMy Family plan shows Free after renewing. *Not bold*, <b>not HTML</b>, [not a link](https://example.com).\n\nThanks!",
+            'status' => SupportMessage::STATUS_NEW,
+            'created_at' => now(),
+        ]);
+
+        return $message->setRelation('user', null)->setRelation('family', null);
+    }
+
+    /**
+     * A made-up staff reply (not saved) to the sample message.
+     */
+    private function sampleSupportReply(string $locale): SupportMessageReply
+    {
+        $reply = (new SupportMessageReply)->forceFill([
+            'id' => 1,
+            'support_message_id' => 12345,
+            'body' => $locale === 'fr'
+                ? "Bonjour,\n\nMerci pour votre message. Le forfait est maintenant actif : tirez vers le bas dans l’onglet Famille pour actualiser.\n\nL’équipe Brainy Clan"
+                : "Hello,\n\nThanks for your message. The plan is active again: pull down on the Family tab to refresh.\n\nThe Brainy Clan team",
+            'sent_at' => now(),
+        ]);
+
+        return $reply->setRelation('supportMessage', $this->sampleSupportMessage($locale));
     }
 
     private function pause(): void

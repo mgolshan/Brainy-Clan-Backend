@@ -2,6 +2,7 @@
 
 namespace App\Modules\Family\Http\Controllers;
 
+use App\Modules\Core\Support\Website;
 use App\Modules\Family\Actions\ConfirmAccountDeletionRequest;
 use App\Modules\Family\Actions\RequestAccountDeletionByEmail;
 use App\Modules\Family\Http\Requests\AccountDeletionPageRequest;
@@ -52,7 +53,7 @@ class AccountDeletionPageController
         return response()->view('account.delete', [
             'locale' => $this->locale($request),
             'state' => $state,
-            'contactEmail' => (string) config('legal.contact.email'),
+            'contactUrl' => Website::contactUrl($this->locale($request), 'account'),
             ...$data,
         ])->header('Cache-Control', 'no-store, private');
     }

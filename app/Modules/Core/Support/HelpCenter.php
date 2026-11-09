@@ -88,7 +88,7 @@ class HelpCenter
                     'tip' => isset($article['tip']) ? $this->fill($article['tip'], $values) : null,
                     'image' => $image,
                     'links' => array_map(fn (array $link): array => [
-                        'url' => in_array($link['route'], self::LINK_ROUTES, true) ? route($link['route'], $lang) : route('website.support', $lang),
+                        'url' => (in_array($link['route'], self::LINK_ROUTES, true) ? route($link['route'], $lang) : route('website.support', $lang)).(isset($link['anchor']) ? '#'.$link['anchor'] : ''),
                         'label' => $link['label'],
                     ], $article['links'] ?? []),
                     'keywords' => $article['keywords'] ?? [],
@@ -204,11 +204,11 @@ class HelpCenter
     /**
      * Raw content of a language (`resources/help/{locale}.php`).
      *
-     * @return list<array{id: string, title: string, summary: string, icon: string, articles: list<array{id: string, title: string, summary: string, steps: list<string>, tip?: string, image?: string, alt?: string, links?: list<array{route: string, label: string}>, keywords?: list<string>}>}>
+     * @return list<array{id: string, title: string, summary: string, icon: string, articles: list<array{id: string, title: string, summary: string, steps: list<string>, tip?: string, image?: string, alt?: string, links?: list<array{route: string, label: string, anchor?: string}>, keywords?: list<string>}>}>
      */
     public static function content(string $locale): array
     {
-        /** @var list<array{id: string, title: string, summary: string, icon: string, articles: list<array{id: string, title: string, summary: string, steps: list<string>, tip?: string, image?: string, alt?: string, links?: list<array{route: string, label: string}>, keywords?: list<string>}>}> $content */
+        /** @var list<array{id: string, title: string, summary: string, icon: string, articles: list<array{id: string, title: string, summary: string, steps: list<string>, tip?: string, image?: string, alt?: string, links?: list<array{route: string, label: string, anchor?: string}>, keywords?: list<string>}>}> $content */
         $content = require resource_path('help/'.(in_array($locale, ['en', 'fr'], true) ? $locale : 'en').'.php');
 
         return $content;

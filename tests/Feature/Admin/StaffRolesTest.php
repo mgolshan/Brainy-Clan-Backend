@@ -148,6 +148,7 @@ it('lets support open the read-only pages', function (string $url) {
     '/admin/webhook-events/{event}',
     '/admin/account-deletion-requests',
     '/admin/account-deletion-requests/{deletion}',
+    '/admin/support-messages',
 ]);
 
 it('keeps support out of edit, create, settings, policy, audit, AI and Horizon pages', function (string $url) {

@@ -37,6 +37,6 @@
         <p>{{ $fr
             ? 'Pour recevoir un nouveau lien, ouvrez l’application Brainy Clan et touchez « Mot de passe oublié ? » dans l’écran de connexion.'
             : 'To get a new link, open the Brainy Clan app and tap "Forgot password?" on the sign-in screen.' }}</p>
-        <p>{{ $fr ? 'Une question ? Écrivez-nous à ' : 'Questions? Email us at ' }}<a href="mailto:{{ $supportEmail }}">{{ $supportEmail }}</a>.</p>
+        <p>{{ $fr ? 'Une question ? ' : 'Questions? ' }}<a href="{{ \App\Modules\Core\Support\Website::contactUrl($locale) }}">{{ $fr ? 'Écrivez-nous' : 'Write to us' }}</a>.</p>
     @endif
 @endsection

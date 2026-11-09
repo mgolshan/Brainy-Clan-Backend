@@ -44,6 +44,9 @@ function affiliateRows(int $count): void
 
 function billingAdminQueries(string $url): int
 {
+    // Warm up like adminQueries(): the panel builds its navigation (and badge counts) once per app instance.
+    test()->get($url)->assertOk();
+
     DB::flushQueryLog();
     DB::enableQueryLog();
     test()->get($url)->assertOk();

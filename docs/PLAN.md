@@ -205,6 +205,27 @@ as written there; if something must change, update `docs/API.md` first and note 
   `docs/API.md` "Brain games"). Free tier still unlocks the first 3 top-level categories; new
   categories go at the end. Avoided on purpose: pop culture, celebrities, brands, current events,
   religion.
+- **Three more Family-plan worlds (2026-11-08, Moe: "3 more themes for the family plan… add the image
+  to the worlds collection"):** `castle` Fairy-Tale Castle / Château enchanté (warm storybook: castle
+  towers, banners, friendly dragon, stars), `arctic` Polar Lights / Aurores polaires (icy blues,
+  aurora, snow, polar bear and penguin friends), `robot` Robot Lab / Labo des robots (clean tech look
+  for teens: friendly robots, circuits, gears, teal + orange). Unlock type `family_plan`, sorted
+  after `midnight`; each with full light/dark palettes, illustrations, sounds (kids on by default),
+  celebration and category-art compatibility like the phase-2 worlds; real screenshots added to the
+  landing page worlds gallery and the help center. Chosen to add a fantasy, a nature-cold and a tech
+  look that none of the 13 existing worlds covers.
+- **Support channel without a public mailto (2026-11-08, Moe: "Doesn't that help spam bots…? Is there a
+  better way to get in touch with the support team?"):** the main channel is in-app "Contact support"
+  for family admins (`docs/API.md` "Support messages"), plus a no-JavaScript contact form on the
+  website's `/support` page (honeypot field, signed form-time token rejecting submissions under 3 s or
+  older than 2 h, per-IP rate limit; silent success for bots). No acknowledgement mail to the sender of
+  a web form (it would let anyone send our mail to any address). Every message is stored
+  (`support_messages`) and mailed to the support inbox with Reply-To = sender; staff reply from the
+  Filament "Support inbox" (reply mail in the shared template, history kept, status new/open →
+  answered → closed) and a dashboard card shows new messages. `support@` stays visible only where
+  required (privacy policy, terms, Google Play listing), as plain text with light HTML-entity
+  obfuscation; every other "contact us" links to the form. Personal data: in `/me/export`, deleted
+  with the account, retention 1 year after closing (2 years max).
 - **Categories 18–20: level-up puzzles (2026-11-08, Moe: "I'd like to have 20… variable
   difficulty… from kids to adults"; suggested math crosswords, the rest left to Claude):**
   Cross Math (number-lattice math crossword, + − × ÷ with normal precedence), Mazes (perfect

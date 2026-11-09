@@ -12,6 +12,7 @@ use App\Modules\Notifications\NotificationsServiceProvider;
 use App\Modules\Play\PlayServiceProvider;
 use App\Modules\Policy\PolicyServiceProvider;
 use App\Modules\Scoring\ScoringServiceProvider;
+use App\Modules\Support\SupportServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\Filament\AdminPanelProvider;
 use App\Providers\HorizonServiceProvider;
@@ -34,4 +35,5 @@ return [
     BillingServiceProvider::class,
     NotificationsServiceProvider::class,
     ChatServiceProvider::class,
+    SupportServiceProvider::class,
 ];

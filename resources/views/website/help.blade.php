@@ -226,7 +226,7 @@
 
         <p class="help-more">{{ $fr ? 'Vous ne trouvez pas votre réponse ?' : 'Can’t find your answer?' }}
             <a href="{{ route('website.support', $lang) }}">{{ $fr ? 'Visitez la page d’aide' : 'Visit the support page' }}</a>
-            {{ $fr ? 'ou écrivez à' : 'or email' }} <a href="mailto:{{ $supportEmail }}">{{ $supportEmail }}</a>.</p>
+            {{ $fr ? 'ou' : 'or' }} <a href="{{ \App\Modules\Core\Support\Website::contactUrl($locale) }}">{{ $fr ? 'écrivez-nous' : 'write to us' }}</a>.</p>
     </div>
 @endsection
 

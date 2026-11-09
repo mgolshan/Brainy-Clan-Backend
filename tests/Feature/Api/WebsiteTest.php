@@ -44,7 +44,8 @@ describe('pages', function () {
             ->assertSee(route('legal.terms', ['lang' => 'en']), false)
             ->assertSee(route('website.support', ['lang' => 'en']), false)
             ->assertSee(route('account.delete', ['lang' => 'en']), false)
-            ->assertSee('mailto:support@brainyclan.com', false)
+            ->assertSee(route('website.support', ['lang' => 'en']).'#contact', false)
+            ->assertDontSee('mailto:', false)
             ->assertSee('© '.now()->year.' Brainy Clan', false)
             ->assertHeader('Content-Language', 'en')
             ->assertHeader('X-Frame-Options', 'DENY');
@@ -97,9 +98,10 @@ describe('pages', function () {
             ->assertSee('English');
     });
 
-    it('renders the support page with the FAQ, the support email and links in both languages', function (string $lang, array $texts) {
+    it('renders the support page with the FAQ, the contact form and links in both languages', function (string $lang, array $texts) {
         $response = $this->get("/support?lang={$lang}")->assertOk()
-            ->assertSee('mailto:support@brainyclan.com', false)
+            ->assertSee('<section id="contact" aria-labelledby="contact-title">', false)
+            ->assertDontSee('mailto:', false)
             ->assertSee(route('account.delete', ['lang' => $lang]), false)
             ->assertSee('/password/reset', false)
             ->assertSee(route('legal.privacy', ['lang' => $lang]), false)
@@ -530,7 +532,8 @@ describe('partners page', function () {
             ->assertSee('[DRAFT FOR LAWYER REVIEW]')
             ->assertSee('brainyclan.com/r/', false)
             ->assertSee('#ad')
-            ->assertSee('mailto:support@brainyclan.com?subject=Partner%20application', false);
+            ->assertSee(e(route('website.support', ['topic' => 'other', 'lang' => $lang])).'#contact', false)
+            ->assertDontSee('mailto:', false);
 
         foreach ($texts as $text) {
             $response->assertSee($text, false);

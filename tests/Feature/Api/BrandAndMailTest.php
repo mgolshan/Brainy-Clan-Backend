@@ -10,6 +10,10 @@ use App\Modules\Identity\Mail\PasswordChanged;
 use App\Modules\Identity\Mail\PasswordResetLink;
 use App\Modules\Identity\Mail\SignInAttemptsNotice;
 use App\Modules\Identity\Models\User;
+use App\Modules\Support\Mail\SupportMessageReceived;
+use App\Modules\Support\Mail\SupportReplyMail;
+use App\Modules\Support\Models\SupportMessage;
+use App\Modules\Support\Models\SupportMessageReply;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
@@ -36,6 +40,8 @@ function everyMailable(string $locale): array
         'web checkout link' => new WebCheckoutMail($locale, 'annual', 'https://brainyclan.test/subscribe/checkout?token=t', null, null),
         'web checkout refused' => new WebCheckoutMail($locale, 'annual', null, 'store_plan_active', 'app_store'),
         'child data export' => new ChildDataExport(User::factory()->create(), 'Little <b>Fox</b> *star*', $locale),
+        'support message (inbox)' => new SupportMessageReceived(SupportMessage::factory()->create(['message' => 'Hello *team* <b>x</b>'])),
+        'support reply' => new SupportReplyMail(SupportMessageReply::query()->create(['support_message_id' => SupportMessage::factory()->create(['locale' => $locale])->id, 'body' => 'Fixed *now* <i>y</i>', 'sent_at' => now()])),
         'ops alert' => new OpsAlertMail('[Brainy Clan testing] Queued job failed: X', "Job: App\\Jobs\\X\n\nQueue: redis / default"),
     ];
 }
@@ -170,7 +176,8 @@ describe('email template', function () {
 
         foreach (everyMailable($locale) as $name => $mailable) {
             $html = (string) $mailable->render();
-            $mailLocale = $mailable instanceof OpsAlertMail ? 'en' : $locale;
+            // Staff mails (ops alerts, the support inbox) are always English.
+            $mailLocale = $mailable instanceof OpsAlertMail || $mailable instanceof SupportMessageReceived ? 'en' : $locale;
 
             expect($html)->toContain('src="'.e(Brand::emailLogoUrl()).'"')
                 ->toContain('class="header-name"')
@@ -235,14 +242,14 @@ describe('mail:preview', function () {
         $this->artisan('mail:preview', ['email' => 'moe@example.test', '--pause' => 0])->assertSuccessful();
         $sent = Mail::getFacadeRoot()->mailer()->getSymfonyTransport()->messages();
 
-        expect($sent)->toHaveCount(9)
+        expect($sent)->toHaveCount(11)
             ->and($sent->every(fn ($message): bool => $message->getOriginalMessage()->getTo()[0]->getAddress() === 'moe@example.test'))->toBeTrue();
 
         $this->artisan('mail:preview', ['email' => 'moe@example.test', '--locale' => 'fr', '--pause' => 0])->assertSuccessful();
-        $subjects = Mail::getFacadeRoot()->mailer()->getSymfonyTransport()->messages()->slice(9)
+        $subjects = Mail::getFacadeRoot()->mailer()->getSymfonyTransport()->messages()->slice(11)
             ->map(fn ($message): string => (string) $message->getOriginalMessage()->getSubject());
 
-        expect($subjects)->toHaveCount(7)
+        expect($subjects)->toHaveCount(8)
             ->and($subjects->first())->toBe('Réinitialisez votre mot de passe Brainy Clan');
     });
 
@@ -253,7 +260,17 @@ describe('mail:preview', function () {
         $covered = collect(everyMailable('en'))->map(fn (Mailable $mailable): string => class_basename($mailable::class))->unique()->sort()->values();
 
         expect($covered->all())->toBe($classes->all())
-            ->and(array_keys(app(MailPreviewCommand::class)->samples('en')))->toHaveCount(9);
+            ->and(array_keys(app(MailPreviewCommand::class)->samples('en')))->toHaveCount(11);
+    });
+
+    it('sends only the samples matching --only', function () {
+        $this->artisan('mail:preview', ['email' => 'moe@example.test', '--pause' => 0, '--only' => 'support'])->assertSuccessful();
+        $subjects = Mail::getFacadeRoot()->mailer()->getSymfonyTransport()->messages()
+            ->map(fn ($message): string => (string) $message->getOriginalMessage()->getSubject())->values()->all();
+
+        expect($subjects)->toBe(['Re: your message to Brainy Clan support (#12345)', 'Support message #12345: Plan and billing (website)']);
+
+        $this->artisan('mail:preview', ['email' => 'moe@example.test', '--only' => 'nothing-matches'])->assertFailed();
     });
 
     it('rejects a bad address or locale', function () {

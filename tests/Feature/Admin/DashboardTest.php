@@ -12,6 +12,7 @@ use App\Filament\Widgets\PlaysPerCategoryChart;
 use App\Filament\Widgets\PlaysTrendChart;
 use App\Filament\Widgets\RecentFamilies;
 use App\Filament\Widgets\RecentWebhookErrors;
+use App\Filament\Widgets\SupportInbox;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Models\WebhookEvent;
 use App\Modules\Billing\Support\WebhookRejections;
@@ -47,6 +48,7 @@ const DASHBOARD_WIDGETS = [
     RecentFamilies::class,
     BatchesAwaitingReview::class,
     RecentWebhookErrors::class,
+    SupportInbox::class,
 ];
 
 function dashboardPlay(FamilyMember $member, Category $category, CarbonImmutable $at): PlaySession

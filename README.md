@@ -175,6 +175,34 @@ Plan limits on the landing page come from the same policy settings as the
 app. Routes: `routes/web.php`; host routing: `WEBSITE_URL` / `WEBSITE_HOST` (empty locally, so every
 page works on `http://localhost:8080`; production setup in [docs/DEPLOY.md](docs/DEPLOY.md) section 4).
 
+## Support channel (support messages)
+
+There is **no public `mailto:` support link** on the website (docs/PLAN.md "Support channel without a
+public mailto"). People reach us in two ways, both stored in `support_messages` (module
+`app/Modules/Support`) and mailed to the support inbox (`LEGAL_SUPPORT_EMAIL`, Reply-To = the
+sender):
+
+- **In the app** (family admins only): Profile → Contact support → `POST /api/v1/support/messages`
+  (docs/API.md "Support messages"; 5/hour + 20/day per user, idempotent `client_id`).
+- **On the website**: the contact form on `/support#contact` (name, email, topic, message). Stateless
+  like the other pages (no session, no cookie, no CSRF token, no JavaScript); protected by a hidden
+  honeypot field, a signed form-time token (HMAC with `APP_KEY`; posts within 3 s or after 2 h are
+  refused) and 5 stored messages per hour per IP (plus a 30 posts/hour flood guard). Bots get the
+  normal "sent" page and nothing is stored. No acknowledgement mail is ever sent to the address typed
+  in the form.
+
+Every "contact us" on the website links to `/support?lang=…#contact` (`Website::contactUrl()`). The
+address `support@…` is shown only where it must be — privacy policy and terms — as plain text with
+light HTML-entity obfuscation (`Brand::obfuscatedEmail()`). Mails we send keep the address in their
+footer (the recipient already has it, and they can simply reply).
+
+Staff answer from **Admin → Support inbox** (both staff roles; the navigation badge and the
+dashboard card show new messages): opening a message marks it `open`, **Reply** sends a branded mail
+in the sender's language (Reply-To = the support inbox) and marks it `answered`, **Close** / **Mark
+open** change the status; only admins can delete. App messages are part of `/me/export` and deleted
+with the account; `support:prune` (daily 03:40) deletes closed messages 1 year after closing and any
+message 2 years after its last activity. How to answer and handle spam: docs/OPERATIONS_HANDBOOK.md §9.
+
 ## Environment (`CENTRAL_DOMAIN`)
 
 The product's domain is **one line** in `.env` / `.env.prod`: `CENTRAL_DOMAIN=brainyclan.com`.
@@ -242,14 +270,19 @@ the only image is our logo.
 | Account deletion confirmation | `Family\Mail\AccountDeletionConfirmation` | queued |
 | Child data export (JSON attached) | `Family\Mail\ChildDataExport` | synchronous (never in a queue) |
 | Web checkout link / why not | `Billing\Mail\WebCheckoutMail` | queued |
+| New support message (to the support inbox, English) | `Support\Mail\SupportMessageReceived` | queued (ids only in the payload) |
+| Staff reply to a support message | `Support\Mail\SupportReplyMail` | queued (ids only in the payload) |
 | Ops alert (failed job) | `Core\Mail\OpsAlertMail` | synchronous |
 | Horizon long wait | Horizon's `LongWaitDetected` notification | queued by Horizon |
 
 Write a new mail as `new Content(markdown: 'mail.<name>', ...)` with `<x-mail::message reason="…">`,
 call `$this->locale($locale)` in the constructor, keep the Markdown lines at column 0 (indented = code
 block) and put user-chosen text (nicknames) in a `<p>…</p>` HTML block so it is never read as
-Markdown. Add it to `everyMailable()` in `tests/Feature/Api/BrandAndMailTest.php` and to
-`mail:preview`.
+Markdown. Longer text people typed (support messages, replies, names) goes through the
+`<x-mail::user-text :text="…" />` and `<x-mail::details :rows="…" />` components (`MailText::html()`:
+escaped, line breaks as `<br>`, on one line so CommonMark sees one raw HTML block; the text version
+prints it as is), with a blank line before and after. Add it to `everyMailable()` in
+`tests/Feature/Api/BrandAndMailTest.php` and to `mail:preview`.
 
 **Dev inbox.** By default mails land in Mailpit (http://localhost:8026). To see them in a
 **Mailtrap sandbox** (closer to real clients, HTML check, spam score): in `.env` set
@@ -262,7 +295,8 @@ outbound port 2525 through (STARTTLS to Mailtrap is verified against the contain
 **Preview every mail:** `docker compose exec app php artisan mail:preview you@example.com` (and
 `--locale=fr`) sends one sample of each mail type above with made-up data (no real user, fake
 tokens, a sample JSON attachment) synchronously, so SMTP errors show in the console; `--pause=2`
-(seconds between mails) keeps under the sandbox rate limit. Refused in production.
+(seconds between mails) keeps under the sandbox rate limit; `--only=support` sends only the samples
+whose label contains that text. Refused in production.
 
 ## API documentation
 
@@ -996,7 +1030,7 @@ staff became `admin`):
 | Role | Can |
 | --- | --- |
 | `admin` | Everything: edits, create/delete, table and bulk actions, CSV import, AI batch generator, settings and age bands, audit log (Activity), Horizon, the staff privacy actions below. |
-| `support` | Read-only: dashboard, families (members, devices, invites, consents, subscription), goal plans, content (items, batches, categories, tags, challenge types, worlds, preview), webhook events, account deletion requests. No create/edit/delete, no actions, no toggles, no AI generator, no settings/age bands, no audit log, no Horizon. |
+| `support` | Read-only: dashboard, families (members, devices, invites, consents, subscription), goal plans, content (items, batches, categories, tags, challenge types, worlds, preview), webhook events, account deletion requests. No create/edit/delete, no actions, no toggles, no AI generator, no settings/age bands, no audit log, no Horizon. Exception: the **Support inbox** — support staff reply to messages and mark them open/closed (only admins delete). |
 | none (`null`) | No admin access (every app user). |
 
 Family chat is never shown in the admin, whatever the role. Set or remove a role (logged in the

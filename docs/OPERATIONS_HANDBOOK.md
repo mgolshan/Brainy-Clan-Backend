@@ -179,6 +179,7 @@ local file). No CI pipeline exists (no `.github/`): checks run in the developer 
 | `billing:reconcile-subscriptions` | hourly | Safety net: re-checks subscriptions whose expiry passed without an EXPIRATION webhook (asks RevenueCat when `REVENUECAT_API_KEY` is set, else expires them after `REVENUECAT_RECONCILE_AFTER_MINUTES`, default 60). |
 | `play:abandon-idle-sessions` | hourly | Abandons play sessions with no answer for 24 h. |
 | `chat:prune` | hourly | Deletes chat messages older than the family's retention (7 / 365 days). |
+| `support:prune` | daily 03:40 | Deletes support messages (and their replies) 1 year after closing, and any support message 2 years after its last activity. |
 | `auth:clear-resets` | daily | Removes expired password-reset tokens. |
 | `ops:heartbeat` | every minute | Scheduler heartbeat: writes a cache timestamp; `/api/v1/health/deep` fails (503) when it is older than 3 minutes. |
 | `horizon:snapshot` | every 5 minutes | Horizon metrics graphs (throughput, runtime per job and queue). |
@@ -786,10 +787,45 @@ it, Support thanks them (macro M9).
 
 ## 9. Support
 
-Channels: `support@brainyclan.com` (mailbox [Moe] to set up) and the website `/support` FAQ.
-In-app: Profile → Help & support (opens `/support`) and Email us (adults/teens; not shown to children).
-Answer in the user's language (English or French). Never ask for passwords, codes, birth dates or
-children's details. Never confirm whether an email has an account.
+Channels (2026-11-08, no public `mailto:` any more): **in the app**, family admins write from
+Profile → Contact support; **on the website**, anyone uses the contact form on
+`https://brainyclan.com/support#contact`. Both land in **Admin → Support inbox** and are also mailed
+to `support@brainyclan.com` (mailbox [Moe] to set up) with Reply-To = the sender. The address itself
+is only printed (obfuscated) on the privacy policy and terms, and in the footer of our own mails.
+Children and other members can't write from the app: they ask a family admin. Answer in the user's
+language (English or French). Never ask for passwords, codes, birth dates or children's details.
+Never confirm whether an email has an account.
+
+### 9.0 Answering support messages (Admin → Support inbox)
+
+1. **Open the inbox** (left menu; the orange badge and the dashboard card "Support messages" count
+   **new** = not yet opened by anyone). Filter by status, source (App / Website) or topic; search
+   by name, email or text. Work oldest first (the dashboard card shows the age of the oldest
+   unanswered message).
+2. **Open a message.** Opening marks it **Open** (so two people don't both think it's unread). The
+   page shows the text, who wrote (app messages: the family admin's account email and the family
+   link; website messages: the name and email they typed — **unverified**), the app version /
+   platform / device, and every earlier reply.
+3. **Reply** (button at the top): plain text, in the sender's language (shown in the dialog; the mail
+   frame is translated automatically). Use §9.1 / §9.2. The reply is emailed in our branded template
+   with Reply-To = `support@`, the original message quoted below, and the message becomes
+   **Answered**; the app shows "answered" to the admin. Their answer to that email arrives in the
+   `support@` mailbox (not in the inbox) — reply from there or, better, paste the gist into a new
+   reply here so the history stays in one place.
+4. **Close** when the case is done (it is deleted automatically 1 year later); **Mark open** if it
+   comes back. Only `admin` staff can **Delete** (use it for spam and for data that should not be
+   kept, e.g. a message where someone pasted a password — delete, then tell them to change it).
+5. **Website messages are unverified.** The email may not belong to the sender. Never send account
+   data, exports, family details or anything personal in reply to a website message; ask them to
+   write from the app (family admin) or from the account's own email. Account actions (deletion,
+   child data) follow §9.3 / the staff privacy actions only.
+
+**Spam.** The form silently drops obvious bots (hidden honeypot field, posts within 3 seconds, a
+forged or missing form token) and allows 5 stored messages per hour per IP; the app allows 5 per
+hour and 20 per day per admin. What still gets through: don't reply (a reply confirms the address),
+**Delete** it (admin) or **Close** it (support), and never click links in a message. A wave of spam
+from many IPs → Monitoring: note the pattern, tell Moe (options: lower the limits, add a challenge);
+never publish `support@` as a link again.
 
 ### 9.1 FAQ (grounded answers)
 

@@ -141,7 +141,7 @@
             <a href="{{ route('website.partners', $lang) }}">{{ $fr ? 'Partenaires' : 'Partners' }}</a>
             <a href="{{ route('account.delete', $lang) }}">{{ $fr ? 'Supprimer un compte' : 'Delete account' }}</a>
         </nav>
-        <p>{{ $fr ? 'Nous joindre :' : 'Contact:' }} <a href="mailto:{{ $supportEmail }}">{{ $supportEmail }}</a></p>
+        <p><a href="{{ \App\Modules\Core\Support\Website::contactUrl($locale) }}">{{ $fr ? 'Nous joindre' : 'Contact us' }}</a></p>
         <p>© {{ now()->year }} Brainy Clan</p>
     </div>
 </footer>
