@@ -235,3 +235,84 @@ it('seeds French word puzzles from words_fr.php without touching the English one
     file_put_contents($path, '<?php return '.var_export(['Animaux' => [1 => [['ÉTÉ', 'Saison']]]], true).';');
     expect(fn () => $seeder->run())->toThrow(RuntimeException::class, 'uppercase A-Z without accents');
 });
+
+it('accepts the real legacy French files and seeds them in the English translation groups', function () {
+    $seeder = app(ContentSeeder::class);
+    $seeder->runLegacy();
+
+    $french = ContentItem::query()->where('locale', 'fr')->get();
+    $english = ContentItem::query()->where('locale', 'en')->get()->keyBy('translation_group');
+
+    expect($french->where('type_key', 'multiple_choice'))->toHaveCount(count(require database_path('seeders/data/multiple_choice_fr.php')))
+        ->and($french->where('type_key', 'wisdom_card'))->toHaveCount(count(require database_path('seeders/data/wisdom_cards_fr.php')));
+
+    foreach ($french as $item) {
+        $en = $english[$item->translation_group] ?? null;
+        expect($en)->not->toBeNull()
+            ->and($item->source_ref)->toBe($en->source_ref.':fr')
+            ->and([$item->type_key, $item->category_id, $item->difficulty, $item->cross_locale])->toBe([$en->type_key, $en->category_id, $en->difficulty, true]);
+    }
+});
+
+it('adds legacy French versions to an existing database without touching the English rows, idempotently', function () {
+    $seeder = app(ContentSeeder::class);
+    $seeder->multipleChoiceFrPath = $this->fixtures.'/none.php';
+    $seeder->wisdomCardsFrPath = $this->fixtures.'/none.php';
+    $seeder->runLegacy();
+
+    $before = ContentItem::query()->orderBy('id')->pluck('id', 'source_ref')->all();
+    expect(ContentItem::query()->where('locale', 'fr')->exists())->toBeFalse();
+
+    file_put_contents($this->fixtures.'/mc_fr.php', '<?php return '.var_export([
+        "Which country's flag has a red maple leaf?" => ['question' => "Quel pays a un drapeau avec une feuille d'érable rouge ?", 'answer' => 'Canada', 'wrong' => ['Japon', 'Suisse', 'Pérou'], 'explanation' => 'Depuis 1965.'],
+    ], true).';');
+    file_put_contents($this->fixtures.'/wisdom_fr.php', '<?php return '.var_export([
+        'Lost time is never found again.' => ['text' => 'Le temps perdu ne se retrouve jamais.', 'author' => 'Benjamin Franklin', 'source' => 'Almanach (traduction Brainy Clan)', 'answer' => 'Utilise bien ton temps', 'wrong' => ['Le temps se rattrape', 'Les horloges se trompent'], 'explanation' => 'Le temps ne se remplace pas.'],
+    ], true).';');
+
+    $seeder = app(ContentSeeder::class);
+    $seeder->multipleChoiceFrPath = $this->fixtures.'/mc_fr.php';
+    $seeder->wisdomCardsFrPath = $this->fixtures.'/wisdom_fr.php';
+    $seeder->runLegacy();
+    $seeder->runLegacy();
+
+    expect(ContentItem::query()->where('locale', 'en')->orderBy('id')->pluck('id', 'source_ref')->all())->toBe($before)
+        ->and(ContentItem::query()->count())->toBe(count($before) + 2);
+
+    $flagEn = ContentItem::query()->where('locale', 'en')->where('payload->question', "Which country's flag has a red maple leaf?")->firstOrFail();
+    $flagFr = ContentItem::query()->where('source_ref', $flagEn->source_ref.':fr')->firstOrFail();
+    expect($flagEn->translation_group)->toStartWith('mc:')
+        ->and($flagFr->translation_group)->toBe($flagEn->translation_group)
+        ->and($flagFr->locale)->toBe('fr')
+        ->and($flagFr->cross_locale)->toBeTrue()
+        ->and($flagFr->payload['question'])->toBe("Quel pays a un drapeau avec une feuille d'érable rouge ?")
+        ->and(collect($flagFr->payload['choices'])->firstWhere('id', $flagFr->answer['choice_id'])['text'])->toBe('Canada')
+        ->and($flagFr->answer['explanation'])->toBe('Depuis 1965.');
+
+    $cardFr = ContentItem::query()->where('locale', 'fr')->where('type_key', 'wisdom_card')->firstOrFail();
+    $cardEn = ContentItem::query()->where('locale', 'en')->where('translation_group', $cardFr->translation_group)->firstOrFail();
+    expect($cardEn->payload['card']['text'])->toBe('Lost time is never found again.')
+        ->and($cardFr->source_ref)->toBe($cardEn->source_ref.':fr')
+        ->and($cardFr->payload['question'])->toBe("Quelle est l'idée principale ?")
+        ->and($cardFr->payload['card'])->toBe(['text' => 'Le temps perdu ne se retrouve jamais.', 'author' => 'Benjamin Franklin', 'source' => 'Almanach (traduction Brainy Clan)'])
+        ->and(collect($cardFr->payload['choices'])->firstWhere('id', $cardFr->answer['choice_id'])['text'])->toBe('Utilise bien ton temps');
+});
+
+it('rejects a legacy French entry that does not match a translatable English item', function (string $file, array $data, string $message) {
+    $path = $this->fixtures.'/'.$file;
+    file_put_contents($path, '<?php return '.var_export($data, true).';');
+
+    $seeder = app(ContentSeeder::class);
+    $seeder->multipleChoiceFrPath = $file === 'multiple_choice_fr.php' ? $path : $this->fixtures.'/none.php';
+    $seeder->wisdomCardsFrPath = $file === 'wisdom_cards_fr.php' ? $path : $this->fixtures.'/none.php';
+
+    expect(fn () => $seeder->runLegacy())->toThrow(RuntimeException::class, $message);
+})->with([
+    'unknown question' => ['multiple_choice_fr.php', ['What is the capital of Atlantis?' => ['question' => 'Q ?', 'answer' => 'A', 'wrong' => ['B', 'C', 'D'], 'explanation' => null]], '[What is the capital of Atlantis?] is not an item in multiple_choice.php'],
+    'unknown card text' => ['wisdom_cards_fr.php', ['Not a real card.' => ['text' => 'T', 'author' => null, 'source' => null, 'answer' => 'A', 'wrong' => ['B', 'C'], 'explanation' => 'E']], '[Not a real card.] is not an item in wisdom_cards.php'],
+    'language-bound item' => ['multiple_choice_fr.php', ['Which word means the same as "big"?' => ['question' => 'Q ?', 'answer' => 'Grand', 'wrong' => ['B', 'C', 'D'], 'explanation' => null]], 'language-bound category (English-only)'],
+    'ambiguous English key' => ['multiple_choice_fr.php', ['Which word is spelled correctly?' => ['question' => 'Q ?', 'answer' => 'A', 'wrong' => ['B', 'C', 'D'], 'explanation' => null]], 'matches 8 items'],
+    'wrong answer count' => ['multiple_choice_fr.php', ['In which city is the Eiffel Tower?' => ['question' => 'Q ?', 'answer' => 'Paris', 'wrong' => ['Rome', 'Berlin'], 'explanation' => null]], '[fr.wrong] must list exactly 3'],
+    'missing explanation' => ['multiple_choice_fr.php', ['How many legs does a spider have?' => ['question' => 'Q ?', 'answer' => '8', 'wrong' => ['6', '10', '4'], 'explanation' => null]], '[fr.explanation] must be a non-empty string'],
+    'unknown field' => ['wisdom_cards_fr.php', ['Lost time is never found again.' => ['text' => 'T', 'author' => null, 'source' => null, 'answer' => 'A', 'wrong' => ['B', 'C'], 'explanation' => 'E', 'question' => 'Q ?']], 'unknown field(s): question'],
+]);

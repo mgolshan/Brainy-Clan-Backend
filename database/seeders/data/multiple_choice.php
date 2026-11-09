@@ -65,7 +65,7 @@ return [
     // Ancient world
     ['ancient-world', 2, 'Which ancient people built the pyramids of Giza?', 'The Egyptians', ['The Romans', 'The Greeks', 'The Vikings'], null],
     ['ancient-world', 3, 'Where did the ancient Olympic Games begin?', 'Greece', ['Rome', 'Egypt', 'China'], null],
-    ['ancient-world', 4, 'Which language did the ancient Romans speak?', 'Latin', ['Greek', 'Italian', 'English'], null],
+    ['ancient-world', 4, 'Which language did the ancient Romans speak?', 'Latin', ['Spanish', 'Italian', 'English'], null],
     ['ancient-world', 4, 'Julius Caesar was a leader of which ancient state?', 'Rome', ['Greece', 'Egypt', 'Persia'], null],
     ['ancient-world', 4, 'Cleopatra was the queen of which country?', 'Egypt', ['Greece', 'Rome', 'Persia'], null],
     ['ancient-world', 5, 'What is the picture writing of ancient Egypt called?', 'Hieroglyphs', ['Cuneiform', 'Runes', 'Braille'], null],
@@ -100,7 +100,7 @@ return [
     ['human-body', 1, 'Which organs do you use to breathe?', 'The lungs', ['The kidneys', 'The stomach', 'The heart'], null],
     ['human-body', 2, 'Which organ is the control centre of your body?', 'The brain', ['The heart', 'The stomach', 'The skin'], null],
     ['human-body', 5, 'What do red blood cells carry around the body?', 'Oxygen', ['Food', 'Germs', 'Sound'], null],
-    ['human-body', 5, 'How many teeth does an adult usually have?', '32', ['20', '28', '40'], 'Children have 20 baby teeth.'],
+    ['human-body', 5, 'How many teeth does an adult usually have?', '32', ['20', '40', '50'], 'A full adult set has 32 teeth, including 4 wisdom teeth. Children have 20 baby teeth.'],
     ['human-body', 6, 'How many bones does an adult human have?', '206', ['106', '306', '150'], null],
     ['human-body', 6, 'What is the largest organ of the human body?', 'The skin', ['The liver', 'The heart', 'The brain'], null],
     ['human-body', 7, 'Where is the smallest bone in the human body?', 'In the ear', ['In the nose', 'In the toe', 'In the finger'], null],

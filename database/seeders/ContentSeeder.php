@@ -18,6 +18,9 @@ use Illuminate\Database\Seeder;
  *   cards in English and/or French, validated strictly by QuestionBank.
  * - French versions of generated items: capitals and continents from data/countries_fr.php
  *   (when present), times tables and mental math.
+ * - French versions of the hand-written items and wisdom cards from data/multiple_choice_fr.php and
+ *   data/wisdom_cards_fr.php (optional, validated by LegacyTranslations): ref `<english ref>:fr`, in
+ *   the English item's translation group. Language-bound items stay English-only.
  *
  * Every item has a stable `source_ref`, so re-running updates instead of duplicating. Translations
  * share a `translation_group` (the English ref without "seed:", or `q:<id>` for the question bank);
@@ -48,6 +51,10 @@ class ContentSeeder extends Seeder
     public string $questionsPath = __DIR__.'/data/questions';
 
     public string $countriesFrPath = __DIR__.'/data/countries_fr.php';
+
+    public string $multipleChoiceFrPath = __DIR__.'/data/multiple_choice_fr.php';
+
+    public string $wisdomCardsFrPath = __DIR__.'/data/wisdom_cards_fr.php';
 
     /** @var array<string, int> */
     private array $categoryIds = [];
@@ -81,6 +88,19 @@ class ContentSeeder extends Seeder
     {
         $this->prepare();
         Model::withoutEvents(fn () => $this->seedQuestionBank());
+    }
+
+    /**
+     * Seeds only the legacy hand-written multiple choice and wisdom cards with their French
+     * versions (used by tests with fixture files).
+     */
+    public function runLegacy(): void
+    {
+        $this->prepare();
+        Model::withoutEvents(function (): void {
+            $this->seedHandWritten();
+            $this->seedWisdomCards();
+        });
     }
 
     /**
@@ -228,15 +248,50 @@ class ContentSeeder extends Seeder
         return $out;
     }
 
+    /**
+     * Hand-written English items, plus their French versions from data/multiple_choice_fr.php
+     * (optional, keyed by the English question) in the same translation group.
+     */
     private function seedHandWritten(): void
     {
         /** @var list<array{0: string, 1: int, 2: string, 3: string, 4: list<string>, 5: string|null}> $items */
         $items = require __DIR__.'/data/multiple_choice.php';
 
+        $french = LegacyTranslations::load($this->multipleChoiceFrPath, 'multiple_choice', 'multiple_choice.php',
+            self::legacyKeys(array_map(fn (array $item) => [$item[2], $item[0], $item[5]], $items)));
+
         foreach ($items as [$slug, $difficulty, $question, $correct, $wrong, $explanation]) {
-            $this->multipleChoice($slug, $difficulty, $question, $correct, $wrong, $explanation, 'mc:'.md5($slug.'|'.$question.'|'.$correct),
-                ['cross_locale' => ! in_array($slug, self::LANGUAGE_BOUND_CATEGORIES, true)]);
+            $ref = 'mc:'.md5($slug.'|'.$question.'|'.$correct);
+            $crossLocale = ! in_array($slug, self::LANGUAGE_BOUND_CATEGORIES, true);
+            $this->multipleChoice($slug, $difficulty, $question, $correct, $wrong, $explanation, $ref, ['cross_locale' => $crossLocale]);
+
+            if (isset($french[$question])) {
+                $fr = $french[$question];
+                $this->multipleChoice($slug, $difficulty, (string) $fr['question'], $fr['answer'], $fr['wrong'], $fr['explanation'], "{$ref}:fr",
+                    ['locale' => 'fr', 'translation_group' => $ref, 'cross_locale' => $crossLocale]);
+            }
         }
+    }
+
+    /**
+     * Facts LegacyTranslations needs about the English items, by English key.
+     *
+     * @param  list<array{0: string, 1: string, 2: string|null}>  $items  [key, category slug, explanation]
+     * @return array<string, array{count: int, has_explanation: bool, language_bound: bool}>
+     */
+    private static function legacyKeys(array $items): array
+    {
+        $keys = [];
+
+        foreach ($items as [$key, $slug, $explanation]) {
+            $keys[$key] = [
+                'count' => ($keys[$key]['count'] ?? 0) + 1,
+                'has_explanation' => $explanation !== null,
+                'language_bound' => in_array($slug, self::LANGUAGE_BOUND_CATEGORIES, true),
+            ];
+        }
+
+        return $keys;
     }
 
     private function seedGeography(): void
@@ -319,15 +374,30 @@ class ContentSeeder extends Seeder
         /** @var list<array{0: string, 1: int, 2: string, 3: string|null, 4: string|null, 5: string, 6: list<string>, 7: string}> $cards */
         $cards = require __DIR__.'/data/wisdom_cards.php';
 
+        $french = LegacyTranslations::load($this->wisdomCardsFrPath, 'wisdom_card', 'wisdom_cards.php',
+            self::legacyKeys(array_map(fn (array $card) => [$card[2], $card[0], $card[7]], $cards)));
+
         foreach ($cards as [$slug, $difficulty, $text, $author, $source, $correct, $wrong, $explanation]) {
             $ref = 'wisdom:'.md5($text);
             [$choices, $answerId] = $this->shuffledChoices($correct, $wrong, $ref);
 
             $this->store($slug, 'wisdom_card', $difficulty, [
                 'card' => ['text' => $text, 'author' => $author, 'source' => $source],
-                'question' => 'What is the main idea?',
+                'question' => self::WISDOM_QUESTION['en'],
                 'choices' => $choices,
             ], ['choice_id' => $answerId, 'explanation' => $explanation], $ref);
+
+            if (isset($french[$text])) {
+                $fr = $french[$text];
+                [$choices, $answerId] = $this->shuffledChoices($fr['answer'], $fr['wrong'], "{$ref}:fr");
+
+                $this->store($slug, 'wisdom_card', $difficulty, [
+                    'card' => ['text' => $fr['text'], 'author' => $fr['author'], 'source' => $fr['source']],
+                    'question' => self::WISDOM_QUESTION['fr'],
+                    'choices' => $choices,
+                ], ['choice_id' => $answerId, 'explanation' => $fr['explanation']], "{$ref}:fr",
+                    ['locale' => 'fr', 'translation_group' => $ref]);
+            }
         }
     }
 

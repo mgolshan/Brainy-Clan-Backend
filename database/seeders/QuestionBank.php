@@ -137,7 +137,7 @@ class QuestionBank
      * @param  \Closure(string): RuntimeException  $fail
      * @return LocaleBlock
      */
-    private static function validateLocale(mixed $block, string $type, string $locale, \Closure $fail): array
+    public static function validateLocale(mixed $block, string $type, string $locale, \Closure $fail): array
     {
         if (! is_array($block)) {
             throw $fail("[{$locale}] must be an array.");

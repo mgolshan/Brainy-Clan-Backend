@@ -380,6 +380,25 @@ curl http://localhost:8080/api/v1/health
 
 ## Log
 
+### 2026-11-08 content round
+- **French for legacy seed files:** optional `data/multiple_choice_fr.php` (89 items, keyed by the English
+  question) and `data/wisdom_cards_fr.php` (all 50 cards, keyed by the English text), validated by
+  `Database\Seeders\LegacyTranslations` (unknown/ambiguous/language-bound key, field shape). French rows get
+  ref `<english ref>:fr` in the English translation group; English rows keep their source_ref, so re-seeding
+  only adds the French rows. Language-bound items (synonyms, idioms, spelling, grade vocabulary, missing
+  letter) and "baby kangaroo" stay English-only. Tests in `QuestionBankTest.php`.
+- **About 660 new hand-written items** in all 13 `data/questions/*.php` areas (en + fr; vocabulary adds 61
+  French-only items, Language Swap 65 paired items, Wisdom 40 cards), difficulty spread 1–10, written by four
+  agents and checked by three independent fact-check passes (≈ 20 fixes, 9 near-duplicates deleted; id
+  gaps are intentional, ids are never reused). Dev DB re-seeded: 2,891 en / 2,753 fr published items.
+- **Legacy fixes (identity unchanged):** "Romans speak" distractor Greek → Spanish; "adult teeth" distractor
+  28 → 50 with a "full adult set" explanation; Seneca source years (Letters 76 → 1920, 101 → 1925).
+- **For Moe (borderline, kept):** `history-europe-046` (German reunification, date only), `history-americas-045`
+  (Haiti 1804), `olympics-040` (Fosbury flop), ceviche/khachapuri origins, `computers-coding-046` (Python),
+  `habits-028` (screens before bed), legacy "Tao Te Ching" card (philosophy vs. religion rule), legacy Aesop
+  "Much wants more" ≈ `wisdom.php` "Greed oft o'er reaches itself". Committed French questions over 120 chars:
+  `computers-coding-029`, `brain-teasers-016`, `-023`, `-032`.
+
 ### 2026-11-08 categories 18–20 (Cross Math, Mazes, Code Breaker)
 - **Three generated types** (docs/API.md "Level-up puzzles", PLAN "Categories 18–20"), handlers on the
   `BrainGame` base: `CrossMath` (+ `Generators/CrossMathGenerator`, `CrossMathSolver`), `Maze`
