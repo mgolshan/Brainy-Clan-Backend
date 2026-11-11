@@ -37,6 +37,8 @@ class GoalPlanResource extends JsonResource
             'starts_on' => $plan->starts_on->toDateString(),
             'ends_on' => $plan->ends_on?->toDateString(),
             'is_active' => $plan->is_active,
+            'everyone' => $plan->everyone,
+            'all_categories' => $plan->all_categories,
             'scopes' => $plan->categories->map(fn (Category $category) => [
                 'category_id' => $category->id,
                 'name' => $category->localizedName((string) $locale),

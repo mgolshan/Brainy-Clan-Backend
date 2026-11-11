@@ -263,6 +263,24 @@ as written there; if something must change, update `docs/API.md` first and note 
   disputed facts), exactly one defensible answer, plausible but clearly wrong distractors, original wording,
   child-safe. Translations share a `translation_group`; a member whose locale is not `en` gets the item in their
   locale and the English item only when no translation of it is published (picker dedupe, one `NOT EXISTS`).
+- **Goals that explain themselves + chat reactions (2026-11-11, Moe).**
+  - **What Moe hit:** "Pizza Friday" stayed at 0 because it only counts World Geography, and
+    Jordan joined after the goal was made.
+  - **New goal options:**
+    - Plans gain `everyone`: the whole family, and newcomers join every `everyone` plan, including
+      its open period.
+    - Plans gain `all_categories`: any category counts.
+    - The migration sets `everyone = true` on existing plans and adds missing active members.
+      This is pre-launch, so the only existing goals are demo and test data.
+  - **Goal UI:**
+    - Cards say what counts and who plays.
+    - Category tiles and the results screen show which goals a game counts toward. The app works
+      this out from the plans it already has; there is no new endpoint.
+  - **Chat reactions:**
+    - A fixed, kid-safe set of 6: ❤️ 👍 😂 😮 🎉 ⭐. Kept to a fixed set so moderation stays trivial.
+    - One reaction per member per message.
+    - No push.
+    - Polled through a cursor endpoint next to `after`.
 
 ## Working rules
 

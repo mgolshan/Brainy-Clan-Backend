@@ -13,7 +13,8 @@ use Illuminate\Support\Collection;
 
 /**
  * GoalProgress (docs/API.md) for a period, always computed from the points ledger: points
- * inside the window, in the plan's scope subtrees, by the period's members. Closed periods
+ * inside the window, in the plan's scope subtrees (any category for `all_categories`), by the
+ * period's members. Closed periods
  * return their stored result.
  *
  * - cooperation: `reached` when the team total meets the period target.
@@ -58,18 +59,21 @@ class ComputeGoalProgress
             return $results;
         }
 
-        /** @var array<int, array{period: GoalPeriod, targets: array<int, int>, categories: list<int>}> $windows */
+        /** @var array<int, array{period: GoalPeriod, targets: array<int, int>, all: bool, categories: list<int>}> $windows */
         $windows = [];
 
         foreach ($open as $period) {
             $plan = $period->plan;
-            $categoryIds = $plan->relationLoaded('categories')
-                ? $plan->categories->pluck('id')
-                : $plan->categories()->pluck('categories.id');
+            $categoryIds = match (true) {
+                $plan->all_categories => collect(),
+                $plan->relationLoaded('categories') => $plan->categories->pluck('id'),
+                default => $plan->categories()->pluck('categories.id'),
+            };
 
             $windows[$period->id] = [
                 'period' => $period,
                 'targets' => collect($period->member_targets)->mapWithKeys(fn ($target, $id) => [(int) $id => (int) $target])->all(),
+                'all' => $plan->all_categories,
                 'categories' => $categoryIds->flatMap(fn ($id) => $this->tree->subtreeIds((int) $id))->unique()->values()->all(),
             ];
         }
@@ -89,12 +93,14 @@ class ComputeGoalProgress
      * Points per (period, member) in one grouped query: a conditional SUM per period over the
      * union of the periods' families, members and time ranges.
      *
-     * @param  array<int, array{period: GoalPeriod, targets: array<int, int>, categories: list<int>}>  $windows
+     * An `all_categories` plan has no category condition.
+     *
+     * @param  array<int, array{period: GoalPeriod, targets: array<int, int>, all: bool, categories: list<int>}>  $windows
      * @return array<int, array<int, int>> period id => member id => points
      */
     private function ledgerTotals(array $windows): array
     {
-        $windows = array_filter($windows, fn (array $window) => $window['targets'] !== [] && $window['categories'] !== []);
+        $windows = array_filter($windows, fn (array $window) => $window['targets'] !== [] && ($window['all'] || $window['categories'] !== []));
 
         if ($windows === []) {
             return [];
@@ -114,11 +120,11 @@ class ComputeGoalProgress
             $end = $end === null || $period->ends_at->gt($end) ? $period->ends_at : $end;
 
             $memberMarks = implode(',', array_fill(0, count($window['targets']), '?'));
-            $categoryMarks = implode(',', array_fill(0, count($window['categories']), '?'));
+            $categoryCondition = $window['all'] ? '' : ' AND category_id IN ('.implode(',', array_fill(0, count($window['categories']), '?')).')';
 
             $query->selectRaw(
-                "SUM(CASE WHEN family_id = ? AND created_at >= ? AND created_at < ? AND member_id IN ({$memberMarks}) AND category_id IN ({$categoryMarks}) THEN amount ELSE 0 END) AS p{$periodId}",
-                [$period->plan->family_id, $period->starts_at, $period->ends_at, ...array_keys($window['targets']), ...$window['categories']],
+                "SUM(CASE WHEN family_id = ? AND created_at >= ? AND created_at < ? AND member_id IN ({$memberMarks}){$categoryCondition} THEN amount ELSE 0 END) AS p{$periodId}",
+                [$period->plan->family_id, $period->starts_at, $period->ends_at, ...array_keys($window['targets']), ...($window['all'] ? [] : $window['categories'])],
             );
         }
 

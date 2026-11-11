@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Creates or updates a goal plan for the admin's family. Enforces the tier's
- * `limits.max_active_goals`, refuses locked categories, defaults members to the whole family.
+ * `limits.max_active_goals`, refuses locked categories, defaults to `everyone` (the whole family;
+ * newcomers join automatically, {@see JoinEveryoneGoalPlans}). `all_categories` plans have no scopes.
  * The open period keeps its snapshotted targets; edits apply from the next period.
  */
 class SaveGoalPlan
@@ -24,21 +25,32 @@ class SaveGoalPlan
         private readonly ResolveCategoryAccess $access,
         private readonly CategoryTree $tree,
         private readonly OpenGoalPeriod $open,
+        private readonly JoinEveryoneGoalPlans $join,
     ) {}
 
     /**
-     * @param  array{name: string, mode: string, period_type: string, target_points: int, reward_text?: string|null, starts_on: string, ends_on?: string|null, category_ids: list<int>, members?: list<array{member_id: int, target_override?: int|null}>|null}  $data
+     * `everyone` defaults to true when `members` is absent (or empty); with `everyone` the team is
+     * every active member and `members` only carries `target_override`s.
+     *
+     * @param  array{name: string, mode: string, period_type: string, target_points: int, reward_text?: string|null, starts_on: string, ends_on?: string|null, all_categories?: bool, category_ids?: list<int>|null, everyone?: bool, members?: list<array{member_id: int, target_override?: int|null}>|null}  $data
      */
     public function create(FamilyMember $admin, array $data): GoalPlan
     {
         $family = $admin->family;
+        $allCategories = (bool) ($data['all_categories'] ?? false);
+        $categoryIds = $allCategories ? [] : ($data['category_ids'] ?? []);
+        $everyone = array_key_exists('everyone', $data) ? (bool) $data['everyone'] : empty($data['members']);
+
+        if (! $allCategories && $categoryIds === []) {
+            throw ApiException::validation('category_ids', 'Choose at least one category, or all categories.');
+        }
 
         $this->ensureUnderLimit($family);
         $this->ensureStartsOnNotPast($family, $data['starts_on']);
-        $this->ensureCategoriesAllowed($admin, $data['category_ids']);
-        $members = $this->resolveMembers($family, $data['members'] ?? null);
+        $this->ensureCategoriesAllowed($admin, $categoryIds);
+        $members = $this->resolveMembers($family, $data['members'] ?? null, $everyone);
 
-        return DB::transaction(function () use ($family, $data, $members): GoalPlan {
+        return DB::transaction(function () use ($family, $data, $members, $allCategories, $categoryIds, $everyone): GoalPlan {
             $plan = GoalPlan::query()->create([
                 'family_id' => $family->id,
                 'name' => $data['name'],
@@ -49,9 +61,11 @@ class SaveGoalPlan
                 'starts_on' => $data['starts_on'],
                 'ends_on' => $data['ends_on'] ?? null,
                 'is_active' => true,
+                'everyone' => $everyone,
+                'all_categories' => $allCategories,
             ]);
             $plan->setRelation('family', $family);
-            $plan->categories()->sync($data['category_ids']);
+            $plan->categories()->sync($categoryIds);
             $plan->planMembers()->createMany($members);
 
             $this->open->handle($plan);
@@ -61,6 +75,12 @@ class SaveGoalPlan
     }
 
     /**
+     * Changes apply from the next period, except switching `everyone` on: the missing active members
+     * join the plan and its open period right away. With `everyone`, `members` (when sent) is the
+     * full list of `target_override`s (members not listed get none). Sending `category_ids` alone
+     * switches an all-categories plan back to scopes; turning `all_categories` off needs
+     * `category_ids` when the plan has no scopes (422).
+     *
      * @param  array<string, mixed>  $data  validated subset of the create fields plus `is_active`
      */
     public function update(GoalPlan $plan, FamilyMember $admin, array $data): GoalPlan
@@ -75,26 +95,53 @@ class SaveGoalPlan
             $this->ensureStartsOnNotPast($family, (string) $data['starts_on']);
         }
 
-        if (isset($data['category_ids'])) {
-            /** @var list<int> $categoryIds */
-            $categoryIds = $data['category_ids'];
+        /** @var list<int> $categoryIds */
+        $categoryIds = is_array($data['category_ids'] ?? null) ? array_values($data['category_ids']) : [];
+        $allCategories = array_key_exists('all_categories', $data)
+            ? (bool) $data['all_categories']
+            : ($categoryIds !== [] ? false : $plan->all_categories);
+
+        if ($allCategories) {
+            $categoryIds = [];
+        } elseif ($categoryIds !== []) {
             $this->ensureCategoriesAllowed($admin, $categoryIds);
+        } elseif ($plan->all_categories) {
+            throw ApiException::validation('category_ids', 'Choose at least one category, or all categories.');
         }
 
-        $members = array_key_exists('members', $data) ? $this->resolveMembers($family, $data['members']) : null;
+        $syncCategories = $allCategories !== $plan->all_categories || $categoryIds !== [];
+        $everyone = array_key_exists('everyone', $data) ? (bool) $data['everyone'] : $plan->everyone;
+        $joinsWholeFamily = $everyone && ! $plan->everyone;
 
-        return DB::transaction(function () use ($plan, $family, $data, $members): GoalPlan {
-            $plan->fill(array_intersect_key($data, array_flip(['name', 'mode', 'period_type', 'target_points', 'reward_text', 'starts_on', 'ends_on', 'is_active'])))->save();
+        if (! $everyone && array_key_exists('members', $data) && empty($data['members'])) {
+            throw ApiException::validation('members', 'Choose at least one member, or everyone.');
+        }
+
+        /** @var list<array{member_id: int, target_override?: int|null}>|null $requestedMembers */
+        $requestedMembers = $data['members'] ?? null;
+        $members = array_key_exists('members', $data) ? $this->resolveMembers($family, $requestedMembers, $everyone) : null;
+
+        return DB::transaction(function () use ($plan, $family, $data, $members, $allCategories, $categoryIds, $syncCategories, $everyone, $joinsWholeFamily): GoalPlan {
+            $plan->fill([
+                ...array_intersect_key($data, array_flip(['name', 'mode', 'period_type', 'target_points', 'reward_text', 'starts_on', 'ends_on', 'is_active'])),
+                'everyone' => $everyone,
+                'all_categories' => $allCategories,
+            ])->save();
             $plan->setRelation('family', $family);
 
-            if (isset($data['category_ids'])) {
-                $plan->categories()->sync($data['category_ids']);
+            if ($syncCategories) {
+                $plan->categories()->sync($categoryIds);
+                $plan->unsetRelation('categories');
             }
 
             if ($members !== null) {
                 $plan->planMembers()->delete();
                 $plan->planMembers()->createMany($members);
                 $plan->unsetRelation('planMembers');
+            }
+
+            if ($joinsWholeFamily) {
+                $this->join->wholeFamily($plan);
             }
 
             $this->open->handle($plan);
@@ -155,6 +202,10 @@ class SaveGoalPlan
      */
     private function ensureCategoriesAllowed(FamilyMember $admin, array $categoryIds): void
     {
+        if ($categoryIds === []) {
+            return;
+        }
+
         $locked = $this->access->lockedRootIds($admin);
 
         foreach ($categoryIds as $categoryId) {
@@ -167,20 +218,19 @@ class SaveGoalPlan
     }
 
     /**
+     * The plan's member rows. With `everyone` (or no list) the team is every active member and
+     * `$members` only sets overrides; otherwise it is the hand-picked list. Every listed member must
+     * be an active member of the family (422).
+     *
      * @param  list<array{member_id: int, target_override?: int|null}>|null  $members
      * @return list<array{member_id: int, target_override: int|null}>
      */
-    private function resolveMembers(Family $family, ?array $members): array
+    private function resolveMembers(Family $family, ?array $members, bool $everyone): array
     {
         $familyMemberIds = $family->members()->pluck('id')->map(fn ($id) => (int) $id)->all();
-
-        if ($members === null || $members === []) {
-            return array_map(fn (int $id) => ['member_id' => $id, 'target_override' => null], $familyMemberIds);
-        }
-
         $resolved = [];
 
-        foreach ($members as $member) {
+        foreach ($members ?? [] as $member) {
             $memberId = (int) $member['member_id'];
 
             if (! in_array($memberId, $familyMemberIds, true)) {
@@ -188,6 +238,10 @@ class SaveGoalPlan
             }
 
             $resolved[$memberId] = ['member_id' => $memberId, 'target_override' => isset($member['target_override']) ? (int) $member['target_override'] : null];
+        }
+
+        if ($everyone || $resolved === []) {
+            return array_map(fn (int $id) => $resolved[$id] ?? ['member_id' => $id, 'target_override' => null], $familyMemberIds);
         }
 
         return array_values($resolved);

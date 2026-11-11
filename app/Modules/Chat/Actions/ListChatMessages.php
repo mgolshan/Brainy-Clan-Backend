@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Collection;
  * id cursor — newest first without a cursor or with `before`, oldest first with `after` (polling).
  * Only the member's own family; messages past retention are hidden. A fixed number of queries for
  * any page size: messages (with `reported` as an EXISTS subquery for admins), authors, their users
- * (avatars) and the unread count.
+ * (avatars), reactions and the unread count ({@see ChatMessage::viewedBy()}).
  */
 class ListChatMessages
 {
@@ -32,14 +32,10 @@ class ListChatMessages
     {
         $limit = max(1, min(self::MAX_LIMIT, $limit));
 
-        $messages = ChatMessage::query()
-            ->where('family_id', $member->family_id)
+        $messages = ChatMessage::viewedBy($member)
             ->where('created_at', '>=', $this->unread->retentionCutoff($member))
             ->when($after !== null, fn ($query) => $query->where('id', '>', $after)->orderBy('id'))
             ->when($after === null, fn ($query) => $query->when($before !== null, fn ($query) => $query->where('id', '<', $before))->orderByDesc('id'))
-            ->with(['author' => fn ($query) => $query->select(['id', 'family_id', 'user_id', 'nickname', 'status'])->with('user:id,avatar')])
-            // `reported` only for admins: an EXISTS subquery in the same select (no extra query).
-            ->when($member->isAdmin(), fn ($query) => $query->withExists('reports as reported'))
             ->limit($limit + 1)
             ->get();
 

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * A weekly cooperation plan starting today (in the family's timezone, like the API does), without scopes or members (add them in the test).
+ * Hand-picked team and scoped categories by default; `everyone()` / `allCategories()` switch the 2026-11-11 options on.
  *
  * @extends Factory<GoalPlan>
  */
@@ -35,12 +36,30 @@ class GoalPlanFactory extends Factory
             )->toDateString(),
             'ends_on' => null,
             'is_active' => true,
+            'everyone' => false,
+            'all_categories' => false,
         ];
     }
 
     public function competition(): static
     {
         return $this->state(fn () => ['mode' => GoalPlan::MODE_COMPETITION]);
+    }
+
+    /**
+     * The whole family is the team; newcomers join automatically.
+     */
+    public function everyone(): static
+    {
+        return $this->state(fn () => ['everyone' => true]);
+    }
+
+    /**
+     * Points in any category count (no scopes).
+     */
+    public function allCategories(): static
+    {
+        return $this->state(fn () => ['all_categories' => true]);
     }
 
     public function inactive(): static

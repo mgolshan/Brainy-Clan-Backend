@@ -3,6 +3,7 @@
 namespace App\Modules\Family\Actions;
 
 use App\Modules\Core\Exceptions\ApiException;
+use App\Modules\Family\Events\MemberJoined;
 use App\Modules\Family\Models\Family;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Identity\Models\User;
@@ -31,7 +32,7 @@ class CreateFamily
                 'tier' => Family::TIER_FREE,
             ]);
 
-            FamilyMember::query()->create([
+            $member = FamilyMember::query()->create([
                 'family_id' => $family->id,
                 'user_id' => $user->id,
                 'role' => FamilyMember::ROLE_ADMIN,
@@ -39,6 +40,8 @@ class CreateFamily
                 'status' => FamilyMember::STATUS_ACTIVE,
                 'joined_at' => now(),
             ]);
+
+            MemberJoined::dispatch($member->id, $family->id);
 
             $user->unsetRelation('activeMember');
 

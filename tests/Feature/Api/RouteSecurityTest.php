@@ -70,16 +70,19 @@ it('keeps admin-only family routes behind the family:admin middleware', function
     expect($adminRoutes)->toBe([]);
 });
 
-it('keeps the family chat routes authenticated, rate-limited and the post and report routes on their own limiters', function () {
+it('keeps the family chat routes authenticated, rate-limited and the post, report and reaction routes on their own limiters', function () {
     $chat = apiRouteMiddleware()->filter(fn (array $middleware, string $route) => Str::contains($route, 'family/chat'));
 
     expect($chat->keys()->sort()->values()->all())->toBe([
         'DELETE api/v1/family/chat/messages/{message}',
+        'DELETE api/v1/family/chat/messages/{message}/reaction',
         'GET api/v1/family/chat/messages',
+        'GET api/v1/family/chat/reactions',
         'GET api/v1/family/chat/unread',
         'POST api/v1/family/chat/messages',
         'POST api/v1/family/chat/messages/{message}/report',
         'POST api/v1/family/chat/read',
+        'PUT api/v1/family/chat/messages/{message}/reaction',
     ]);
 
     foreach ($chat as $middleware) {
@@ -87,7 +90,9 @@ it('keeps the family chat routes authenticated, rate-limited and the post and re
     }
 
     expect($chat['POST api/v1/family/chat/messages'])->toContain('throttle:chat-post')
-        ->and($chat['POST api/v1/family/chat/messages/{message}/report'])->toContain('throttle:chat-report');
+        ->and($chat['POST api/v1/family/chat/messages/{message}/report'])->toContain('throttle:chat-report')
+        ->and($chat['PUT api/v1/family/chat/messages/{message}/reaction'])->toContain('throttle:chat-react')
+        ->and($chat['DELETE api/v1/family/chat/messages/{message}/reaction'])->toContain('throttle:chat-react');
 });
 
 it('never runs production with APP_DEBUG on', function () {

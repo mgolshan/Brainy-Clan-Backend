@@ -44,13 +44,15 @@ class GoalController
     /**
      * Create a goal plan (admin).
      *
-     * Competition or cooperation over daily/weekly/monthly periods in the family timezone. 403
-     * `goal_limit_reached` (tier), 403 `category_not_allowed` (locked category).
+     * Competition or cooperation over daily/weekly/monthly periods in the family timezone.
+     * `everyone` (default when `members` is absent): the whole family, newcomers join automatically.
+     * `all_categories`: any category counts. 403 `goal_limit_reached` (tier), 403
+     * `category_not_allowed` (locked category).
      */
     #[ApiErrors('goal_limit_reached', 'category_not_allowed')]
     public function store(StoreGoalRequest $request, SaveGoalPlan $save, LoadGoalPlans $load): JsonResponse
     {
-        /** @var array{name: string, mode: string, period_type: string, target_points: int, reward_text?: string|null, starts_on: string, ends_on?: string|null, category_ids: list<int>, members?: list<array{member_id: int, target_override?: int|null}>|null} $data */
+        /** @var array{name: string, mode: string, period_type: string, target_points: int, reward_text?: string|null, starts_on: string, ends_on?: string|null, all_categories?: bool, category_ids?: list<int>|null, everyone?: bool, members?: list<array{member_id: int, target_override?: int|null}>|null} $data */
         $data = $request->validated();
         $member = $this->currentMember($request);
         $plan = $save->create($member, $data);
@@ -62,7 +64,7 @@ class GoalController
      * Update a goal plan (admin).
      *
      * Changes apply from the next period; the open period keeps its targets. `is_active: false`
-     * pauses the plan.
+     * pauses the plan. Switching `everyone` on adds the missing members to the open period at once.
      */
     #[ApiErrors('goal_limit_reached', 'category_not_allowed')]
     public function update(UpdateGoalRequest $request, int $plan, SaveGoalPlan $save, LoadGoalPlans $load): GoalPlanResource

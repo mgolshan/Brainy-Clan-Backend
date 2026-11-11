@@ -64,7 +64,10 @@ class GoalPlanResource extends Resource
             TextEntry::make('reward_text')->label('Reward')->placeholder('—'),
             TextEntry::make('starts_on')->date(),
             TextEntry::make('ends_on')->date()->placeholder('open-ended'),
-            TextEntry::make('categories.slug')->label('Scopes')->badge(),
+            IconEntry::make('everyone')->boolean()->label('Whole family (newcomers join)'),
+            IconEntry::make('all_categories')->boolean()->label('All categories count'),
+            TextEntry::make('categories.slug')->label('Scopes')->badge()
+                ->placeholder(fn (GoalPlan $record): string => $record->all_categories ? 'all categories' : '—'),
             TextEntry::make('members')->label('Members')->listWithLineBreaks()
                 ->state(fn (GoalPlan $record): array => $record->planMembers
                     ->map(fn (GoalPlanMember $m) => $m->member->nickname.($m->target_override !== null ? " (target {$m->target_override})" : ''))
@@ -84,8 +87,11 @@ class GoalPlanResource extends Resource
                 TextColumn::make('period_type')->label('Period')->badge(),
                 TextColumn::make('target_points')->label('Target')->numeric()->sortable(),
                 TextColumn::make('reward_text')->label('Reward')->limit(30)->toggleable(),
-                TextColumn::make('categories.slug')->label('Scopes')->badge()->toggleable(),
+                TextColumn::make('categories.slug')->label('Scopes')->badge()->toggleable()
+                    ->placeholder(fn (GoalPlan $record): string => $record->all_categories ? 'all categories' : '—'),
+                IconColumn::make('all_categories')->boolean()->label('All categories')->toggleable(),
                 TextColumn::make('plan_members_count')->counts('planMembers')->label('Members'),
+                IconColumn::make('everyone')->boolean()->label('Whole family')->toggleable(),
                 TextColumn::make('periods_count')->counts('periods')->label('Periods'),
                 TextColumn::make('starts_on')->date()->sortable(),
                 TextColumn::make('ends_on')->date()->placeholder('open-ended'),
@@ -94,6 +100,8 @@ class GoalPlanResource extends Resource
             ])
             ->filters([
                 TernaryFilter::make('is_active')->label('Active'),
+                TernaryFilter::make('everyone')->label('Whole family'),
+                TernaryFilter::make('all_categories')->label('All categories'),
                 TrashedFilter::make()->label('Deleted by the family'),
                 SelectFilter::make('mode')->options(array_combine(GoalPlan::MODES, GoalPlan::MODES)),
                 SelectFilter::make('period_type')->label('Period')->options(array_combine(GoalPlan::PERIOD_TYPES, GoalPlan::PERIOD_TYPES)),

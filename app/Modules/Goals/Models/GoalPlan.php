@@ -31,6 +31,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon $starts_on
  * @property Carbon|null $ends_on
  * @property bool $is_active
+ * @property bool $everyone The team is the whole family; newcomers join the plan and its open period
+ * @property bool $all_categories Points in any category count (no scopes)
  * @property Carbon|null $created_at
  * @property Carbon|null $deleted_at
  * @property-read Family $family
@@ -38,12 +40,22 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, GoalPlanMember> $planMembers
  * @property-read Collection<int, GoalPeriod> $periods
  */
-#[Fillable(['family_id', 'name', 'mode', 'period_type', 'target_points', 'reward_text', 'starts_on', 'ends_on', 'is_active'])]
+#[Fillable(['family_id', 'name', 'mode', 'period_type', 'target_points', 'reward_text', 'starts_on', 'ends_on', 'is_active', 'everyone', 'all_categories'])]
 #[UseFactory(GoalPlanFactory::class)]
 class GoalPlan extends Model
 {
     /** @use HasFactory<GoalPlanFactory> */
     use HasFactory, SoftDeletes;
+
+    /**
+     * Matches the column defaults, so a just-created plan has them without a refresh.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'everyone' => false,
+        'all_categories' => false,
+    ];
 
     public const string MODE_COMPETITION = 'competition';
 
@@ -66,6 +78,8 @@ class GoalPlan extends Model
             'starts_on' => 'date',
             'ends_on' => 'date',
             'is_active' => 'boolean',
+            'everyone' => 'boolean',
+            'all_categories' => 'boolean',
         ];
     }
 

@@ -574,6 +574,13 @@ GoalPlan:
   "members": [ { "member_id": 7, "nickname": "Sam", "avatar": "fox", "target_override": 20 } ],
   "current_period": GoalProgress | null }
 ```
+- 2026-11-11 additions (see the changelog):
+  - `"everyone": true|false`: the team is the whole family. A member who joins later, or who is
+    added later, joins every `everyone` plan of the family automatically. They get
+    `target_override: null` and are added to the open period too, with target `target_points`.
+    Only points earned after they joined count, because the ledger only has those.
+    With `false`, `members` is the hand-picked list and newcomers are not added.
+  - `"all_categories": true|false`: when `true`, points in **any** category count, and `scopes` is `[]`.
 - `mode`: `competition` (members ranked; each member's target is `target_override ?? target_points`;
   the top scorer wins the reward) | `cooperation` (team total vs `target_points`).
 - `period_type`: `daily` | `weekly` (weeks start Monday) | `monthly`.
@@ -598,11 +605,18 @@ starts at `starts_on` (so it can be shorter than a full week/month); the last en
 - `GET /goals` (needs family) → `{ data: GoalPlan[] }` active plans first, each with `current_period`.
 - `GET /goals/{plan}` → `{ data: GoalPlan }`
 - `POST /goals` (admin) — Body: `name, mode, period_type, target_points (1–10000), reward_text?,
-  starts_on (date, ≥ today in family tz), ends_on?, category_ids (≥1, top-level or sub-scope),
-  members? ([{ member_id, target_override? }], default: all members)`.
+  starts_on (date, ≥ today in family tz), ends_on?, all_categories? (bool, default false),
+  category_ids (≥1, top-level or sub-scope; required unless `all_categories` is true, then it must
+  be absent or empty), everyone? (bool), members? ([{ member_id, target_override? }])`.
+  - `everyone` defaults to `true` when `members` is absent.
+  - With `everyone: true`, `members` may still be sent, but **only** to set `target_override`s.
+    Every active member is on the team anyway.
+  - With `everyone: false`, `members` (≥ 1) is the team.
   → **201** `{ data: GoalPlan }`. 403 `goal_limit_reached`; 403 `category_not_allowed` for locked categories.
 - `PATCH /goals/{plan}` (admin) — same fields, all optional, plus `is_active`. Changes apply from the
   next period; the open period keeps its target. → `{ data: GoalPlan }`
+  Exception: switching `everyone` to `true` adds the missing active members to the plan and to the
+  open period immediately.
 - `DELETE /goals/{plan}` (admin) → 204. Soft delete: the plan disappears from `GET /goals` and `GET /goals/{plan}` (404); its periods and ledger history are kept in the database. Pausing is `PATCH is_active: false` (stays listed).
 - `GET /goals/{plan}/history?page=1` → closed periods, newest first, 20 per page:
 ```json
@@ -764,6 +778,36 @@ signed-in user without an active family membership gets **404 `not_found`** here
   message gains `"reported": true` for admins (other members always see `false`). Admins then delete
   the message or turn chat off for that member (existing tools). Rate limit 10 reports/hour per member.
 - `GET /family/chat/unread` → `{ "data": { "unread": 3 } }` (cheap; the app polls it for the tab badge).
+
+**Reactions (2026-11-11).** Message gains a `reactions` field:
+```json
+"reactions": [ { "key": "heart", "count": 2, "mine": true, "member_ids": [7, 3] } ]
+```
+- The set is fixed: `heart` ❤️, `thumbs_up` 👍, `laugh` 😂, `wow` 😮, `party` 🎉, `star` ⭐.
+  It is in this order, and only keys with a count above 0 are listed.
+- `member_ids` is in reaction order. A member who left the family is not listed, and their
+  reactions are not counted either.
+- The app maps keys to emoji. Unknown keys are skipped.
+- A deleted message has `reactions: []`, and its reactions are removed.
+
+Endpoints:
+- `PUT /family/chat/messages/{id}/reaction` — Body `{ "key": "heart" }`.
+  - Sets the caller's single reaction on the message, replacing any earlier one.
+  - → `{ data: Message }`.
+  - 422 for an unknown key or a deleted message; another family's id → 404.
+  - Reacting to your own message is allowed.
+- `DELETE /family/chat/messages/{id}/reaction` → `{ data: Message }`. Idempotent: no reaction → 200.
+- Rate limit for both: 60/min per member (429 `rate_limited`).
+- Reactions send **no push** and do not change `unread`.
+- `GET /family/chat/reactions?since=<cursor>` — reaction changes for polling.
+  - → `{ "data": [ { "message_id": 812, "reactions": [ … ] } ], "meta": { "cursor": "…" } }`
+  - Lists the messages whose reactions changed after `cursor`, including removals and changes on
+    messages that were deleted since.
+  - At most 200 rows, oldest change first. Call again with the new cursor until `data` is shorter than 200.
+  - Without `since` → `data: []` and the current cursor. The app takes it when it loads the first page.
+  - `cursor` is an opaque string; 422 when it is malformed.
+  - Messages past retention are never listed.
+- The app polls this together with `after`, every ~4 s while the chat is open.
 - The app polls `after` every ~4 s while the chat screen is open and the unread count every ~60 s
   otherwise (plus a push). Real-time sockets may replace polling later without changing these shapes.
 
@@ -847,7 +891,7 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - `GET /me/export` (auth; any non-child user — children get 403, their parent exports via support)
   → `{ "data": { "exported_at": "...", "user": {...}, "memberships": [...], "point_entries": [...],
   "sessions": [...], "goals": [...], "chat_messages": [{ "id", "family_id", "member_id", "body", "created_at" }],
-  "consents": [...], "devices": [...] } }` (`chat_messages`: the user's own not-deleted messages; devices without tokens,
+  "consents": [...], "devices": [...] } }` (`chat_messages`: the user's own not-deleted messages; `chat_reactions: [{ "message_id", "key", "created_at" }]`: the user's own chat reactions (2026-11-11); devices without tokens,
   social accounts without tokens) — right of access (PIPEDA / Quebec Law 25 / GDPR-style).
   Rate-limited: 1 per hour → 429.
 
@@ -908,3 +952,4 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-11-08 — Support messages: `POST/GET /support/messages` (family admins), SupportMessage object, `/me/export` gains `support_messages`.
 - 2026-11-08 — Theme keys `castle` ("Fairy-Tale Castle"), `arctic` ("Polar Lights"), `robot` ("Robot Lab"): three more worlds, unlock type `family_plan`, sorted after `midnight`.
 - 2026-11-08 — Support messages clarifications (backend built, no shape change): `client_id` is required (UUID, case-insensitive) and unique per user — a retry returns the existing message with 200 and does not count against the limits; only created messages count (5 per rolling hour, 20 per rolling day) and the 429 `rate_limited` carries `retry_after` + `Retry-After`; the 403 check runs before validation (a non-admin gets 403 even with an invalid body), and a family admin whose account has no email also gets 403 `forbidden` (message says to add an email); `message` is normalized like chat text (NFC, CRLF → LF, control characters removed, at most 2 empty lines in a row, trimmed) before the 10–5000 code-point check; `app_version` / `device` are stored on one line (line breaks removed). `/me/export` `support_messages`: `[{ "id", "topic", "message", "status", "app_version", "platform", "device", "created_at", "answered_at", "closed_at", "replies": [{ "body", "sent_at" }] }]` (the user's app messages; staff names not included). Website form messages are not linked to an account: they are not in the export and not deleted with it (they follow the same retention).
+- 2026-11-11 — Goals: GoalPlan gains `everyone` (whole family, newcomers join automatically, default when `members` is absent) and `all_categories` (any category counts, `scopes: []`); POST/PATCH accept both. Chat: Message gains `reactions`; `PUT`/`DELETE /family/chat/messages/{id}/reaction`; `GET /family/chat/reactions?since=` for polling. Clarifications (backend built, no shape change): **goals** — `everyone` defaults to `true` when `members` is absent, `null` or `[]`; `everyone: false` without members → 422 `members`; with `everyone: true` a sent `members` list is the full set of overrides (members not listed get `target_override: null`); newcomers also join paused (not deleted) `everyone` plans, so they are on the team when it resumes; switching `everyone` off keeps the current team until `members` is sent; `all_categories: true` with a non-empty `category_ids` → 422 `category_ids`; on PATCH, sending `category_ids` alone turns `all_categories` off, and `all_categories: false` on a plan without scopes needs `category_ids` (422 otherwise). **reactions** — `PUT` on a deleted message → 422 `validation_failed` (`errors.message`), `DELETE` there → 200 no-op (`reactions: []`); a message past retention → 404; setting the same key again changes nothing; the 60/min limit is shared by `PUT` and `DELETE`; `GET /family/chat/reactions` may list a message again for about 2 s after a change (rows are full snapshots, apply them idempotently; this catches changes that commit late), and the cursor without `since` is "now"; a member who leaves the family loses their reactions (the messages are listed as changed). `/me/export` gains `chat_reactions: [{ "message_id", "key", "created_at" }]` (the user's own reactions).

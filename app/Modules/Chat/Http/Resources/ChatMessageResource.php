@@ -3,6 +3,7 @@
 namespace App\Modules\Chat\Http\Resources;
 
 use App\Modules\Chat\Models\ChatMessage;
+use App\Modules\Chat\Support\ChatReactions;
 use App\Modules\Core\Support\Iso;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Identity\Models\User;
@@ -14,7 +15,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * encoding is the only transformation); null when deleted. An author who is no longer an active
  * member of the family shows as "Former member" (localized for the viewer) with `member_id` and
  * `avatar` null. Needs `author.user` eager-loaded. `reported` is true only when the actions loaded
- * `withExists('reports as reported')` — they do so for family admins only.
+ * `withExists('reports as reported')` — they do so for family admins only. `reactions` needs the
+ * reactions loaded through {@see ChatMessage::viewedBy()} (active members only); `mine` is the
+ * viewer's active membership (already resolved by the chat actions).
  *
  * @property ChatMessage $resource
  */
@@ -48,6 +51,7 @@ class ChatMessageResource extends JsonResource
             // always sees false.
             'reported' => array_key_exists('reported', $message->getAttributes()) && (bool) $message->getAttribute('reported'),
             'created_at' => Iso::format($message->created_at),
+            'reactions' => ChatReactions::summary($message, $viewer instanceof User ? $viewer->activeMembership()?->id : null),
         ];
     }
 }

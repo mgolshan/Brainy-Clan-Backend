@@ -7,6 +7,7 @@ use App\Modules\Chat\Models\ChatMessage;
 use App\Modules\Chat\Support\ChatText;
 use App\Modules\Core\Exceptions\ApiException;
 use App\Modules\Family\Models\FamilyMember;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 
 /**
@@ -54,6 +55,7 @@ class PostChatMessage
         }
 
         $message->setRelation('author', $member->loadMissing('user'));
+        $message->setRelation('reactions', new Collection);
 
         MessagePosted::dispatch($message->id, $member->family_id, $member->id);
 
@@ -62,11 +64,8 @@ class PostChatMessage
 
     private function find(FamilyMember $member, string $clientId): ?ChatMessage
     {
-        return ChatMessage::query()
-            ->where('family_id', $member->family_id)
+        return ChatMessage::viewedBy($member)
             ->where('client_id', $clientId)
-            ->with(['author' => fn ($query) => $query->select(['id', 'family_id', 'user_id', 'nickname', 'status'])->with('user:id,avatar')])
-            ->when($member->isAdmin(), fn ($query) => $query->withExists('reports as reported'))
             ->first();
     }
 }

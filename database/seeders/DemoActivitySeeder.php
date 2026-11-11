@@ -109,6 +109,7 @@ class DemoActivitySeeder extends Seeder
             'reward_text' => 'Pizza night!',
             'starts_on' => CarbonImmutable::now($family->timezone)->startOfWeek()->toDateString(),
             'is_active' => true,
+            'everyone' => true,
         ]);
         $plan->categories()->sync([$scope]);
         $plan->planMembers()->createMany($family->members()->get()->map(fn (FamilyMember $m) => [

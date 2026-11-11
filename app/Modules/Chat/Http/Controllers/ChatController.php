@@ -5,14 +5,20 @@ namespace App\Modules\Chat\Http\Controllers;
 use App\Modules\Chat\Actions\CountUnreadChatMessages;
 use App\Modules\Chat\Actions\DeleteChatMessage;
 use App\Modules\Chat\Actions\ListChatMessages;
+use App\Modules\Chat\Actions\ListChatReactionChanges;
 use App\Modules\Chat\Actions\MarkChatRead;
 use App\Modules\Chat\Actions\PostChatMessage;
+use App\Modules\Chat\Actions\ReactToChatMessage;
 use App\Modules\Chat\Actions\ReportChatMessage;
 use App\Modules\Chat\Actions\ResolveChatMember;
 use App\Modules\Chat\Http\Requests\ListChatMessagesRequest;
+use App\Modules\Chat\Http\Requests\ListChatReactionsRequest;
 use App\Modules\Chat\Http\Requests\MarkChatReadRequest;
 use App\Modules\Chat\Http\Requests\PostChatMessageRequest;
+use App\Modules\Chat\Http\Requests\ReactToChatMessageRequest;
 use App\Modules\Chat\Http\Resources\ChatMessageResource;
+use App\Modules\Chat\Models\ChatMessage;
+use App\Modules\Chat\Support\ChatReactions;
 use App\Modules\Core\Docs\ApiErrors;
 use App\Modules\Core\Http\CurrentMember;
 use App\Modules\Family\Models\FamilyMember;
@@ -100,6 +106,52 @@ class ChatController
         $report->handle($this->chatMember($request), $message);
 
         return response()->noContent();
+    }
+
+    /**
+     * React to a chat message.
+     *
+     * Sets my single reaction (`heart`, `thumbs_up`, `laugh`, `wow`, `party` or `star`), replacing
+     * an earlier one; returns the message. Unknown key or deleted message → 422; another family's id
+     * → 404. No push, unread unchanged. 60 per minute per member (429 `rate_limited`).
+     */
+    #[ApiErrors('chat_disabled', 'validation_failed')]
+    public function react(ReactToChatMessageRequest $request, int $message, ReactToChatMessage $react): ChatMessageResource
+    {
+        return new ChatMessageResource($react->set($this->chatMember($request), $message, $request->string('key')->value()));
+    }
+
+    /**
+     * Remove my reaction.
+     *
+     * Idempotent: without a reaction it still answers 200 with the message.
+     */
+    #[ApiErrors('chat_disabled')]
+    public function unreact(Request $request, int $message, ReactToChatMessage $react): ChatMessageResource
+    {
+        return new ChatMessageResource($react->remove($this->chatMember($request), $message));
+    }
+
+    /**
+     * Reaction changes (polling).
+     *
+     * Messages whose reactions changed after `since` (removals and deleted messages included), oldest
+     * change first, at most 200 rows: call again with `meta.cursor` until fewer come back. Without
+     * `since`: no rows and the current cursor. Malformed cursor → 422.
+     */
+    #[ApiErrors('chat_disabled', 'validation_failed')]
+    public function reactions(ListChatReactionsRequest $request, ListChatReactionChanges $list): JsonResponse
+    {
+        $member = $this->chatMember($request);
+        $page = $list->handle($member, $request->has('since') ? $request->string('since')->value() : null);
+
+        return response()->json([
+            'data' => $page['messages']->map(fn (ChatMessage $message): array => [
+                'message_id' => $message->id,
+                'reactions' => ChatReactions::summary($message, $member->id),
+            ])->values()->all(),
+            'meta' => ['cursor' => $page['cursor']],
+        ]);
     }
 
     /**

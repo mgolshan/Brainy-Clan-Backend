@@ -11,6 +11,9 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('family/chat/messages', [ChatController::class, 'store'])->middleware('throttle:chat-post')->name('api.v1.family.chat.messages.store');
     Route::delete('family/chat/messages/{message}', [ChatController::class, 'destroy'])->whereNumber('message')->name('api.v1.family.chat.messages.destroy');
     Route::post('family/chat/messages/{message}/report', [ChatController::class, 'report'])->whereNumber('message')->middleware('throttle:chat-report')->name('api.v1.family.chat.messages.report');
+    Route::put('family/chat/messages/{message}/reaction', [ChatController::class, 'react'])->whereNumber('message')->middleware('throttle:chat-react')->name('api.v1.family.chat.messages.reaction.update');
+    Route::delete('family/chat/messages/{message}/reaction', [ChatController::class, 'unreact'])->whereNumber('message')->middleware('throttle:chat-react')->name('api.v1.family.chat.messages.reaction.destroy');
+    Route::get('family/chat/reactions', [ChatController::class, 'reactions'])->name('api.v1.family.chat.reactions');
     Route::post('family/chat/read', [ChatController::class, 'read'])->name('api.v1.family.chat.read');
     Route::get('family/chat/unread', [ChatController::class, 'unread'])->name('api.v1.family.chat.unread');
 });

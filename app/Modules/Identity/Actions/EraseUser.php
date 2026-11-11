@@ -2,6 +2,7 @@
 
 namespace App\Modules\Identity\Actions;
 
+use App\Modules\Chat\Actions\RemoveMemberChatReactions;
 use App\Modules\Chat\Models\ChatMessage;
 use App\Modules\Chat\Models\ChatMessageReport;
 use App\Modules\Family\Models\FamilyMember;
@@ -24,7 +25,7 @@ use Laravel\Sanctum\PersonalAccessToken;
  * "Deleted player", email, password, birth data, avatar, staff role) and `erased_at` set. The user
  * row itself stays because the append-only points ledger references its memberships; their
  * nicknames become "Deleted player" and accessibility settings are cleared. Unused sign-in codes are
- * voided, notification preferences, family chat messages and app support messages deleted, the invite they joined with and the unused invites they
+ * voided, notification preferences, family chat messages and reactions and app support messages deleted, the invite they joined with and the unused invites they
  * created (names + birth data of invitees) deleted. Membership status / `MemberRemoved` are the
  * caller's job. Subscriptions stay with the family. A fixed number of queries for any number of users.
  * The activity log gets one entry with user ids only.
@@ -33,7 +34,10 @@ class EraseUser
 {
     public const string ERASED_NAME = 'Deleted player';
 
-    public function __construct(private readonly RevokeAppleTokens $revokeAppleTokens) {}
+    public function __construct(
+        private readonly RevokeAppleTokens $revokeAppleTokens,
+        private readonly RemoveMemberChatReactions $removeChatReactions,
+    ) {}
 
     public function handle(User $user, string $reason = 'account_deleted'): void
     {
@@ -83,6 +87,8 @@ class EraseUser
                 // reports with them, FK cascade), and so do the reports they made.
                 ChatMessage::query()->whereIn('family_member_id', $memberIds)->delete();
                 ChatMessageReport::query()->whereIn('reporter_member_id', $memberIds)->delete();
+                // Their reactions on other members' messages too (marker bumped for pollers).
+                $this->removeChatReactions->handle(array_map(intval(...), $memberIds));
             }
 
             // Support messages the user sent from the app (with the staff replies, FK cascade). Website

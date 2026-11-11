@@ -26,6 +26,7 @@ Milestones are defined in `docs/PLAN.md`.
 | B10 Pricing, affiliates, web checkout (Paddle) | Done (needs a Paddle account) | `GET /pricing`, website `/subscribe` + emailed one-time link → Paddle checkout, Paddle webhook (signature, idempotent, stale), subscriptions per provider, availability + manage-link, referral codes + `/r/{code}`, offer-code/Paddle attribution, commission ledger + monthly payouts (Filament), legal drafts 2026-10-24. Moe: Paddle sandbox → live (README) |
 | B11 Ops hardening | Done | Staff roles `admin`/`support` (read-only) replacing `is_staff`, staff child export/deletion actions, `/api/v1/health/deep` (token), scheduler heartbeat, Horizon long-wait + failed-job alert mails, `horizon:snapshot`, AdMob SSV rejection counts on the dashboard. Moe: set `HEALTH_DEEP_TOKEN`, uptime monitor, SMTP for alerts |
 | Support inbox (2026-11-08) | Done | In-app support messages (family admins), website contact form (no mailto), Filament Support inbox + dashboard card, export/erasure/retention. Moe: set up the `support@` mailbox |
+| Everyone goals + chat reactions (2026-11-11) | Done | Goal plans `everyone` (newcomers join plan + open period via `MemberJoined`) and `all_categories`; chat reactions (fixed set of 6), `PUT`/`DELETE …/reaction`, cursor polling `GET /family/chat/reactions`, export, cleanup on leave/erase |
 
 ## Next up
 
@@ -380,6 +381,47 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-11-11 goals that explain themselves + chat reactions (backend)
+docs/PLAN.md decision "Goals that explain themselves + chat reactions", API.md changelog 2026-11-11
+(with a clarification note: defaults, PATCH rules, reaction edge cases, export field).
+- **Why:** "Pizza Friday" (demo family) stayed at 0: World Geography only, and Jordan (member 14)
+  joined after the plan was made, so he was never on it.
+- **Goals:** migration `2026_11_11_100000_add_everyone_and_all_categories_to_goal_plans`
+  (`goal_plans.everyone`, `all_categories`; backfill: every existing plan `everyone = true`, missing
+  active members inserted into plan members with one INSERT … SELECT and into each open period's
+  `member_targets` with chunked CASE updates; idempotent, `backfill()` is tested). POST/PATCH accept
+  `everyone` (default true when `members` is absent/empty; with it `members` only carries overrides)
+  and `all_categories` (scopes cleared; `category_ids` required otherwise). Switching `everyone` on
+  adds the missing members to the plan and the open period at once (`JoinEveryoneGoalPlans`).
+  **Newcomers:** new event `Family\Events\MemberJoined`, dispatched by `JoinFamilyWithInvite` (every
+  child/teen/adult invite, re-joins are new memberships) and `CreateFamily`; listener
+  `AddToEveryoneGoalPlans` adds the member to every not-deleted `everyone` plan (paused too) and its
+  open period (target = period `target_points`) in a fixed number of queries. There is no other path
+  that makes someone an active member (sign-in codes are for existing members; Filament has no
+  member create). `ComputeGoalProgress`: `all_categories` → no category condition in the same
+  grouped ledger query. `GoalPlanResource` gains both flags; Filament plan list/view show them
+  (columns, filters, "all categories" scope placeholder). Factory states `everyone()`,
+  `allCategories()`; demo seeder makes Pizza Friday `everyone`.
+- **Chat reactions:** migration `2026_11_11_200000_create_chat_message_reactions_table`
+  (`chat_message_reactions`, unique (message, member), FKs cascade; `chat_messages.reactions_changed_at`
+  datetime(6) + index (family_id, reactions_changed_at, id)). `PUT`/`DELETE
+  /family/chat/messages/{id}/reaction` (`ReactToChatMessage`; replace = new row so id order is reaction
+  order; same key = no-op), `GET /family/chat/reactions?since=` (`ListChatReactionChanges`; cursor =
+  base64url "changed_at|id", 200 per page; the cursor never passes now − 2 s unless the page is full,
+  so late commits are caught). `chat-react` limiter 60/min per member. Message gains `reactions`
+  everywhere (`ChatMessage::viewedBy()` eager-loads authors + reactions of active members only;
+  `ChatReactions::summary()`). Deleting a message, a member leaving (`MemberRemoved` →
+  `RemoveChatReactions`) and account erasure (`EraseUser`) delete reactions and bump the marker.
+  `/me/export` gains `chat_reactions`. No push, unread unchanged.
+- **Tests:** `GoalsEveryoneTest` (11: defaults, overrides, validation, PATCH switches, newcomer by
+  invite counts points, hand-picked/deleted plans not joined, re-join, paused plan, all-categories
+  progress, constant query count, migration backfill) and `ChatReactionsTest` (16, plus `RouteSecurityTest` updated for the 3 new routes: set/replace/remove
+  /idempotent, everywhere a Message is returned, 422/404/403, no push + unread, rate limit, former
+  members, deletion/retention, export, cursor polling incl. removals and deletions, 200-row pages,
+  malformed cursors, constant query counts).
+- **Dev DB:** migrated; Pizza Friday (family 1) is `everyone`, plan members 1, 2, 3, 4, 13, 14 and
+  the open period targets include Jordan (14) and member 13 at 100.
 
 ### 2026-11-08 worlds castle, arctic, robot (backend)
 - **Catalog** (docs/PLAN.md "Three more Family-plan worlds", API.md changelog 2026-11-08):

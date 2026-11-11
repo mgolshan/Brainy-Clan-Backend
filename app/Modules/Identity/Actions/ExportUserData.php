@@ -3,6 +3,7 @@
 namespace App\Modules\Identity\Actions;
 
 use App\Modules\Chat\Models\ChatMessage;
+use App\Modules\Chat\Models\ChatMessageReaction;
 use App\Modules\Core\Exceptions\ApiException;
 use App\Modules\Core\Support\Iso;
 use App\Modules\Family\Models\FamilyMember;
@@ -83,6 +84,12 @@ class ExportUserData
             ->whereNull('deleted_at')
             ->orderBy('id')
             ->get(['id', 'family_id', 'family_member_id', 'body', 'created_at']);
+
+        // The user's own chat reactions that still exist.
+        $chatReactions = ChatMessageReaction::query()
+            ->whereIn('member_id', $memberIds)
+            ->orderBy('id')
+            ->get(['id', 'chat_message_id', 'key', 'created_at']);
 
         // Messages the user sent to support from the app, with the staff replies (text and time only).
         $supportMessages = SupportMessage::query()
@@ -176,6 +183,11 @@ class ExportUserData
                 'member_id' => $message->family_member_id,
                 'body' => $message->body,
                 'created_at' => Iso::format($message->created_at),
+            ])->values()->all(),
+            'chat_reactions' => $chatReactions->map(fn (ChatMessageReaction $reaction): array => [
+                'message_id' => $reaction->chat_message_id,
+                'key' => $reaction->key,
+                'created_at' => Iso::format($reaction->created_at),
             ])->values()->all(),
             'support_messages' => $supportMessages->map(fn (SupportMessage $message): array => [
                 'id' => $message->id,

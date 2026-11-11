@@ -3,6 +3,7 @@
 namespace App\Modules\Family\Actions;
 
 use App\Modules\Core\Exceptions\ApiException;
+use App\Modules\Family\Events\MemberJoined;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Models\Invite;
 use App\Modules\Identity\Actions\AcceptLegalTerms;
@@ -127,6 +128,8 @@ class JoinFamilyWithInvite
                 ->where('subject_invite_id', $invite->id)
                 ->where('type', Consent::PARENTAL)
                 ->update(['subject_member_id' => $member->id]);
+
+            MemberJoined::dispatch($member->id, $member->family_id);
 
             if ($email !== null) {
                 $this->acceptLegalTerms->handle($user, $ipAddress);
