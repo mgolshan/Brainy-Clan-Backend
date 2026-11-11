@@ -131,7 +131,7 @@ All production hosts are **(server)**: DNS and HTTPS are not set up yet.
 | Repo | What | Key docs |
 | --- | --- | --- |
 | `Brainy-Clan-Backend` (github.com/mgolshan/Brainy-Clan-Backend) | Laravel 13 REST API `/api/v1`, Filament 5 admin, public website, queues, scheduler | `README.md`, `docs/PLAN.md`, `docs/API.md` (the app↔API contract), `docs/DEPLOY.md`, `docs/PROGRESS.md` |
-| `Brainy-Clan-Frontend` (github.com/mgolshan/Brainy-Clan-Frontend) | Expo SDK 57 React Native app (iOS, Android; web for development) | `README.md`, `docs/PLAN.md`, `docs/STORE.md`, `docs/PROGRESS.md`, `eas.json`, `app.json`, `app.config.ts` |
+| `Brainy-Clan-Frontend` (github.com/mgolshan/Brainy-Clan-Frontend) | Expo SDK 58 React Native app (iOS, Android; web for development) | `README.md`, `docs/PLAN.md`, `docs/STORE.md`, `docs/PROGRESS.md`, `eas.json`, `app.json`, `app.config.ts` |
 
 The product/architecture design doc is a claude.ai artifact linked in both `CLAUDE.md` files (not a
 local file). No CI pipeline exists (no `.github/`): checks run in the developer Docker stack.

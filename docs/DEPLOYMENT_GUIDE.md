@@ -483,7 +483,7 @@ EAS environment variables per environment (app handbook §4; secret `SENTRY_AUTH
    in RevenueCat (service credentials for RevenueCat per the app README).
 8. Tracks: **internal** (≤ 100 testers) → **closed** (waitlist families) → **production** with a
    **staged rollout** (20 % → 100 %) **[Moe]**.
-9. Target API level: Expo SDK 57 sets a current `targetSdkVersion`; check Play's yearly
+9. Target API level: Expo SDK 58 sets a current `targetSdkVersion`; check Play's yearly
    target-API deadline before each release (assumption: compliant out of the box).
 
 ### 4.3 Web
