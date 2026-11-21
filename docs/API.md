@@ -306,7 +306,7 @@ members use their invite code (`/auth/join`). No shared passwords, no parent ema
   when `has_password` is true). 422 when the user has no email. → 204
 - `GET /me/stats` (auth, needs family) →
   `{ "data": { "points_today": 4, "points_week": 23, "points_total": 120, "streak": { "current": 3, "longest": 7 } } }`
-- Onboarding / FTUE progress: `GET /me/onboarding`, `POST /me/onboarding/{step}`, `POST /me/onboarding/dismiss` — see "Onboarding (FTUE)".
+- Onboarding / FTUE progress: `GET /me/onboarding`, `POST /me/onboarding/{step}`, `POST /me/onboarding/dismiss`, `POST /me/onboarding/restore` — see "Onboarding (FTUE)".
 
 **Account deletion** (App Store guideline 5.1.1(v); also on Android/web):
 - `GET /me/deletion-check` (auth) → `{ "data": { "can_delete": true, "blockers": [],
@@ -1109,8 +1109,9 @@ never repeats it.
 | `GET /me/onboarding` | – | 200 `{ "data": Onboarding }` |
 | `POST /me/onboarding/{step}` | none (empty / `{}`) | 200 `{ "data": Onboarding }` (the whole object, after the change) |
 | `POST /me/onboarding/dismiss` | none | 200 `{ "data": Onboarding }` |
+| `POST /me/onboarding/restore` | none | 200 `{ "data": Onboarding }` with `dismissed_at: null`; step progress kept; idempotent (2026-11-21) |
 
-`dismiss` is a reserved path segment, never a step key.
+`dismiss` and `restore` are reserved path segments, never step keys.
 
 **Onboarding object:**
 ```json

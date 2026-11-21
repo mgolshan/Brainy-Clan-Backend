@@ -95,7 +95,7 @@ return [
                     'Tap a step to do it. Steps like your first game or your first goal tick by themselves once you have done them, on any device.',
                     'Not needed? Tap **Hide** on the card. It stays hidden on all your devices.',
                 ],
-                'tip' => 'Hiding the list never stops you from playing, and everything in it is also in the normal tabs. The small tips on Play, goals and Chat show once. A hidden list cannot be shown again in the app yet; ask support if you want it back.',
+                'tip' => 'Hiding the list never stops you from playing, and everything in it is also in the normal tabs. The small tips on Play, goals and Chat show once. Want it back? Go to **Profile** and tap **Show the getting started checklist**; your progress is kept.',
                 'keywords' => ['checklist', 'getting started', 'set up your class', 'steps', 'hide', 'tour', 'welcome', 'new account', 'tips'],
                 'links' => [['route' => 'website.support', 'anchor' => 'contact', 'label' => 'Contact support']],
             ],

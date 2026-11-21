@@ -24,10 +24,11 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::patch('me', [MeController::class, 'update'])->name('api.v1.me.update');
     Route::put('me/password', [MeController::class, 'password'])->name('api.v1.me.password');
 
-    // Onboarding / FTUE (docs/API.md "Onboarding (FTUE)"): no family needed. `dismiss` is reserved
-    // (never a step key), so it is registered before `{step}`.
+    // Onboarding / FTUE (docs/API.md "Onboarding (FTUE)"): no family needed. `dismiss` and
+    // `restore` are reserved (never step keys), so they are registered before `{step}`.
     Route::get('me/onboarding', [OnboardingController::class, 'show'])->name('api.v1.me.onboarding.show');
     Route::post('me/onboarding/dismiss', [OnboardingController::class, 'dismiss'])->name('api.v1.me.onboarding.dismiss');
+    Route::post('me/onboarding/restore', [OnboardingController::class, 'restore'])->name('api.v1.me.onboarding.restore');
     Route::post('me/onboarding/{step}', [OnboardingController::class, 'store'])->name('api.v1.me.onboarding.store');
 
     Route::get('me/social-accounts', [SocialAccountController::class, 'index'])->name('api.v1.me.social-accounts.index');

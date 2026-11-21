@@ -6,6 +6,7 @@ use App\Modules\Core\Http\CurrentMember;
 use App\Modules\Identity\Actions\DismissOnboarding;
 use App\Modules\Identity\Actions\GetOnboarding;
 use App\Modules\Identity\Actions\MarkOnboardingStep;
+use App\Modules\Identity\Actions\RestoreOnboarding;
 use App\Modules\Identity\Http\Requests\MarkOnboardingStepRequest;
 use App\Modules\Identity\Http\Resources\OnboardingResource;
 use Dedoc\Scramble\Attributes\Group;
@@ -53,5 +54,15 @@ class OnboardingController
     public function dismiss(Request $request, DismissOnboarding $dismiss): OnboardingResource
     {
         return new OnboardingResource($dismiss->handle($this->currentUser($request)));
+    }
+
+    /**
+     * Show the getting-started checklist again.
+     *
+     * Clears `dismissed_at`; step progress is kept. Idempotent. Returns the whole object.
+     */
+    public function restore(Request $request, RestoreOnboarding $restore): OnboardingResource
+    {
+        return new OnboardingResource($restore->handle($this->currentUser($request)));
     }
 }

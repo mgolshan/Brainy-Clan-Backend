@@ -89,7 +89,7 @@ return [
                     'Touchez une étape pour la faire. Des étapes comme votre première partie ou votre premier objectif se cochent toutes seules une fois faites, sur tous vos appareils.',
                     'Pas besoin ? Touchez **Masquer** sur la carte. Elle reste masquée sur tous vos appareils.',
                 ],
-                'tip' => 'Masquer la liste ne vous empêche jamais de jouer, et tout ce qu’elle contient se trouve aussi dans les onglets habituels. Les petites astuces sur Jouer, les objectifs et Messages s’affichent une seule fois. Une liste masquée ne peut pas encore être réaffichée dans l’app ; écrivez au soutien si vous voulez la retrouver.',
+                'tip' => 'Masquer la liste ne vous empêche jamais de jouer, et tout ce qu’elle contient se trouve aussi dans les onglets habituels. Les petites astuces sur Jouer, les objectifs et Messages s’affichent une seule fois. Pour la retrouver, allez dans **Profil** et touchez **Afficher la liste pour bien démarrer** ; votre progression est conservée.',
                 'keywords' => ['liste', 'bien démarrer', 'préparez votre classe', 'étapes', 'masquer', 'visite', 'bienvenue', 'nouveau compte', 'astuces'],
                 'links' => [['route' => 'website.support', 'anchor' => 'contact', 'label' => 'Nous joindre']],
             ],

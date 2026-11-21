@@ -110,10 +110,30 @@ it('dismisses once and keeps the first dismissed_at', function () {
     Carbon::setTestNow();
 });
 
+it('restores a hidden checklist and keeps the progress', function () {
+    Carbon::setTestNow('2026-11-21 10:00:00');
+    actingAsMember(familyOwner());
+
+    $this->postJson('/api/v1/me/onboarding/welcome')->assertOk();
+    $this->postJson('/api/v1/me/onboarding/dismiss')->assertOk()
+        ->assertJsonPath('data.dismissed_at', '2026-11-21T10:00:00Z');
+
+    $this->postJson('/api/v1/me/onboarding/restore')->assertOk()
+        ->assertJsonPath('data.dismissed_at', null)
+        ->assertJsonPath('data.steps.welcome', '2026-11-21T10:00:00Z');
+    $this->postJson('/api/v1/me/onboarding/restore')->assertOk()
+        ->assertJsonPath('data.dismissed_at', null);
+    $this->getJson('/api/v1/me/onboarding')->assertOk()
+        ->assertJsonPath('data.dismissed_at', null)
+        ->assertJsonPath('data.steps.welcome', '2026-11-21T10:00:00Z');
+    Carbon::setTestNow();
+});
+
 it('needs a token', function () {
     $this->getJson('/api/v1/me/onboarding')->assertUnauthorized()->assertJsonPath('code', 'unauthenticated');
     $this->postJson('/api/v1/me/onboarding/welcome')->assertUnauthorized();
     $this->postJson('/api/v1/me/onboarding/dismiss')->assertUnauthorized();
+    $this->postJson('/api/v1/me/onboarding/restore')->assertUnauthorized();
 });
 
 it('derives the owner steps from real data and stores them once', function () {

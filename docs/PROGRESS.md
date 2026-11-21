@@ -35,7 +35,7 @@ Milestones are defined in `docs/PLAN.md`.
 
 ## Next up
 
-**B12 (2026-11-21):** all four steps done on the backend (plan tiers, chat safety, Classroom tools, FTUE onboarding: `/me/onboarding`). Next: the app wires the checklist to `GET /me/onboarding` (it may use the server `flow` / `required_steps`); optional later: a "show the checklist again" endpoint (not in the contract yet). Lawyer review of `/legal/classroom` (draft) before launch. Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
+**B12 (2026-11-21):** all four steps done on the backend (plan tiers, chat safety, Classroom tools, FTUE onboarding: `/me/onboarding`). The app uses `GET /me/onboarding` with the server `flow` / `required_steps`; `POST /me/onboarding/restore` brings a hidden checklist back (Profile). Next: Moe tests everything on devices. Lawyer review of `/legal/classroom` (draft) before launch. Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
 
 **Start of next session (2026-10-24 wrap-up):** run the full backend suite first — the last full run was cut short when Docker stopped. The order-dependent `WebCheckoutTest` / `AccountDeletionPageTest` failure after `WebsiteTest` is fixed (2026-10-25: Livewire's static "component rendered" flag leaked between tests; `TestCase` now calls `Livewire::flushState()`). Moe's open items: content audit decisions (docs/CONTENT_AUDIT_2026-10-24.md, 36 items), lawyer review (terms/privacy 2026-10-24, partner agreement), server region, accounts weekend, when /partners goes public.
 0. **State at last stop (session 17, 2026-10-17, launch question bank + French content):** done (see log). Dev DB:
@@ -392,6 +392,9 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-11-21 FTUE: show the checklist again
+- `POST /me/onboarding/restore` clears `dismissed_at` (progress kept, idempotent); used by the app's Profile row "Show the getting started checklist". Help article tip updated (en/fr). Test in `OnboardingTest`.
 
 ### 2026-11-21 B12 step 4: FTUE / onboarding
 - **Contract:** the app's `Brainy-Clan-Frontend/docs/FTUE-CONTRACT.md`, copied into API.md "Onboarding (FTUE)"
