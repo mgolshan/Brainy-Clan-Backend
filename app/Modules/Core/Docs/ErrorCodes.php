@@ -19,7 +19,7 @@ final class ErrorCodes
         'forbidden' => ['status' => 403, 'meaning' => 'Not allowed (e.g. non-admin calling an admin endpoint)'],
         'member_limit_reached' => ['status' => 403, 'meaning' => 'Tier member limit reached'],
         'adult_limit_reached' => ['status' => 403, 'meaning' => 'Tier adult-seat limit reached (Classroom: 2 adults)'],
-        'owner_too_young' => ['status' => 403, 'meaning' => 'Too young to own this: a family needs 16+, a Classroom 18+ (`family.owner_min_age` / `classroom.owner_min_age`); body has `min_age`'],
+        'owner_too_young' => ['status' => 403, 'meaning' => 'Too young to own this: a family (any plan) needs 18+ (`family.owner_min_age`; a Classroom also checks `classroom.owner_min_age`, 18); body has `min_age`'],
         'category_not_allowed' => ['status' => 403, 'meaning' => 'Category outside tier/age policy'],
         'second_chance_unavailable' => ['status' => 403, 'meaning' => 'No second chance of that method left / allowed'],
         'goal_limit_reached' => ['status' => 403, 'meaning' => 'Tier limit on active goal plans reached'],

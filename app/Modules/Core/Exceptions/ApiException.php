@@ -62,8 +62,8 @@ class ApiException extends RuntimeException
 
     /**
      * The (family) owner is younger than the rule's minimum age (docs/API.md "Plans and tiers" →
-     * "Owner ages"): `family.owner_min_age` to create a family, `classroom.owner_min_age` for a
-     * Classroom. The body carries `min_age`.
+     * "Owner ages"): `family.owner_min_age` (18) to create a family on any plan,
+     * `classroom.owner_min_age` (18) for a Classroom's owner. The body carries `min_age`.
      */
     public static function ownerTooYoung(int $minAge, ?string $message = null): self
     {

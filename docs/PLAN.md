@@ -19,6 +19,11 @@ as written there; if something must change, update `docs/API.md` first and note 
 - **Age bands seeded:** child 0–12, teen 13–17, adult 18–64, senior 65+ (`senior` added to the
   design doc's bands so the classic theme and calmer defaults have a home).
 - **Adults joining by invite** may set email + password during join; children never do.
+- **Minimum age 18 for every plan (Moe, 2026-11-21):** creating a family on any plan (Free, Family,
+  Big Clan, Classroom) and self sign-up (email or Google / Apple / Facebook) need 18+, like
+  Classroom. Replaces the 2026-11-20 rule "family 16+, Classroom 18+". The settings
+  `family.owner_min_age` and `classroom.owner_min_age` (both 18) stay, so the age remains
+  configurable; teens 13–17 only join by invite and never use social sign-in.
 - **Goal progress from the ledger, targets snapshotted per period (2026-10-11):** progress is always
   computed from `point_entries` (window × scope subtrees × plan members), never cached per session,
   because one answer can count toward several plans. Each `goal_periods` row snapshots

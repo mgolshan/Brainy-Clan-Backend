@@ -9,8 +9,8 @@ use App\Modules\Policy\PolicyResolver;
 /**
  * Social sign-in follows the self sign-up age: the user's age band allows email (`collect_email`,
  * adults) or the user is old enough to sign up alone (`PolicyResolver::selfSignUpAllowed()`,
- * `family.owner_min_age`, 16), so a 16- or 17-year-old who signed up with Google or Apple can
- * sign in again. Children never use Google/Facebook/Apple.
+ * `family.owner_min_age`, 18). Children and teens (including invited ones) never use
+ * Google/Facebook/Apple: they get 403 `forbidden`.
  */
 class EnsureSocialSignInAllowed
 {

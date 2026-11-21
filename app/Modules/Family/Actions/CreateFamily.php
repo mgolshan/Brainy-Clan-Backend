@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Creates a family on the free tier; the caller becomes its owner and an admin. The caller must be
- * at least `family.owner_min_age` (16): else 403 `owner_too_young` with `min_age`. A user without
+ * at least `family.owner_min_age` (18, any plan): else 403 `owner_too_young` with `min_age`. A user without
  * birth data counts as an adult (like everywhere in the PolicyResolver).
  */
 class CreateFamily

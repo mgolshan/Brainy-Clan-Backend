@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
  * 3. otherwise create a user (birth data required, age checked like `/auth/register`,
  *    `accept_terms` required and recorded as terms + privacy consents);
  *    its email is the provider-verified one, or null when the provider shares none.
- * Returns a device-bound Sanctum token like `/auth/login`. Only from the self sign-up age (16: adults and older teens).
+ * Returns a device-bound Sanctum token like `/auth/login`. Only from the self sign-up age (18: adults).
  */
 class SignInWithSocial
 {

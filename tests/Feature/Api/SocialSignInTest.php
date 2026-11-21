@@ -89,37 +89,42 @@ it('asks for birth data before creating a new user (social_signup_incomplete)', 
     expect(User::query()->count())->toBe(0)->and(SocialAccount::query()->count())->toBe(0);
 });
 
-it('refuses a new social user under the self sign-up age (16)', function (int $age) {
+it('refuses a new social user under the self sign-up age (18)', function (int $age) {
     googleIdentity();
 
     $this->postJson('/api/v1/auth/social/google', socialPayload(['birth_year' => now()->year - $age, 'birth_month' => 1]))
         ->assertStatus(422)
         ->assertJsonPath('code', 'validation_failed')
-        ->assertJsonValidationErrors('birth_year');
+        ->assertJsonValidationErrors('birth_year')
+        ->assertJsonPath('errors.birth_year.0', fn (string $message) => str_contains($message, 'at least 18'));
 
     expect(User::query()->count())->toBe(0);
-})->with([9, 15]);
+})->with([9, 15, 16, 17]);
 
-it('signs up a 16-year-old with Google (self sign-up age), who can sign in again', function () {
+it('signs up an 18-year-old with Google (self sign-up age), who can sign in again', function () {
     googleIdentity(email: 'sam@gmail.com');
 
-    $this->postJson('/api/v1/auth/social/google', socialPayload(['birth_year' => now()->year - 16, 'birth_month' => 1]))
+    $this->postJson('/api/v1/auth/social/google', socialPayload(['birth_year' => now()->year - 18, 'birth_month' => 1]))
         ->assertCreated()
-        ->assertJsonPath('data.policy.age_band', 'teen');
+        ->assertJsonPath('data.policy.age_band', 'adult');
 
     $this->postJson('/api/v1/auth/social/google', socialPayload())->assertOk();
 
     expect(User::query()->count())->toBe(1);
 });
 
-it('links a 17-year-old email login on Google sign-in (from the self sign-up age)', function () {
-    $teen = User::factory()->aged(17)->create(['email' => 'older-teen@gmail.com']);
-    googleIdentity(email: 'older-teen@gmail.com');
+it('never links an invited 16- or 17-year-old email login on Google, Apple or Facebook sign-in (403)', function (int $age, string $provider) {
+    $teen = addMember(familyOwner()->family, $age);
+    $teen->user->forceFill(['email' => 'older-teen@example.com'])->save();
+    fakeSocialProvider($provider, new SocialIdentity($provider, 'p-teen', 'older-teen@example.com', 'Sam'));
 
-    $this->postJson('/api/v1/auth/social/google', socialPayload())->assertOk();
+    $this->postJson("/api/v1/auth/social/{$provider}", socialPayload())
+        ->assertForbidden()
+        ->assertJsonPath('code', 'forbidden')
+        ->assertJsonPath('message', fn (string $message) => str_contains($message, 'from age 18'));
 
-    expect($teen->socialAccounts()->count())->toBe(1);
-});
+    expect($teen->user->socialAccounts()->count())->toBe(0)->and(Device::query()->count())->toBe(0);
+})->with([16, 17])->with([SocialAccount::GOOGLE, SocialAccount::APPLE, SocialAccount::FACEBOOK]);
 
 it('creates a user without email when the provider shares none, and never links by email then', function () {
     User::factory()->create(['email' => 'dad@example.com']);
@@ -263,14 +268,20 @@ it('refuses to link an account that belongs to another user (409)', function () 
         ->assertJsonPath('code', 'social_account_taken');
 });
 
-it('refuses to link for children (403) and invalid tokens (401)', function () {
+it('refuses to link for children and invited 16- or 17-year-olds (403) and invalid tokens (401)', function () {
     googleIdentity();
     $family = familyOwner()->family;
-    actingAsMember(addMember($family, 9));
+    foreach ([9, 16, 17] as $age) {
+        actingAsMember(addMember($family, $age));
 
-    $this->postJson('/api/v1/me/social-accounts/google', ['token' => 'provider-token'])
-        ->assertForbidden()
-        ->assertJsonPath('code', 'forbidden');
+        $this->postJson('/api/v1/me/social-accounts/google', ['token' => 'provider-token'])
+            ->assertForbidden()
+            ->assertJsonPath('code', 'forbidden');
+    }
+
+    actingAsMember(addMember($family, 18));
+    $this->postJson('/api/v1/me/social-accounts/google', ['token' => 'provider-token'])->assertCreated();
+    SocialAccount::query()->delete();
 
     Sanctum::actingAs(User::factory()->create());
     $this->postJson('/api/v1/me/social-accounts/google', ['token' => 'bad'])

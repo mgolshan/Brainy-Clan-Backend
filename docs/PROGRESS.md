@@ -35,7 +35,7 @@ Milestones are defined in `docs/PLAN.md`.
 
 ## Next up
 
-**B12 (2026-11-21):** all four steps done on the backend (plan tiers, chat safety, Classroom tools, FTUE onboarding: `/me/onboarding`). The app uses `GET /me/onboarding` with the server `flow` / `required_steps`; `POST /me/onboarding/restore` brings a hidden checklist back (Profile). Next: Moe tests everything on devices. Lawyer review of `/legal/classroom` (draft) before launch. Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
+**B12 (2026-11-21):** all four steps done on the backend (plan tiers, chat safety, Classroom tools, FTUE onboarding: `/me/onboarding`). The app uses `GET /me/onboarding` with the server `flow` / `required_steps`; `POST /me/onboarding/restore` brings a hidden checklist back (Profile). Minimum age is 18 for every plan (2026-11-21: `family.owner_min_age` 16 → 18). Next: Moe tests everything on devices. Lawyer review of `/legal/classroom` (draft) before launch. Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
 
 **Start of next session (2026-10-24 wrap-up):** run the full backend suite first — the last full run was cut short when Docker stopped. The order-dependent `WebCheckoutTest` / `AccountDeletionPageTest` failure after `WebsiteTest` is fixed (2026-10-25: Livewire's static "component rendered" flag leaked between tests; `TestCase` now calls `Livewire::flushState()`). Moe's open items: content audit decisions (docs/CONTENT_AUDIT_2026-10-24.md, 36 items), lawyer review (terms/privacy 2026-10-24, partner agreement), server region, accounts weekend, when /partners goes public.
 0. **State at last stop (session 17, 2026-10-17, launch question bank + French content):** done (see log). Dev DB:
@@ -393,6 +393,31 @@ curl http://localhost:8080/api/v1/health
 
 ## Log
 
+### 2026-11-21 Minimum age 18 for every plan (Moe's decision)
+- **Rule:** creating a family on any plan and self sign-up (email, Google, Apple, Facebook) need 18+, like
+  Classroom. Replaces 2026-11-20's "family 16+". Settings and mechanisms kept, so the age stays configurable.
+- **Migration** `2026_11_21_300000_raise_family_owner_min_age_to_18`: global `family.owner_min_age` → 18 (updates the
+  existing row, inserts it when missing; `down()` restores 16). `PolicySeeder` and the resolver default → 18;
+  `classroom.owner_min_age` stays 18. Dev DB migrated.
+- **Behaviour (same as before bebd30e):** `selfSignUpAllowed()` is now "adult band or 18+", so teens 13–17 get 422 on
+  `/auth/register` and social sign-up; `EnsureSocialSignInAllowed` again refuses an invited 16- or 17-year-old
+  signing in with or linking Google / Apple / Facebook (403 `forbidden`, "only available from age 18").
+  `POST /families` under 18 → 403 `owner_too_young`, `min_age: 18`. Nothing else depended on 16 (the Classroom
+  owner check, pricing `min_owner_age`, subscribe page and mail already used `classroom.owner_min_age`).
+- **Texts:** help center en + fr — the Classroom-only owner-age sentences are gone (plans list, Big Clan or
+  Classroom, Subscribe tip); one rule in the plans tip ("whatever the plan … at least 18"); create-family and
+  create-class keep their placeholder lines. Docblocks (`RegisterAdult`, `SignInWithSocial`,
+  `EnsureSocialSignInAllowed`, `CreateFamily`, controllers, `ApiException`, `ErrorCodes`) and docs/API.md (error
+  table, register, social, `POST /families`, "Owner ages", pricing, changelog line). Terms/privacy already say 18:
+  unchanged. Landing page, subscribe page and mail had no 16: unchanged.
+- **Tests:** `OwnerAgeTest` (13/16/17 refused, 18 accepted, birthday month at 18, `POST /families` 16/17 → 403,
+  new migration test: 16 → 18, idempotent, down, insert when missing), `SocialSignInTest` (16/17 refused on
+  sign-up, 18 accepted, invited 16/17 refused on Google/Apple/Facebook sign-in and on `/me/social-accounts` linking,
+  18 links), `AuthTest` (13–17 refused with "at least 18", exactly 18 registers).
+- **Resolved open questions** (from the 2026-11-20 entries): terms vs 16, 16–17 owners/purchases, Google linking
+  for 16–17, a removed teen creating a family.
+- **Checks:** Pint and PHPStan clean; related files (OwnerAge, SocialSignIn, Auth, Family, Website, WebCheckout, AdultSeats, IdentityFamilyActions) green; full suite `--parallel`: **1447 passed** (705 s). A French help tip first used "avoir", which made the plans article match the "Comment avoir une DEUXIEME chance" search test; reworded ("être âgée d’au moins").
+
 ### 2026-11-21 FTUE: show the checklist again
 - `POST /me/onboarding/restore` clears `dismissed_at` (progress kept, idempotent); used by the app's Profile row "Show the getting started checklist". Help article tip updated (en/fr). Test in `OnboardingTest`.
 
@@ -486,11 +511,8 @@ curl http://localhost:8080/api/v1/health
   `{family_owner_min_age}`, `{classroom_owner_min_age}`).
 - **Tests:** new `tests/Feature/Api/OwnerAgeTest.php` (16 tests); `SocialSignInTest` (+2: 16-year-old Google
   sign-up and sign-in again, 17-year-old link), `WebCheckoutTest` pricing shape.
-- **Open for Moe:** Terms (`legal/en|fr/terms.blade.php` line 13) still say only adults 18+ may create an account
-  and a family, privacy has "Adults (18+)"; not changed (legal text). A 16–17 owner is an admin while "only adults
-  can be admins" holds for promotions; teens have `purchases_allowed: false`, so a 16–17 owner cannot buy any paid
-  plan (web: `purchases_not_allowed`; app hides purchases). The subscribe page's "can't subscribe" text has no
-  specific `owner_too_young` line (website views were being edited elsewhere).
+- **Superseded 2026-11-21:** Moe set the minimum age to 18 for every plan (see the 2026-11-21 entry), which
+  also closes this entry's open questions (terms vs 16, 16–17 owners and purchases, Google linking for 16–17).
 
 ### 2026-11-20 website header: grouped menu (replaces the 13-pill row)
 - New `resources/views/website/partials/site-header.blade.php`, included by `website/layout` on
@@ -526,8 +548,8 @@ curl http://localhost:8080/api/v1/health
 - **Admins must be adults (every tier):** `UpdateMember` → 422 on `role` ("Only adults can be family admins.")
   when `role: admin` is set for a non-admin child or teen, using birth data sent in the same request. Existing
   child admins (and `role: admin` resent for them) are untouched. No other path promotes to admin (Filament
-  only lists members). Not changed: `POST /family` makes the creator owner + admin; sign-up is adults-only, but a
-  removed teen with an email login could still create a family (open question for Moe).
+  only lists members). Not changed: `POST /family` makes the creator owner + admin; sign-up is adults-only, and
+  `POST /families` needs 18+ (`owner_too_young`, 2026-11-21), so a removed teen cannot create a family.
 - **Help center:** member-settings tip (only adults can be admins) and the Big Clan or Classroom article
   (adult seats full → students only), en + fr; `{classroom_adults}` now comes from the tier setting.
 - **Tests:** `tests/Feature/Api/AdultSeatsTest.php` (policy per tier, migration idempotence, adult/senior/teen/

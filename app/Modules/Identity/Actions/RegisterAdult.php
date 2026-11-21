@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Self sign-up with email + password (no invite). Refused (422) below the self sign-up age
- * (`PolicyResolver::selfSignUpAllowed()`: `family.owner_min_age`, 16, unless the band collects email),
- * so a 16- or 17-year-old can register and create a family; younger children and teens are invited.
+ * (`PolicyResolver::selfSignUpAllowed()`: `family.owner_min_age`, 18, unless the band collects email),
+ * so only adults register on their own; children and teens are invited.
  */
 class RegisterAdult
 {

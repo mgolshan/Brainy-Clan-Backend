@@ -16,8 +16,9 @@ use Laravel\Sanctum\Sanctum;
 
 /**
  * Owner ages (docs/API.md "Plans and tiers" → "Owner ages"): global settings
- * `family.owner_min_age` (16: create a family, self sign-up) and `classroom.owner_min_age` (18: a
- * Classroom's family owner), 403 `owner_too_young` with `min_age`, and `GET /pricing` `min_owner_age`.
+ * `family.owner_min_age` (18 since 2026-11-21: create a family on any plan, self sign-up) and
+ * `classroom.owner_min_age` (18: a Classroom's family owner), 403 `owner_too_young` with `min_age`,
+ * and `GET /pricing` `min_owner_age`.
  */
 function ownerAgeRegister(int $age, string $email = 'young@example.com'): TestResponse
 {
@@ -75,26 +76,27 @@ beforeEach(function () {
 it('reads the owner ages from the PolicyResolver', function () {
     $policy = app(PolicyResolver::class);
 
-    expect($policy->familyOwnerMinAge())->toBe(16)
+    expect($policy->familyOwnerMinAge())->toBe(18)
         ->and($policy->classroomOwnerMinAge())->toBe(18)
         ->and($policy->minOwnerAgeFor(Family::TIER_CLASSROOM))->toBe(18)
         ->and($policy->minOwnerAgeFor(Family::TIER_FAMILY))->toBeNull()
         ->and($policy->minOwnerAgeFor(Family::TIER_BIG_CLAN))->toBeNull()
         ->and($policy->minOwnerAgeFor(Family::TIER_FREE))->toBeNull()
-        ->and($policy->selfSignUpAllowed(now()->year - 15, 1))->toBeFalse()
-        ->and($policy->selfSignUpAllowed(now()->year - 16, 1))->toBeTrue()
-        ->and($policy->selfSignUpAllowed(now()->year - 17, 1))->toBeTrue()
+        ->and($policy->selfSignUpAllowed(now()->year - 13, 1))->toBeFalse()
+        ->and($policy->selfSignUpAllowed(now()->year - 16, 1))->toBeFalse()
+        ->and($policy->selfSignUpAllowed(now()->year - 17, 1))->toBeFalse()
+        ->and($policy->selfSignUpAllowed(now()->year - 18, 1))->toBeTrue()
         ->and($policy->selfSignUpAllowed(now()->year - 40, 1))->toBeTrue()
         ->and($policy->selfSignUpAllowed(null, null))->toBeTrue()
         ->and($policy->userIsAtLeast(User::factory()->make(['birth_year' => null, 'birth_month' => null]), 18))->toBeTrue();
 });
 
-it('counts the birthday month: 16 only from the birth month on', function () {
+it('counts the birthday month: 18 only from the birth month on', function () {
     $this->travelTo(now()->setDate(2026, 5, 15));
     $policy = app(PolicyResolver::class);
 
-    expect($policy->selfSignUpAllowed(2010, 5))->toBeTrue()
-        ->and($policy->selfSignUpAllowed(2010, 6))->toBeFalse();
+    expect($policy->selfSignUpAllowed(2008, 5))->toBeTrue()
+        ->and($policy->selfSignUpAllowed(2008, 6))->toBeFalse();
 });
 
 it('adds the owner age settings to an existing database, keeping admin edits', function () {
@@ -112,38 +114,66 @@ it('adds the owner age settings to an existing database, keeping admin edits', f
         ->and($rows['classroom.owner_min_age']->value)->toBe(19);
 });
 
+it('raises family.owner_min_age from 16 to 18 on an existing database', function () {
+    $migration = require database_path('migrations/2026_11_21_300000_raise_family_owner_min_age_to_18.php');
+    $family = fn () => Setting::query()->where('key', 'family.owner_min_age')->where('scope', 'global')->whereNull('scope_id');
+
+    $family()->update(['value' => json_encode(16)]);
+    $migration->up();
+    $migration->up(); // twice changes nothing
+
+    expect($family()->count())->toBe(1)
+        ->and($family()->sole()->value)->toBe(18)
+        ->and(Setting::query()->where('key', 'classroom.owner_min_age')->sole()->value)->toBe(18);
+
+    $migration->down();
+    expect($family()->sole()->value)->toBe(16);
+
+    // Missing row: inserted.
+    $family()->delete();
+    $migration->up();
+    expect($family()->sole()->value)->toBe(18);
+});
+
 // ---------------------------------------------------------------------------------------------
 // Self sign-up and POST /families
 // ---------------------------------------------------------------------------------------------
 
-it('lets a 16- or 17-year-old register and create a family', function (int $age) {
-    $token = ownerAgeRegister($age)->assertCreated()->json('data.token');
+it('lets an 18-year-old register and create a family', function () {
+    $token = ownerAgeRegister(18)->assertCreated()->json('data.token');
 
     $this->withToken($token);
     ownerAgeCreateFamily()->assertCreated()->assertJsonPath('data.tier', 'free');
 
     $user = User::query()->where('email', 'young@example.com')->sole();
     expect(Family::query()->where('owner_user_id', $user->id)->count())->toBe(1);
-})->with([16, 17]);
-
-it('still refuses self sign-up under 16 with a validation error', function () {
-    ownerAgeRegister(15)->assertStatus(422)
-        ->assertJsonPath('code', 'validation_failed')
-        ->assertJsonValidationErrors('birth_year')
-        ->assertJsonPath('errors.birth_year.0', fn (string $message) => str_contains($message, '16'));
-
-    expect(User::query()->count())->toBe(0);
 });
 
-it('refuses POST /families under 16 with owner_too_young and min_age', function () {
-    Sanctum::actingAs(User::factory()->aged(15)->create());
+it('refuses self sign-up under 18 with a validation error', function (int $age) {
+    ownerAgeRegister($age)->assertStatus(422)
+        ->assertJsonPath('code', 'validation_failed')
+        ->assertJsonValidationErrors('birth_year')
+        ->assertJsonPath('errors.birth_year.0', fn (string $message) => str_contains($message, 'at least 18'));
+
+    expect(User::query()->count())->toBe(0);
+})->with([13, 16, 17]);
+
+it('refuses POST /families under 18 with owner_too_young and min_age, on any plan', function (int $age) {
+    Sanctum::actingAs(User::factory()->aged($age)->create());
 
     ownerAgeCreateFamily()->assertStatus(403)
         ->assertJsonPath('code', 'owner_too_young')
-        ->assertJsonPath('min_age', 16)
+        ->assertJsonPath('min_age', 18)
+        ->assertJsonPath('message', fn (string $message) => str_contains($message, 'at least 18 to create a family'))
         ->assertJsonStructure(['message', 'code', 'min_age']);
 
     expect(Family::query()->count())->toBe(0);
+})->with([16, 17]);
+
+it('lets an 18-year-old without a family create one', function () {
+    Sanctum::actingAs(User::factory()->aged(18)->create());
+
+    ownerAgeCreateFamily()->assertCreated();
 });
 
 it('lets a user without birth data create a family (unknown age counts as an adult)', function () {

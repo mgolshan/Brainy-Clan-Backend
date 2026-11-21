@@ -24,7 +24,7 @@ class AuthController
      * Register (self sign-up, no invite).
      *
      * Email + password sign-up. 422 when the computed age may not self-register: below
-     * `family.owner_min_age` (16) unless the band collects email; and on `accept_terms` unless it is `true` (the
+     * `family.owner_min_age` (18) unless the band collects email; and on `accept_terms` unless it is `true` (the
      * acceptance of the current terms + privacy versions is recorded). Creates a device-bound token.
      */
     public function register(RegisterRequest $request, RegisterAdult $register): JsonResponse

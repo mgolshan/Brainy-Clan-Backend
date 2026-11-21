@@ -22,7 +22,7 @@ class SocialAuthController
      * signs in a linked account (200), links a user with the same provider-verified email (200), or
      * creates a new user (201). A would-be new user without `birth_year`/`birth_month` gets
      * 422 `social_signup_incomplete`: ask for them and retry with the same token. Under the self sign-up
-     * age (16, like register) → 422 `validation_failed`. A new account also needs `accept_terms: true`
+     * age (18, like register) → 422 `validation_failed`. A new account also needs `accept_terms: true`
      * (422 `validation_failed` on `accept_terms` otherwise; the acceptance is recorded). 401 `social_token_invalid` when the token
      * can't be verified. 403 `forbidden` when the matching user is under the self sign-up age.
      *

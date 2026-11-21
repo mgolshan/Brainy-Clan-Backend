@@ -38,7 +38,7 @@ and add a line to the changelog at the bottom.
 | `forbidden` | 403 | Not allowed (e.g. non-admin calling an admin endpoint) |
 | `member_limit_reached` | 403 | Tier member limit reached |
 | `adult_limit_reached` | 403 | Tier adult-seat limit reached (Classroom: 2 adults) |
-| `owner_too_young` | 403 | Too young to own this: a family needs 16+, a Classroom 18+ (`family.owner_min_age` / `classroom.owner_min_age`); body has `min_age` |
+| `owner_too_young` | 403 | Too young to own this: a family (any plan) needs 18+ (`family.owner_min_age`; a Classroom also checks `classroom.owner_min_age`, 18); body has `min_age` |
 | `classroom_consent_required` | 409 | An admin of the Classroom must accept the current Classroom consent statement first (`POST /family/classroom/consent`) |
 | `category_not_allowed` | 403 | Category outside tier/age policy |
 | `no_family` | 409 | Endpoint needs a family membership and the user has none |
@@ -223,9 +223,9 @@ a `devices` row bound to the new token.
 
 - `POST /auth/register` — self sign-up (no invite). Body: `display_name, email, password (min 8), birth_year,
   birth_month, locale?, device_name, platform`. 422 `validation_failed` on `birth_year` if the
-  computed age is below the **self sign-up age** = `family.owner_min_age` (16), unless the band
-  collects email (adults). So 16- and 17-year-olds may register and create a family; younger
-  players join with an invite. Invited members are unchanged (`collect_email` per band). → **201**
+  computed age is below the **self sign-up age** = `family.owner_min_age` (18), unless the band
+  collects email (adults). So only adults register on their own; children and teens join with an
+  invite. Invited members are unchanged (`collect_email` per band). → **201**
 - `POST /auth/login` — Body: `email, password, device_name, platform`. → 200, 401 `invalid_credentials`.
 - `POST /auth/join` — join a family with an invite code. Body: `code, device_name, platform,
   email?, password?`. Creates the user from the invite (nickname, birth data) and the membership.
@@ -262,16 +262,17 @@ a `devices` row bound to the new token.
     answers 429 `login_locked`. The `message` is English; the app translates by `code`. Unlock paths for the owner: wait, reset the password
     (`/auth/password/forgot`), social sign-in, or a sign-in code from a family admin.
 
-- `POST /auth/social/{provider}` — sign in or sign up with `google` | `facebook` | `apple` (from the self sign-up age, 16).
+- `POST /auth/social/{provider}` — sign in or sign up with `google` | `facebook` | `apple` (from the self sign-up age, 18: adults only).
   Body: `token` (Google: the **ID token**; Facebook: the **access token**), `device_name, platform`,
   plus for a first-time sign-up `birth_year, birth_month` and optionally `display_name, locale`.
   The server verifies the token with the provider, then: a linked account → sign in (**200**);
   no link but a user with the same provider-verified email → link and sign in (**200**); otherwise
   create a user (**201**). Without birth data on a would-be new user → 422
   `social_signup_incomplete` (the app asks for birth year/month and retries with the same token);
-  an age below the self sign-up age (16) → 422 like `/auth/register`. An existing user below it
-  (and not in an email band) → 403 `forbidden`. 401 `social_token_invalid`.
-  Returns `AuthPayload`. Children never use social sign-in.
+  an age below the self sign-up age (18) → 422 like `/auth/register`. An existing user below it
+  (and not in an email band) → 403 `forbidden`, so an invited teen can't sign in with or link
+  Google, Apple or Facebook. 401 `social_token_invalid`.
+  Returns `AuthPayload`. Children and teens never use social sign-in.
   Google ID tokens are accepted when `aud` is any of the configured Google client IDs (web,
   Android, iOS — Android and web tokens carry the web client ID, iOS ones may carry the iOS ID).
   Facebook: the standard user access token (not iOS "Limited Login" tokens).
@@ -337,8 +338,8 @@ members use their invite code (`/auth/join`). No shared passwords, no parent ema
 ### Family
 - `POST /families` (auth) — Body: `name, timezone (IANA), country_code (ISO-2)`. Creates the family
   (tier `free`), the caller becomes owner and `admin`. → **201** `{ data: Family }`, 409 `already_in_family`.
-  The caller must be at least `family.owner_min_age` (global setting, **16**): else **403**
-  `{ "message": "You need to be at least 16 to create a family. …", "code": "owner_too_young", "min_age": 16 }`
+  The caller must be at least `family.owner_min_age` (global setting, **18**, every plan): else **403**
+  `{ "message": "You need to be at least 18 to create a family. …", "code": "owner_too_young", "min_age": 18 }`
   (checked after `already_in_family`). A user without birth data counts as an adult (unknown age
   resolves to the adult band everywhere). See Plans and tiers → "Owner ages".
 - `GET /family` (auth, needs family) → `{ data: { family: Family, members: Member[] } }`
@@ -659,12 +660,17 @@ rank `family` < `big_clan` < `classroom`.
 | `ads.enabled` | true | false | false | false |
 | `chat.retention_days` | 7 | 365 | 365 | 365 |
 
-- **Owner ages (2026-11-20):** two global settings, read through the PolicyResolver.
-  - `family.owner_min_age` = **16**: creating a family (`POST /families`) and self sign-up
-    (`POST /auth/register`, social sign-up). Younger → 403 `owner_too_young` with `"min_age": 16`
-    on `POST /families`, 422 on sign-up.
+- **Owner ages (2026-11-20, changed 2026-11-21):** the minimum age is **18 for every plan**. Two
+  global settings, read through the PolicyResolver, both **18**; they stay separate so either can
+  be changed later without code.
+  - `family.owner_min_age` = **18**: creating a family on any plan (`POST /families`) and self
+    sign-up (`POST /auth/register`, social sign-up and social sign-in). Younger → 403
+    `owner_too_young` with `"min_age": 18` on `POST /families`, 422 on sign-up, 403 `forbidden`
+    on social sign-in or linking for an existing (invited) teen.
   - `classroom.owner_min_age` = **18**: the **family owner** (the teacher) of a Classroom; not the
-    buyer — an adult admin may buy Classroom when the owner is 18+.
+    buyer — an adult admin may buy Classroom when the owner is 18+. While both settings are 18,
+    this only catches an owner whose family was created before the rule (or a younger value of
+    `family.owner_min_age`).
     - `GET /family/web-checkout/availability?tier=classroom` → 403 `owner_too_young`
       `{ "message": "...", "code": "owner_too_young", "min_age": 18 }` when the owner is younger.
     - Website: `POST /web/subscribe` with `tier=classroom` still shows the same "check your email"
@@ -706,7 +712,7 @@ rank `family` < `big_clan` < `classroom`.
   - `members` is that tier's `limits.max_members`.
   - `min_owner_age` (int | null, 2026-11-20): the family owner's minimum age for that tier —
     `classroom.owner_min_age` (18) for `classroom`, `null` for `family` and `big_clan` (only the
-    general 16+ to own a family applies).
+    general `family.owner_min_age`, 18, applies).
 - **Web subscribe:**
   - `POST /web/subscribe` gains `tier` (`family` | `big_clan` | `classroom`, default `family`).
   - The page accepts `?tier=…&plan=…`.
@@ -1341,3 +1347,4 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-11-21 — Classroom tools (B12 step 3, backend built): `POST /family/classroom/consent`, `GET /legal` `classroom_consent` (`version`, `text_url`, plus `statement`), page `/legal/classroom` (en/fr draft), Family `classroom` setup state, 409 `classroom_consent_required`, `POST /family/classroom/roster`, `POST /family/classroom/sign-in-codes` (201, tier setting `sign_in_codes.card_ttl_days` 14, 10/h per family), `GET /family/classroom/summary` + `summary.csv`, `POST /family/classroom/new-year`, `families.season_started_at` (leaderboard and open goal periods count from the season). Clarifications in "Classroom tools" → "Built (2026-11-21)": gate order (403 `forbidden` → 403 `plan_required` → 409 before validation), `consent_version` is the newest version any active admin accepted, adult-aged roster students count against `max_adults`, `member_ids` must be active members (422), summary rows include admins, `accuracy_percent` null without answers, CSV format (BOM, headers en/fr, formula-safe cells), leaderboard `starts_at` clipped to the season.
 - 2026-11-21 — Onboarding / FTUE (B12 step 4, backend built): `GET /me/onboarding`, `POST /me/onboarding/{step}`, `POST /me/onboarding/dismiss` (auth, no family needed), Onboarding object `{ steps, dismissed_at, flow, required_steps, optional_steps }` with 24 step keys (manual and server-derived; derived steps are stored once true and stay done), unknown or derived `{step}` → 422 `validation_failed` on `step`; contract from the app's FTUE-CONTRACT.md plus the additive `flow` / `required_steps` / `optional_steps`; `/me/export` gains `onboarding`; the progress is erased with the account. No new error codes.
 - 2026-11-21 — Classroom notes (no shape change): the app's teacher sign-up door ("I'm a teacher — create a class") uses the same account and calls; known limit accepted for launch: one login belongs to one family or one class (`POST /families` → 409 `already_in_family`).
+- 2026-11-21 — Owner ages: the minimum age is now **18 for every plan**. `family.owner_min_age` 16 → 18 (data migration), same as `classroom.owner_min_age`. Self sign-up (`POST /auth/register`, social sign-up) is again adults only (13–17 → 422 on `birth_year`); `POST /families` under 18 → 403 `owner_too_young` with `min_age: 18`; an invited teen signing in with or linking Google / Apple / Facebook → 403 `forbidden` (as before 2026-11-20). No shape change; both settings stay configurable.

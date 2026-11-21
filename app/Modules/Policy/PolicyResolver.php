@@ -40,7 +40,7 @@ class PolicyResolver
         'sign_in_codes.card_ttl_days' => 14,
         'chat.retention_days' => 7,
         'chat.modes_allowed' => false,
-        'family.owner_min_age' => 16,
+        'family.owner_min_age' => 18,
         'classroom.owner_min_age' => 18,
         'feature_flags' => [],
     ];
@@ -279,7 +279,8 @@ class PolicyResolver
     // ---------------------------------------------------------------------------------
 
     /**
-     * Youngest age that may create (own) a family (global setting `family.owner_min_age`, seeded 16).
+     * Youngest age that may create (own) a family on any plan (global setting `family.owner_min_age`,
+     * seeded 18, the same as `classroom.owner_min_age`).
      */
     public function familyOwnerMinAge(): int
     {
@@ -317,7 +318,7 @@ class PolicyResolver
     /**
      * Whether someone with this birth data may sign up on their own (email/password or social,
      * without an invite): a band that collects email (adults, seniors) or an age of at least
-     * `familyOwnerMinAge()`, so a 16-year-old can register and create a family. Separate from
+     * `familyOwnerMinAge()` (18, so the same people as the adult bands by default). Separate from
      * `collect_email`, which still decides email for invited members.
      */
     public function selfSignUpAllowed(?int $birthYear, ?int $birthMonth): bool

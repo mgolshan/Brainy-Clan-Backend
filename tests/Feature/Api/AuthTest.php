@@ -40,14 +40,21 @@ it('registers an adult and returns the auth payload', function () {
         ->and($device->personal_access_token_id)->not->toBeNull();
 });
 
-it('refuses to register a child or teen', function (int $age) {
-    $this->postJson('/api/v1/auth/register', registerPayload(['birth_year' => now()->year - $age]))
+it('refuses to register a child or teen (under 18)', function (int $age) {
+    $this->postJson('/api/v1/auth/register', registerPayload(['birth_year' => now()->year - $age, 'birth_month' => 1]))
         ->assertStatus(422)
         ->assertJsonPath('code', 'validation_failed')
-        ->assertJsonValidationErrors('birth_year');
+        ->assertJsonValidationErrors('birth_year')
+        ->assertJsonPath('errors.birth_year.0', fn (string $message) => str_contains($message, 'at least 18'));
 
     expect(User::query()->count())->toBe(0);
-})->with([9, 15]);
+})->with([9, 13, 15, 16, 17]);
+
+it('registers someone who is exactly 18', function () {
+    $this->postJson('/api/v1/auth/register', registerPayload(['birth_year' => now()->year - 18, 'birth_month' => 1]))
+        ->assertCreated()
+        ->assertJsonPath('data.policy.age_band', 'adult');
+});
 
 it('validates register input', function () {
     User::factory()->create(['email' => 'taken@example.com']);
