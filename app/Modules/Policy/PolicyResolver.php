@@ -26,6 +26,7 @@ class PolicyResolver
     private const array DEFAULT_SETTINGS = [
         'min_app_version' => '1.0.0',
         'limits.max_members' => 2,
+        'limits.max_adults' => null,
         'limits.max_categories' => 3,
         'limits.max_active_goals' => 1,
         'second_chance.free_per_day' => 0,
@@ -40,6 +41,9 @@ class PolicyResolver
         'chat.modes_allowed' => false,
         'feature_flags' => [],
     ];
+
+    /** Oldest age `adultMinAge()` looks at. */
+    private const int MAX_AGE_SCANNED = 130;
 
     private const array DEFAULT_ACCESSIBILITY = ['text_scale' => 1.0, 'reduced_motion' => false, 'calm_timers' => false, 'sound_effects' => false];
 
@@ -113,6 +117,7 @@ class PolicyResolver
             'ad_request' => $this->adRequest($band),
             'limits' => [
                 'max_members' => (int) $this->setting('limits.max_members', $tier, $band?->code),
+                'max_adults' => $this->maxAdultsFor($tier),
                 'max_categories' => (int) $this->setting('limits.max_categories', $tier, $band?->code),
                 'max_active_goals' => $this->maxActiveGoalsFor($tier),
             ],
@@ -237,6 +242,35 @@ class PolicyResolver
         return (bool) ($this->bandForMember($member)?->rule('purchases_allowed') ?? false);
     }
 
+    /**
+     * Whether a band counts as an adult for seats and the admin role (docs/API.md "Adult seats"):
+     * the band has `purchases_allowed` (seeded: adult and senior).
+     */
+    public function isAdultBand(?AgeBand $band): bool
+    {
+        return (bool) ($band?->rule('purchases_allowed') ?? false);
+    }
+
+    /**
+     * The youngest age from which every age resolves to an adult band (with the country's bands),
+     * so adults can be counted in SQL from birth data; null when no age does. Ages above
+     * MAX_AGE_SCANNED count like MAX_AGE_SCANNED.
+     */
+    public function adultMinAge(?string $countryCode = null): ?int
+    {
+        $minAge = null;
+
+        for ($age = self::MAX_AGE_SCANNED; $age >= 0; $age--) {
+            if (! $this->isAdultBand($this->bandForAge($age, $countryCode))) {
+                break;
+            }
+
+            $minAge = $age;
+        }
+
+        return $minAge;
+    }
+
     // ---------------------------------------------------------------------------------
     // Rules used by actions
     // ---------------------------------------------------------------------------------
@@ -252,6 +286,16 @@ class PolicyResolver
     public function maxMembersFor(string $tier): int
     {
         return (int) $this->setting('limits.max_members', $tier);
+    }
+
+    /**
+     * Adult seats of a tier (`limits.max_adults`; seeded: classroom 2, other tiers null = unlimited).
+     */
+    public function maxAdultsFor(string $tier): ?int
+    {
+        $value = $this->setting('limits.max_adults', $tier);
+
+        return $value === null ? null : (int) $value;
     }
 
     public function maxCategories(Family $family): int

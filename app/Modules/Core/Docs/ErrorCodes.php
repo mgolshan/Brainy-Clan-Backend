@@ -18,6 +18,7 @@ final class ErrorCodes
         'social_token_invalid' => ['status' => 401, 'meaning' => 'Google/Facebook token could not be verified'],
         'forbidden' => ['status' => 403, 'meaning' => 'Not allowed (e.g. non-admin calling an admin endpoint)'],
         'member_limit_reached' => ['status' => 403, 'meaning' => 'Tier member limit reached'],
+        'adult_limit_reached' => ['status' => 403, 'meaning' => 'Tier adult-seat limit reached (Classroom: 2 adults)'],
         'category_not_allowed' => ['status' => 403, 'meaning' => 'Category outside tier/age policy'],
         'second_chance_unavailable' => ['status' => 403, 'meaning' => 'No second chance of that method left / allowed'],
         'goal_limit_reached' => ['status' => 403, 'meaning' => 'Tier limit on active goal plans reached'],

@@ -29,10 +29,11 @@ Milestones are defined in `docs/PLAN.md`.
 | Everyone goals + chat reactions (2026-11-11) | Done | Goal plans `everyone` (newcomers join plan + open period via `MemberJoined`) and `all_categories`; chat reactions (fixed set of 6), `PUT`/`DELETE …/reaction`, cursor polling `GET /family/chat/reactions`, export, cleanup on leave/erase |
 | B12 Plans — step 1 plan tiers (2026-11-20) | Done | Tiers `big_clan` / `classroom` (+ rank helpers), per-tier settings (Family 7 → 6), RevenueCat entitlement → tier map (highest rank wins, `entitlement` in the subscription), Paddle prices per tier, web subscribe + availability with `tier`, `GET /pricing` `tiers[]`, any paid tier unlocks `family_plan` worlds, admin badges/filter/metrics, website plans (4 cards) + use-case slider + subscribe tier picker, help center, terms 2026-11-20, README. Next: step 2 (chat safety) |
 | B12 Plans — step 2 chat safety (2026-11-20) | Done | Bad-words filter (`ProfanityFilter`, en + fr lists in `resources/chat-filter/`, disguises, whole words only, ★ masking, `filtered`), Family `chat_filter` (every plan, default on) + `chat_mode` (Classroom via `chat.modes_allowed`, effective mode after downgrade), `announcements` (403 `chat_read_only`) and `off` (403 `chat_off`, unread 0, no pushes), errors `plan_required` / `chat_read_only` / `chat_off`, admin family view, help center, website line. Next: step 3 (Classroom tools) |
+| B12 Plans — step 3a adult seats (2026-11-20) | Done | Policy `limits.max_adults` (tier setting, classroom 2, others null), 403 `adult_limit_reached` on adult invites (active adults + pending adult invites, two count queries), admins must be adults on every tier (422 on `role`, on change only), help center lines. Next: rest of step 3 (consent, roster, code cards, summary, new year) |
 
 ## Next up
 
-**B12 (2026-11-20):** steps 1 (plan tiers) and 2 (chat safety) done — next is step 3 (Classroom tools: the contract is already written in docs/API.md "Classroom tools", backend + app in parallel), then step 4 FTUE (docs/PLAN.md "FTUE plan"). Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
+**B12 (2026-11-20):** steps 1 (plan tiers), 2 (chat safety) and 3a (adult seats + adults-only admins) done — next is the rest of step 3 (Classroom tools: consent statement, setup state, roster, code cards, class summary, new year; contract in docs/API.md "Classroom tools", backend + app in parallel), then step 4 FTUE (docs/PLAN.md "FTUE plan"). Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
 
 **Start of next session (2026-10-24 wrap-up):** run the full backend suite first — the last full run was cut short when Docker stopped. The order-dependent `WebCheckoutTest` / `AccountDeletionPageTest` failure after `WebsiteTest` is fixed (2026-10-25: Livewire's static "component rendered" flag leaked between tests; `TestCase` now calls `Livewire::flushState()`). Moe's open items: content audit decisions (docs/CONTENT_AUDIT_2026-10-24.md, 36 items), lawyer review (terms/privacy 2026-10-24, partner agreement), server region, accounts weekend, when /partners goes public.
 0. **State at last stop (session 17, 2026-10-17, launch question bank + French content):** done (see log). Dev DB:
@@ -385,6 +386,28 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-11-20 B12 step 3a: adult seats + adults-only admins
+- **Migration** `2026_11_20_300000_add_max_adults_tier_settings`: tier setting `limits.max_adults` (null =
+  unlimited for free / family / big_clan, 2 for classroom; insert-or-ignore, admin edits kept). `PolicySeeder`
+  has the same rows; `PolicyResolver` default null, `maxAdultsFor()`, `isAdultBand()` (band with
+  `purchases_allowed`: adult, senior), `adultMinAge()` (youngest age from which every age is an adult band,
+  country bands included), policy `limits.max_adults`.
+- **Invites:** `CreateInvite` → 403 `adult_limit_reached` (`ApiException::adultLimitReached()`, `ErrorCodes`,
+  `#[ApiErrors]`) for an adult invitee when active adult members + pending adult invites are at or over the
+  limit; checked after `member_limit_reached`. Counted in two `count` queries from birth year/month (users
+  without birth data count as adults, like `bandForAge()`); members already over the limit keep their seats.
+- **Admins must be adults (every tier):** `UpdateMember` → 422 on `role` ("Only adults can be family admins.")
+  when `role: admin` is set for a non-admin child or teen, using birth data sent in the same request. Existing
+  child admins (and `role: admin` resent for them) are untouched. No other path promotes to admin (Filament
+  only lists members). Not changed: `POST /family` makes the creator owner + admin; sign-up is adults-only, but a
+  removed teen with an email login could still create a family (open question for Moe).
+- **Help center:** member-settings tip (only adults can be admins) and the Big Clan or Classroom article
+  (adult seats full → students only), en + fr; `{classroom_adults}` now comes from the tier setting.
+- **Tests:** `tests/Feature/Api/AdultSeatsTest.php` (policy per tier, migration idempotence, adult/senior/teen/
+  child invites, removed members and used/expired invites ignored, birthday month, unlimited tiers, over-limit
+  after plan change, constant query count, 422 on every tier, same-request birth data, existing child admins).
+  `FamilyTest` "lets an admin update a member" now promotes a grandparent instead of a 9-year-old.
 
 ### 2026-11-20 B12 step 2: chat safety (bad-words filter, Classroom chat modes)
 - **Migration** `2026_11_20_200000_add_chat_safety_columns`: `families.chat_filter` (bool, default true),

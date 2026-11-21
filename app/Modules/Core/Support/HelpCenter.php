@@ -26,9 +26,6 @@ use Normalizer;
  */
 class HelpCenter
 {
-    /** Classroom adult seats: teacher + co-teacher (docs/PLAN.md B12). */
-    private const int CLASSROOM_ADULTS = 2;
-
     /** Longest query the search looks at (characters) and most terms it uses. */
     public const int MAX_QUERY_LENGTH = 100;
 
@@ -243,6 +240,7 @@ class HelpCenter
     public function placeholders(string $locale): array
     {
         $fr = $locale === 'fr';
+        $classroomAdults = $this->policy->maxAdultsFor(Family::TIER_CLASSROOM) ?? 0;
         $lockout = (array) config('auth.lockout.email_ip.durations', [300, 3600, 86400]);
         $byUnlock = ['free' => [], 'points' => [], 'streak' => [], 'family_plan' => []];
 
@@ -265,8 +263,8 @@ class HelpCenter
             'family_members' => (string) $this->policy->maxMembersFor(Family::TIER_FAMILY),
             'big_clan_members' => (string) $this->policy->maxMembersFor(Family::TIER_BIG_CLAN),
             'classroom_members' => (string) $this->policy->maxMembersFor(Family::TIER_CLASSROOM),
-            'classroom_adults' => (string) self::CLASSROOM_ADULTS,
-            'classroom_students' => (string) max(0, $this->policy->maxMembersFor(Family::TIER_CLASSROOM) - self::CLASSROOM_ADULTS),
+            'classroom_adults' => (string) $classroomAdults,
+            'classroom_students' => (string) max(0, $this->policy->maxMembersFor(Family::TIER_CLASSROOM) - $classroomAdults),
             'price_family' => self::priceText(Family::TIER_FAMILY, $fr),
             'price_big_clan' => self::priceText(Family::TIER_BIG_CLAN, $fr),
             'price_classroom' => self::priceText(Family::TIER_CLASSROOM, $fr),

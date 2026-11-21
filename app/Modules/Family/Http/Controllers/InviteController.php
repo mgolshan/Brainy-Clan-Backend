@@ -40,11 +40,13 @@ class InviteController
      * Create an invite (admin).
      *
      * Nickname + birth data of the invitee; 8-character code valid 7 days. 403
-     * `member_limit_reached` when members + pending invites reach the tier limit. For a child
-     * (band with `is_child`, see `GET /family/invites/preview`) `parental_consent: true` is required
-     * (422 on `parental_consent` otherwise); it is recorded as a parental consent.
+     * `member_limit_reached` when members + pending invites reach the tier limit; 403
+     * `adult_limit_reached` for an adult when adults + pending adult invites reach the tier's
+     * `limits.max_adults` (Classroom 2). For a child (band with `is_child`, see
+     * `GET /family/invites/preview`) `parental_consent: true` is required (422 on
+     * `parental_consent` otherwise); it is recorded as a parental consent.
      */
-    #[ApiErrors('member_limit_reached')]
+    #[ApiErrors('member_limit_reached', 'adult_limit_reached')]
     public function store(CreateInviteRequest $request, CreateInvite $create): JsonResponse
     {
         /** @var array{nickname: string, birth_year: int, birth_month: int, avatar?: string|null, parental_consent?: bool|null} $data */

@@ -120,6 +120,7 @@ class PolicySeeder extends Seeder
             ['global', null, 'feature_flags', [], 'Feature flags sent to the app (merged global <- tier <- age band).'],
 
             ['tier', 'free', 'limits.max_members', 2, 'Free tier: admin + 1 member.'],
+            ['tier', 'free', 'limits.max_adults', null, 'Free tier: no limit on adult members (null); the member limit applies.'],
             ['tier', 'free', 'limits.max_categories', 3, 'Free tier: first 3 top-level categories unlocked.'],
             ['tier', 'free', 'limits.max_active_goals', 1, 'Free tier: one active goal plan.'],
             ['tier', 'free', 'second_chance.free_per_day', 0, 'Free second chances per member per day.'],
@@ -128,6 +129,7 @@ class PolicySeeder extends Seeder
             ['tier', 'free', 'chat.modes_allowed', false, 'Free tier: chat modes (announcements only, chat off) are a Classroom tool.'],
 
             ['tier', 'family', 'limits.max_members', 6, 'Family plan: up to 6 members (parents + kids).'],
+            ['tier', 'family', 'limits.max_adults', null, 'Family plan: no limit on adult members (null); the member limit applies.'],
             ['tier', 'family', 'limits.max_categories', 100, 'Family plan: all categories.'],
             ['tier', 'family', 'limits.max_active_goals', null, 'Family plan: unlimited goal plans (null).'],
             ['tier', 'family', 'second_chance.free_per_day', 3, 'Free second chances per member per day.'],
@@ -136,6 +138,7 @@ class PolicySeeder extends Seeder
             ['tier', 'family', 'chat.modes_allowed', false, 'Family plan: chat modes (announcements only, chat off) are a Classroom tool.'],
 
             ['tier', 'big_clan', 'limits.max_members', 12, 'Big Clan plan: up to 12 members (grandparents, cousins, homeschool groups).'],
+            ['tier', 'big_clan', 'limits.max_adults', null, 'Big Clan plan: no limit on adult members (null); the member limit applies.'],
             ['tier', 'big_clan', 'limits.max_categories', 100, 'Big Clan plan: all categories.'],
             ['tier', 'big_clan', 'limits.max_active_goals', null, 'Big Clan plan: unlimited goal plans (null).'],
             ['tier', 'big_clan', 'second_chance.free_per_day', 3, 'Free second chances per member per day.'],
@@ -144,6 +147,7 @@ class PolicySeeder extends Seeder
             ['tier', 'big_clan', 'chat.modes_allowed', false, 'Big Clan plan: chat modes (announcements only, chat off) are a Classroom tool.'],
 
             ['tier', 'classroom', 'limits.max_members', 37, 'Classroom plan: 1 teacher + 1 co-teacher + 35 students.'],
+            ['tier', 'classroom', 'limits.max_adults', 2, 'Classroom plan: 2 adult seats (teacher + co-teacher); everyone else is a student.'],
             ['tier', 'classroom', 'limits.max_categories', 100, 'Classroom plan: all categories.'],
             ['tier', 'classroom', 'limits.max_active_goals', null, 'Classroom plan: unlimited goal plans (null).'],
             ['tier', 'classroom', 'second_chance.free_per_day', 3, 'Free second chances per member per day.'],

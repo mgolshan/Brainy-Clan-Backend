@@ -79,14 +79,14 @@ it('lets admins update the family and forbids members', function () {
 
 it('lets an admin update a member', function () {
     $owner = familyOwner(['tier' => 'family']);
-    $kid = addMember($owner->family, 9);
+    $grandma = addMember($owner->family, 66);
     actingAsMember($owner);
 
-    $this->patchJson("/api/v1/family/members/{$kid->id}", [
+    $this->patchJson("/api/v1/family/members/{$grandma->id}", [
         'nickname' => 'Sammy',
         'avatar' => 'unicorn',
         'difficulty_override' => 6,
-        'birth_year' => now()->year - 10,
+        'birth_year' => now()->year - 67,
         'birth_month' => 2,
         'role' => 'admin',
         'accessibility' => ['reduced_motion' => true],
@@ -99,7 +99,7 @@ it('lets an admin update a member', function () {
         ->assertJsonPath('data.role', 'admin')
         ->assertJsonPath('data.accessibility.reduced_motion', true);
 
-    $this->patchJson("/api/v1/family/members/{$kid->id}", ['difficulty_override' => null])
+    $this->patchJson("/api/v1/family/members/{$grandma->id}", ['difficulty_override' => null])
         ->assertOk()->assertJsonPath('data.difficulty_override', null);
 });
 

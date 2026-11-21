@@ -438,7 +438,7 @@ return [
                     'Plus bas : **Connexion et appareils**, **Discussion familiale** et **Notifications**.',
                     'Touchez **Enregistrer** en haut quand vous avez terminé.',
                 ],
-                'tip' => 'Seuls les administrateurs de la famille voient et modifient ces réglages.',
+                'tip' => 'Seuls les administrateurs de la famille voient et modifient ces réglages. Seul un adulte peut devenir administrateur, quel que soit le forfait.',
                 'image' => 'member-settings',
                 'alt' => 'Les réglages d’un enfant : se connecter sur un autre appareil, une tablette connectée, l’interrupteur Discussion familiale et Notifications (écran en anglais).',
                 'keywords' => ['réglages', 'paramètres', 'contrôle parental', 'modifier un membre', 'surnom', 'admin'],
@@ -538,7 +538,7 @@ return [
                 'summary' => 'Grand Clan est pour les familles et les groupes de familles ; Classe, pour un enseignant et sa classe.',
                 'steps' => [
                     '**Grand Clan** accueille {big_clan_members} membres et autant d’adultes que vous voulez : les grands-parents, oncles et tantes ont chacun leur compte, et plusieurs adultes peuvent aider à gérer le groupe comme co-administrateurs.',
-                    '**Classe** accueille {classroom_members} membres, mais seulement {classroom_adults} adultes : un enseignant et un co-enseignant, et jusqu’à {classroom_students} élèves.',
+                    '**Classe** accueille {classroom_members} membres, mais seulement {classroom_adults} adultes : un enseignant et un co-enseignant, et jusqu’à {classroom_students} élèves. Une fois les {classroom_adults} places d’adulte prises, vous pouvez encore inviter des élèves, mais plus d’adultes.',
                     'Classe ajoutera des outils pour l’enseignant dont une famille n’a pas besoin : une liste d’élèves à coller, des cartes de codes de connexion à imprimer, un export du bilan de la classe et une remise à zéro guidée pour la nouvelle année scolaire. Ces outils arrivent bientôt. Ses modes de discussion (annonces seulement, ou discussion désactivée) sont déjà là.',
                     'Classe est le forfait le plus cher. Une grande famille ou un groupe d’école-maison est en général mieux servi par Grand Clan.',
                 ],

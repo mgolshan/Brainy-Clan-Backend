@@ -444,7 +444,7 @@ return [
                     'Below: **Sign-in & devices**, **Family chat** and **Notifications**.',
                     'Tap **Save** at the top when you are done.',
                 ],
-                'tip' => 'Only family admins can see and change these settings.',
+                'tip' => 'Only family admins can see and change these settings. Only adults can be made admins, on every plan.',
                 'image' => 'member-settings',
                 'alt' => 'A child\'s settings: Sign in on another device, a signed-in tablet, the Family chat switch and Notifications.',
                 'keywords' => ['settings', 'child settings', 'parental controls', 'edit member', 'nickname', 'admin'],
@@ -544,7 +544,7 @@ return [
                 'summary' => 'Big Clan is for families and groups of families; Classroom is for one teacher and a class.',
                 'steps' => [
                     '**Big Clan** has room for {big_clan_members} members and any number of adults: grandparents, aunts and uncles each get their own account, and several adults can help run the group as co-admins.',
-                    '**Classroom** has room for {classroom_members} members but only {classroom_adults} adults: a teacher and a co-teacher, and up to {classroom_students} students.',
+                    '**Classroom** has room for {classroom_members} members but only {classroom_adults} adults: a teacher and a co-teacher, and up to {classroom_students} students. Once the {classroom_adults} adult seats are taken, you can still invite students but no more adults.',
                     'Classroom will add teacher tools a family doesn’t need: a class roster you can paste in, printable sign-in code cards, a class summary export and a guided reset for the new school year. These tools are coming soon. Its chat modes (announcements only, or chat off) are already here.',
                     'Classroom is the most expensive plan. A large family or a homeschool group is usually happier with Big Clan.',
                 ],

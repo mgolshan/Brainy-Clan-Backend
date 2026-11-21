@@ -37,7 +37,7 @@ and add a line to the changelog at the bottom.
 | `invalid_credentials` | 401 | Wrong email/password |
 | `forbidden` | 403 | Not allowed (e.g. non-admin calling an admin endpoint) |
 | `member_limit_reached` | 403 | Tier member limit reached |
-| `adult_limit_reached` | 403 | Tier adult-seat limit reached (Classroom: 2 adults) — B12 step 3 |
+| `adult_limit_reached` | 403 | Tier adult-seat limit reached (Classroom: 2 adults) |
 | `classroom_consent_required` | 409 | A teacher must accept the Classroom consent statement first — B12 step 3 |
 | `category_not_allowed` | 403 | Category outside tier/age policy |
 | `no_family` | 409 | Endpoint needs a family membership and the user has none |
@@ -164,7 +164,7 @@ and add a line to the changelog at the bottom.
   "difficulty": { "min": 1, "max": 4, "default": 2 },
   "second_chance": { "free_per_day": 0, "free_used_today": 0, "ad_allowed": false, "redemption_allowed": true },
   "ad_request": { "non_personalized": true, "under_age_of_consent": false, "max_ad_content_rating": "G" },
-  "limits": { "max_members": 2, "max_categories": 3, "max_active_goals": 1 },
+  "limits": { "max_members": 2, "max_adults": null, "max_categories": 3, "max_active_goals": 1 },
   "accessibility_defaults": { "text_scale": 1.0, "reduced_motion": false, "calm_timers": false, "sound_effects": true },
   "chat": { "retention_days": 7, "modes_allowed": false },
   "feature_flags": {}
@@ -643,6 +643,7 @@ rank `family` < `big_clan` < `classroom`.
 | Setting | free | family | big_clan | classroom |
 |---|---|---|---|---|
 | `limits.max_members` | 2 | 6 | 12 | 37 |
+| `limits.max_adults` | null | null | null | 2 |
 | `limits.max_categories` | 3 | 100 | 100 | 100 |
 | `limits.max_active_goals` | 1 | null | null | null |
 | `second_chance.free_per_day` | 0 | 3 | 3 | 3 |
@@ -926,12 +927,12 @@ most 1 push per member per 2 minutes, collapsed). The push **never contains mess
 through Expo/Apple/Google): title "Brainy Clan", body "Sam sent a message" (localized), `data`
 `{ "type": "family_chat", "message_id": 812 }`.
 
-### Classroom tools (B12 step 3, contract 2026-11-20, not built yet)
+### Classroom tools (B12 step 3, contract 2026-11-20; adult seats built 2026-11-20, the rest not built yet)
 Classroom is a family whose `tier` is `classroom`. The family `name` is the class name. Family
 admins are the teachers. Everything here returns 403 `plan_required` on any other tier, unless a
 rule below says otherwise.
 
-**Adult seats (every tier):**
+**Adult seats (every tier, built 2026-11-20):**
 - Policy `limits` gains `"max_adults"` (tier setting `limits.max_adults`): `null` (unlimited) for
   free, family and big_clan, and **2** for classroom.
 - An adult is a member whose age band has `purchases_allowed`, i.e. adult or senior.
@@ -1144,3 +1145,4 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-11-20 — Plans (B12 step 1): tiers `big_clan` and `classroom` next to `free` / `family` (Family now 6 members, Big Clan 12, Classroom 37); per-tier settings table; RevenueCat entitlements and offerings per tier, product ids `brainyclan_{tier}_{period}`; `GET /family/subscription` gains `entitlement`; `GET /pricing` returns `tiers[]` (breaking, website-only consumer); `POST /web/subscribe` and `/family/web-checkout/availability` take `tier`; Paddle prices per tier; `family_plan` world unlock = any paid plan. Clarifications (backend built): `GET /family/subscription` `entitlement` is null unless the shown row is entitled; a RevenueCat event with an empty `entitlement_ids` keeps the stored entitlement (a new row takes the tier named in `product_id` — `brainyclan_{tier}_…` or Play's `brainyclan_{tier}:{base plan}` — else `family`); the RevenueCat sync picks the highest-ranked entitlement that is still on (else the one that ended last); a Paddle event with an unknown price is `ignored` unless it is for the family's stored Paddle subscription (it keeps its tier); `POST /web/subscribe` with an unknown `tier` → 422 (form error), with a tier that has no web prices → the "coming soon" page; the availability endpoint → 422 for an unknown `tier`, `link_allowed: false` for a tier without web prices; `url` is `/subscribe?tier=…&plan=annual&src=app`; `GET /pricing` keeps `currency` and lists the tiers in rank order (USD `per_month`/`saving_percent` computed as before). Terms version bumped to `2026-11-20` (re-acceptance; multiple plans, changing plans).
 - 2026-11-20 — Chat safety (B12 step 2): Family gains `chat_filter` (profanity filter, default on, every plan) and `chat_mode` (`normal` | `announcements` | `off`, Classroom only via `policy.chat.modes_allowed`); Message gains `filtered`; errors `plan_required`, `chat_read_only`, `chat_off`. Clarifications (backend built): `PATCH /family { chat_mode: "normal" }` on a plan without modes is a 200 no-op (the stored mode is kept), any other `chat_mode` there is 403 `plan_required` and nothing in the request is saved; bad `chat_mode` / non-boolean `chat_filter` → 422. With chat `off`, `chat_off` comes before `chat_disabled` (unread is `{ unread: 0 }` for every member, chat-disabled ones too) and no `family_chat` / `family_chat_report` pushes go out. In `announcements`, a non-admin's post is 403 `chat_read_only` even when retrying an existing `client_id`. The filter runs on the normalized body; inside a match letters, digits and disguise symbols become `★` while separators, spaces and combining marks stay; a letter doubled (not 3+) is not a disguise, so "cul" never matches "cull"; a few listed phrases are never masked ("cul-de-sac", "cul sec").
 - 2026-11-20 — Classroom tools contract (B12 step 3, **not built yet**): policy `limits.max_adults` (classroom 2) + 403 `adult_limit_reached`; admins must be adults; classroom consent statement (`POST /family/classroom/consent`, `GET /legal` `classroom_consent`, 409 `classroom_consent_required`); Family `classroom` setup state; roster bulk add; card sign-in codes (14 days); class summary JSON + CSV; `POST /family/classroom/new-year` (students / points season / chat / goals).
+- 2026-11-20 — Adult seats (B12 step 3a, backend built): policy `limits.max_adults` (tier setting; `null` = unlimited for free / family / big_clan, `2` for classroom); `POST /family/invites` for an adult (band with `purchases_allowed`: adult, senior) → 403 `adult_limit_reached` when active adults + pending adult invites are at or over the limit (checked after `member_limit_reached`; members over the limit keep their seats); `PATCH /family/members/{member}` with `role: admin` for a child or teen → 422 on `role` ("Only adults can be family admins."), using the birth data sent in the same request, checked only when the role changes (existing child admins and `role: admin` sent for someone already admin are left alone).

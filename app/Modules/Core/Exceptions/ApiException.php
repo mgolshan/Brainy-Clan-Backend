@@ -52,6 +52,14 @@ class ApiException extends RuntimeException
         return new self('member_limit_reached', 'Your plan does not allow more family members.', 403);
     }
 
+    /**
+     * The tier's adult seats (`limits.max_adults`, Classroom 2) are taken (docs/API.md "Adult seats").
+     */
+    public static function adultLimitReached(): self
+    {
+        return new self('adult_limit_reached', 'Your plan does not allow more adults in this group.', 403);
+    }
+
     public static function inviteInvalid(): self
     {
         return new self('invite_invalid', 'This invite code is unknown, already used or expired.', 422);

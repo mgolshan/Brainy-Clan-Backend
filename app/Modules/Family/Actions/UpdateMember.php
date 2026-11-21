@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\DB;
  * address is free. Removing it also clears the password; the member sets a new password on
  * their own device (`PUT /me/password`).
  *
+ * `role: admin`: only for adults (band with `purchases_allowed`, after any birth-data change in the
+ * same request), else 422 on `role`. Checked on change only: existing child admins are kept.
+ *
  * `accessibility.theme`: must be a world unlocked for this member (403 `world_locked`); null always works.
  */
 class UpdateMember
@@ -33,6 +36,10 @@ class UpdateMember
     {
         if (array_key_exists('role', $data) && $data['role'] !== FamilyMember::ROLE_ADMIN && $member->isOwner()) {
             throw ApiException::forbidden('The family owner is always an admin.');
+        }
+
+        if (($data['role'] ?? null) === FamilyMember::ROLE_ADMIN && ! $member->isAdmin() && ! $this->isAdultAfterUpdate($member, $data)) {
+            throw ApiException::validation('role', 'Only adults can be family admins.');
         }
 
         if (array_key_exists('email', $data) && $member->isOwner() && $actor !== null && $actor->id !== $member->id) {
@@ -65,6 +72,21 @@ class UpdateMember
 
             return $member->refresh();
         });
+    }
+
+    /**
+     * Whether the member is an adult (band with `purchases_allowed`) with any birth-data change in
+     * the same request applied.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function isAdultAfterUpdate(FamilyMember $member, array $data): bool
+    {
+        $member->loadMissing(['user', 'family']);
+        $birthYear = array_key_exists('birth_year', $data) ? (int) $data['birth_year'] : $member->user->birth_year;
+        $birthMonth = array_key_exists('birth_month', $data) ? (int) $data['birth_month'] : $member->user->birth_month;
+
+        return $this->policy->isAdultBand($this->policy->bandForBirth($birthYear, $birthMonth, $member->family->country_code));
     }
 
     private function updateEmailLogin(FamilyMember $member, User $user, ?string $email): void
