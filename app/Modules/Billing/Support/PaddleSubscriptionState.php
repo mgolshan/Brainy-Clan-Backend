@@ -15,6 +15,9 @@ use Illuminate\Support\Carbon;
  * | `trialing` | active | `period_type` trial |
  * | `past_due` | grace | until the period end + `billing.paddle.grace_days` (Paddle's dunning) |
  * | `paused`, `canceled` | expired | |
+ *
+ * The plan tier comes from the first item's price ({@see PaddleConfig::tierAndPlanForPrice()});
+ * an unknown price keeps the row's tier (Family for a new row).
  */
 final class PaddleSubscriptionState
 {
@@ -28,9 +31,10 @@ final class PaddleSubscriptionState
         $status = is_string($data['status'] ?? null) ? $data['status'] : '';
         $period = is_array($data['current_billing_period'] ?? null) ? $data['current_billing_period'] : [];
         $scheduled = is_array($data['scheduled_change'] ?? null) ? $data['scheduled_change'] : [];
-        $items = is_array($data['items'] ?? null) ? array_values($data['items']) : [];
-        $firstItem = is_array($items[0] ?? null) ? $items[0] : [];
-        $price = is_array($firstItem['price'] ?? null) ? $firstItem['price'] : [];
+        $priceId = self::priceId($data);
+        $tier = PaddleConfig::tierAndPlanForPrice($priceId)['tier'] ?? $subscription->tier();
+        $entitlement = BillingTiers::entitlementFor($tier);
+        $entitlement = $entitlement !== '' ? $entitlement : $tier;
 
         $expiresAt = self::time($period['ends_at'] ?? null)
             ?? self::time($data['next_billed_at'] ?? null)
@@ -49,12 +53,12 @@ final class PaddleSubscriptionState
             'family_id' => $familyId,
             'provider' => Subscription::PROVIDER_PADDLE,
             'app_user_id' => 'family-'.$familyId,
-            'entitlement' => (string) config('services.revenuecat.entitlement', 'family'),
+            'entitlement' => $entitlement,
             'external_id' => is_string($data['id'] ?? null) ? $data['id'] : $subscription->external_id,
             'customer_id' => is_string($data['customer_id'] ?? null) ? $data['customer_id'] : $subscription->customer_id,
             'status' => $rowStatus,
             'store' => Subscription::STORE_PADDLE,
-            'product_id' => is_string($price['id'] ?? null) ? $price['id'] : $subscription->product_id,
+            'product_id' => $priceId ?? $subscription->product_id,
             'period_type' => $status === 'trialing' ? 'trial' : 'normal',
             'environment' => strtoupper(PaddleConfig::environment()),
             'will_renew' => in_array($status, self::ENTITLED_STATUSES, true) && ! $cancelScheduled,
@@ -67,6 +71,20 @@ final class PaddleSubscriptionState
             'last_event_type' => $eventType,
             'raw' => $data,
         ]);
+    }
+
+    /**
+     * The price id of the subscription's first item (`items[0].price.id`), or null.
+     *
+     * @param  array<string, mixed>  $data  the Paddle subscription entity
+     */
+    public static function priceId(array $data): ?string
+    {
+        $items = is_array($data['items'] ?? null) ? array_values($data['items']) : [];
+        $firstItem = is_array($items[0] ?? null) ? $items[0] : [];
+        $price = is_array($firstItem['price'] ?? null) ? $firstItem['price'] : [];
+
+        return is_string($price['id'] ?? null) && $price['id'] !== '' ? $price['id'] : null;
     }
 
     public static function time(mixed $value): ?Carbon

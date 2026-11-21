@@ -9,7 +9,7 @@ use Carbon\CarbonImmutable;
 
 /**
  * Chat retention (hourly, `chat:prune`): deletes, for good, every message older than its family's
- * `chat.retention_days` (tier setting: free 7, Family plan 365). One delete per tier (in batches
+ * `chat.retention_days` (tier setting: free 7, paid plans 365). One delete per tier (in batches
  * of {@see self::BATCH}, so no long locks), using the (created_at) index and a family-id subquery
  * on the tier. After a downgrade the shorter period applies on the next run.
  */

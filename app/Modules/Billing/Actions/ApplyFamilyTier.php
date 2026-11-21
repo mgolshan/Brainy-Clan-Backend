@@ -8,10 +8,10 @@ use App\Modules\Family\Models\Family;
 
 /**
  * The one place a subscription switches the family tier (docs/PLAN.md "Tier switches only via the
- * server"): `family` while any of the family's subscription rows (RevenueCat or Paddle) is entitled
- * (active or in the billing grace period), else `free`. Used by the RevenueCat and Paddle webhooks,
- * `POST /family/subscription/sync` and the scheduled reconciliation. Saves the subscription and
- * dispatches {@see SubscriptionChanged}.
+ * server"): the highest-ranked tier (`family` < `big_clan` < `classroom`) of the family's entitled
+ * subscription rows (RevenueCat or Paddle; active or in the billing grace period), else `free`.
+ * Used by the RevenueCat and Paddle webhooks, `POST /family/subscription/sync` and the scheduled
+ * reconciliation. Saves the subscription and dispatches {@see SubscriptionChanged}.
  */
 class ApplyFamilyTier
 {
@@ -25,10 +25,18 @@ class ApplyFamilyTier
     {
         $subscription->save();
 
-        $entitled = $subscription->isEntitled()
-            || Subscription::entitledElsewhere($family->id, $subscription->provider) !== null;
+        $entitledTiers = Subscription::query()
+            ->where('family_id', $family->id)
+            ->where('provider', '!=', $subscription->provider)
+            ->get()
+            ->filter(fn (Subscription $row): bool => $row->isEntitled())
+            ->map(fn (Subscription $row): string => $row->tier());
 
-        $tier = $entitled ? Family::TIER_FAMILY : Family::TIER_FREE;
+        if ($subscription->isEntitled()) {
+            $entitledTiers->push($subscription->tier());
+        }
+
+        $tier = Family::highestTier($entitledTiers);
         $changed = $family->tier !== $tier;
 
         if ($changed) {

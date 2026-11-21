@@ -26,9 +26,9 @@ use Illuminate\Support\Collection;
  *   `/me/stats` `points_total` (all entries) as long as the ledger has no corrections.
  * - **Longest streak** = `streaks.longest`, the same value as `/me/stats` `streak.longest`; it
  *   never decreases.
- * - **Family plan** = the family's tier is `family`, which Billing sets while the subscription is
- *   active, in a trial or in the billing grace period (ApplyFamilyTier). It drops back to `free`
- *   when the plan ends, so `family_plan` worlds lock again; the stored theme is kept and the
+ * - **Family plan** (`family_plan`) = the family is on any paid tier (`family`, `big_clan` or
+ *   `classroom`), which Billing sets while the subscription is active, in a trial or in the
+ *   billing grace period (ApplyFamilyTier). It drops back to `free` when the plan ends, so `family_plan` worlds lock again; the stored theme is kept and the
  *   member resource reports `theme_unlocked: false`.
  */
 class EvaluateWorldUnlocks
@@ -162,6 +162,6 @@ class EvaluateWorldUnlocks
 
     private function hasFamilyPlan(FamilyMember $member): bool
     {
-        return $member->family->tier === Family::TIER_FAMILY;
+        return Family::isPaidTier($member->family->tier);
     }
 }

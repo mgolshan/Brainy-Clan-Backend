@@ -10,7 +10,7 @@
 return [
 
     /*
-     * Display prices for the website and `GET /api/v1/pricing`. They mirror the prices set in App
+     * Billing periods for the website and `GET /api/v1/pricing`. They mirror the prices set in App
      * Store Connect, Google Play, RevenueCat offerings and Paddle — change them there first. The
      * app never shows these: it shows the store prices from the RevenueCat offering.
      * `months` is used for the per-month price and the saving against the monthly plan.
@@ -21,14 +21,32 @@ return [
         'monthly' => ['months' => 1, 'trial_days' => 0, 'highlighted' => false],
     ],
 
+    /*
+     * Paid plan tiers in rank order (docs/API.md "Plans and tiers", B12): `family` < `big_clan` <
+     * `classroom`. `highlighted` marks the tier the website and `GET /pricing` recommend.
+     */
+    'tiers' => [
+        'family' => ['highlighted' => true],
+        'big_clan' => ['highlighted' => false],
+        'classroom' => ['highlighted' => false],
+    ],
+
     'default_currency' => 'USD',
 
     /*
-     * Prices per currency and plan, as decimal strings.
+     * Prices per currency, tier and billing period, as decimal strings (docs/PLAN.md B12).
      */
     'prices' => [
-        'USD' => ['monthly' => '6.99', 'semiannual' => '29.99', 'annual' => '49.99'],
-        'CAD' => ['monthly' => '8.99', 'semiannual' => '39.99', 'annual' => '64.99'],
+        'USD' => [
+            'family' => ['monthly' => '6.99', 'semiannual' => '29.99', 'annual' => '49.99'],
+            'big_clan' => ['monthly' => '9.99', 'semiannual' => '39.99', 'annual' => '69.99'],
+            'classroom' => ['monthly' => '14.99', 'semiannual' => '69.99', 'annual' => '119.99'],
+        ],
+        'CAD' => [
+            'family' => ['monthly' => '8.99', 'semiannual' => '39.99', 'annual' => '64.99'],
+            'big_clan' => ['monthly' => '12.99', 'semiannual' => '52.99', 'annual' => '89.99'],
+            'classroom' => ['monthly' => '19.99', 'semiannual' => '89.99', 'annual' => '159.99'],
+        ],
     ],
 
     'paddle' => [
@@ -55,14 +73,37 @@ return [
         /* Client-side token for Paddle.js on `/subscribe/pay` (only needed without a hosted checkout). */
         'client_token' => env('PADDLE_CLIENT_TOKEN'),
 
-        /* Paddle price ids per plan (Catalog → Products → Prices, `pri_…`). */
+        /*
+         * Paddle price ids per tier and billing period (Catalog → Products → Prices, `pri_…`): one
+         * Paddle product per tier with 3 prices. A tier is offered on the web only when all 3 of
+         * its prices are set.
+         */
         'price_ids' => [
+            'family' => [
+                'monthly' => env('PADDLE_PRICE_FAMILY_MONTHLY'),
+                'semiannual' => env('PADDLE_PRICE_FAMILY_SEMIANNUAL'),
+                'annual' => env('PADDLE_PRICE_FAMILY_ANNUAL'),
+            ],
+            'big_clan' => [
+                'monthly' => env('PADDLE_PRICE_BIG_CLAN_MONTHLY'),
+                'semiannual' => env('PADDLE_PRICE_BIG_CLAN_SEMIANNUAL'),
+                'annual' => env('PADDLE_PRICE_BIG_CLAN_ANNUAL'),
+            ],
+            'classroom' => [
+                'monthly' => env('PADDLE_PRICE_CLASSROOM_MONTHLY'),
+                'semiannual' => env('PADDLE_PRICE_CLASSROOM_SEMIANNUAL'),
+                'annual' => env('PADDLE_PRICE_CLASSROOM_ANNUAL'),
+            ],
+        ],
+
+        /* Before B12 (Family plan only): still used as the Family prices when the FAMILY ones are empty. */
+        'legacy_price_ids' => [
             'monthly' => env('PADDLE_PRICE_MONTHLY'),
             'semiannual' => env('PADDLE_PRICE_SEMIANNUAL'),
             'annual' => env('PADDLE_PRICE_ANNUAL'),
         ],
 
-        /* Days a `past_due` subscription keeps the Family plan (Paddle's dunning period). */
+        /* Days a `past_due` subscription keeps its paid plan (Paddle's dunning period). */
         'grace_days' => (int) env('PADDLE_GRACE_DAYS', 30),
     ],
 

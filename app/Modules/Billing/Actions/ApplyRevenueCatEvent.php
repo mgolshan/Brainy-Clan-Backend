@@ -6,6 +6,7 @@ use App\Modules\Billing\Events\RevenueRecorded;
 use App\Modules\Billing\Models\CommissionEntry;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Models\WebhookEvent;
+use App\Modules\Billing\Support\BillingTiers;
 use App\Modules\Billing\Support\Money;
 use App\Modules\Family\Models\Family;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -18,7 +19,9 @@ use Illuminate\Support\Facades\Log;
  *
  * Idempotent: every event is stored once in `webhook_events` (unique provider + event id), so a
  * redelivery is a no-op. Events older than the last applied one are recorded as `stale`. The
- * family tier is `family` while the entitlement is active (incl. the billing grace period).
+ * event's `entitlement_ids` pick the plan tier (one entitlement per tier, the highest-ranked one
+ * wins; {@see BillingTiers}); events with entitlements but none of ours are `ignored`. The family
+ * gets that tier while the entitlement is active (incl. the billing grace period).
  */
 class ApplyRevenueCatEvent
 {
@@ -100,10 +103,10 @@ class ApplyRevenueCatEvent
             return [WebhookEvent::OUTCOME_IGNORED, 'Unknown family.', null];
         }
 
-        $entitlement = (string) config('services.revenuecat.entitlement', 'family');
         $entitlements = is_array($event['entitlement_ids'] ?? null) ? $event['entitlement_ids'] : [];
+        $best = BillingTiers::bestOf($entitlements);
 
-        if ($entitlements !== [] && ! in_array($entitlement, $entitlements, true)) {
+        if ($entitlements !== [] && $best === null) {
             return [WebhookEvent::OUTCOME_IGNORED, 'Other entitlement.', $family->id];
         }
 
@@ -117,7 +120,7 @@ class ApplyRevenueCatEvent
                 'family_id' => $family->id,
                 'provider' => Subscription::PROVIDER_REVENUECAT,
                 'app_user_id' => 'family-'.$family->id,
-                'entitlement' => $entitlement,
+                'entitlement' => $this->entitlementFromProduct($event['product_id'] ?? null),
                 'status' => Subscription::STATUS_ACTIVE,
             ]);
 
@@ -128,6 +131,7 @@ class ApplyRevenueCatEvent
         $expiresAt = $this->time($event['expiration_at_ms'] ?? null);
 
         $subscription->fill([
+            'entitlement' => $best['entitlement'] ?? $subscription->entitlement,
             'store' => $this->lower($event['store'] ?? null) ?? $subscription->store,
             'product_id' => is_string($event['product_id'] ?? null) ? $event['product_id'] : $subscription->product_id,
             'period_type' => $this->lower($event['period_type'] ?? null) ?? $subscription->period_type,
@@ -241,6 +245,23 @@ class ApplyRevenueCatEvent
         }
 
         return null;
+    }
+
+    /**
+     * For an event without `entitlement_ids`: the entitlement of the tier named in the store
+     * product id (`brainyclan_{tier}_{period}`, or Google Play's `brainyclan_{tier}:{base plan}`), else the Family one.
+     */
+    private function entitlementFromProduct(mixed $productId): string
+    {
+        $tier = Family::TIER_FAMILY;
+
+        if (is_string($productId) && preg_match('/^brainyclan_(big_clan|classroom|family)(?:[_:]|$)/', $productId, $matches) === 1) {
+            $tier = $matches[1];
+        }
+
+        $entitlement = BillingTiers::entitlementFor($tier);
+
+        return $entitlement !== '' ? $entitlement : $tier;
     }
 
     private function lower(mixed $value): ?string

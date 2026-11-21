@@ -3,6 +3,7 @@
 namespace App\Modules\Billing\Mail;
 
 use App\Modules\Billing\Actions\RequestWebCheckout;
+use App\Modules\Family\Models\Family;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -25,6 +26,7 @@ class WebCheckoutMail extends Mailable implements ShouldQueue
         public readonly ?string $checkoutUrl,
         public readonly ?string $reason,
         public readonly ?string $store,
+        public readonly string $tier = Family::TIER_FAMILY,
     ) {
         $this->locale($pageLocale);
     }
@@ -44,6 +46,7 @@ class WebCheckoutMail extends Mailable implements ShouldQueue
     {
         return new Content(markdown: 'mail.web-checkout', with: [
             'locale' => $this->pageLocale,
+            'planName' => Family::tierLabel($this->tier, $this->pageLocale),
             'checkoutUrl' => $this->checkoutUrl,
             'reason' => $this->reason,
             'storeLabel' => RequestWebCheckout::storeLabel($this->store, $this->pageLocale),

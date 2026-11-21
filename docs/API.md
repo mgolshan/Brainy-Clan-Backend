@@ -53,6 +53,9 @@ and add a line to the changelog at the bottom.
 | `goal_limit_reached` | 403 | Tier limit on active goal plans reached |
 | `world_locked` | 403 | That theme world isn't unlocked for this member (see `GET /me/worlds`) |
 | `chat_disabled` | 403 | A family admin turned off chat for this member |
+| `chat_read_only` | 403 | Chat is in announcements mode; only family admins post |
+| `chat_off` | 403 | A family admin turned the family chat off (Classroom chat mode) |
+| `plan_required` | 403 | The feature needs a different plan (e.g. chat modes need Classroom) |
 | `subscription_exists` | 409 | The family already has an active plan (store or web) |
 | `web_checkout_unavailable` | 503 | Web checkout (Paddle) is not configured |
 | `referral_code_invalid` | 422 | Unknown or inactive referral code |
@@ -123,7 +126,7 @@ and add a line to the changelog at the bottom.
 ```
 - Unlock types: `free` (always); `points` — the member's lifetime points (`/me/stats` `points_total`;
   strictly the points earned, so a later correction entry never lowers it) ≥ `required`; `streak` — the member's longest streak in days (`streak.longest`) ≥ `required`;
-  `family_plan` — the family's tier is the paid Family plan (active, trial or grace). `progress` is
+  `family_plan` — the family is on any paid plan (`family`, `big_clan` or `classroom`; active, trial or grace; see "Plans and tiers"). `progress` is
   present for `points`/`streak`. Once a `points`/`streak` world is unlocked it stays unlocked
   (lifetime and longest values never go down; a corrected ledger does not re-lock). `family_plan`
   worlds lock again when the plan ends.
@@ -630,6 +633,63 @@ starts at `starts_on` (so it can be shorter than a full week/month); the last en
 - A scheduled job closes ended periods (writes `result`), opens the next one, and dispatches
   `PeriodClosed` / `GoalReached`.
 
+### Plans and tiers (B12, 2026-11-20)
+`tier` (Family, Policy, Subscription) is one of `free`, `family`, `big_clan`, `classroom`. Clients
+must treat an unknown value like a paid plan named by `tier`, and never crash on it. Paid tiers
+rank `family` < `big_clan` < `classroom`.
+
+| Setting | free | family | big_clan | classroom |
+|---|---|---|---|---|
+| `limits.max_members` | 2 | 6 | 12 | 37 |
+| `limits.max_categories` | 3 | 100 | 100 | 100 |
+| `limits.max_active_goals` | 1 | null | null | null |
+| `second_chance.free_per_day` | 0 | 3 | 3 | 3 |
+| `ads.enabled` | true | false | false | false |
+| `chat.retention_days` | 7 | 365 | 365 | 365 |
+
+- **The `family_plan` world unlock** now means *any paid plan*: `family`, `big_clan` or
+  `classroom`, active, trial or grace. The key is unchanged.
+- **RevenueCat entitlements** are `family`, `big_clan` and `classroom`, one per tier, configured
+  in the server as an entitlement → tier map.
+  - With several active entitlements, the family gets the highest-ranked tier.
+  - Events that carry none of the three entitlements are `ignored`.
+  - `subscriptions.entitlement` stores the entitlement id.
+- **Store product ids** follow `brainyclan_{tier}_{monthly|6months|annual}`, for example
+  `brainyclan_big_clan_annual`. Each tier's products belong to its own entitlement.
+- **RevenueCat offerings** have the identifiers `family`, `big_clan` and `classroom`. The
+  *current* offering is `family`. The app reads `offerings.all[tier]`.
+- **Changing tier:** store plans change tier inside the store. On the App Store all products are
+  in one subscription group; on Google Play the app passes the old product for a plan change.
+  Web (Paddle) plans change tier by cancelling and buying again, for now.
+  `subscription_exists` (409) still blocks buying a plan from a second source.
+- **`GET /family/subscription`:** `tier` is the entitled tier. The new
+  `"entitlement": "big_clan" | null` field is the entitlement behind it.
+- **`GET /pricing` (public) has a new shape:**
+```json
+{ "data": { "currency": "USD", "tiers": [
+  { "id": "family", "members": 6, "highlighted": true, "available": true,
+    "plans": [ { "id": "annual", "price": "49.99", "per_month": "4.17", "saving_percent": 40,
+                 "trial_days": 7, "highlighted": true }, … ] },
+  { "id": "big_clan", … }, { "id": "classroom", … } ] } }
+```
+  - `available` is false when web checkout isn't configured for that tier, meaning Paddle
+    doesn't have all 3 prices for it.
+  - `members` is that tier's `limits.max_members`.
+- **Web subscribe:**
+  - `POST /web/subscribe` gains `tier` (`family` | `big_clan` | `classroom`, default `family`).
+  - The page accepts `?tier=…&plan=…`.
+  - The emailed link and Paddle transaction use that tier's price.
+- **Paddle:**
+  - Price ids are configured per tier and period: env `PADDLE_PRICE_{FAMILY|BIG_CLAN|CLASSROOM}_{MONTHLY|SEMIANNUAL|ANNUAL}`.
+    The old `PADDLE_PRICE_MONTHLY|SEMIANNUAL|ANNUAL` still work as the Family prices.
+  - Webhooks map the price → (tier, period). An unknown price is `ignored`.
+- **In-app web-checkout link:**
+  - `GET /family/web-checkout/availability?storefront=USA&tier=big_clan` takes `tier`
+    (default `family`).
+  - `url` carries `tier` and `plan=annual`.
+- **Downgrades:** members over a smaller plan's limits keep their data. Limits apply to new
+  members, goals and categories only (as before).
+
 ### Billing, push and notifications (B8)
 **Subscriptions** are bought in the app through RevenueCat (F6); the server learns about them only
 from RevenueCat webhooks and never trusts the app for the tier.
@@ -811,6 +871,42 @@ Endpoints:
 - The app polls `after` every ~4 s while the chat screen is open and the unread count every ~60 s
   otherwise (plus a push). Real-time sockets may replace polling later without changing these shapes.
 
+**Chat safety (B12 step 2, 2026-11-20)**
+- **Profanity filter (every plan):**
+  - The Family object gains `"chat_filter": true` (default `true`); a family admin changes it with `PATCH /family { chat_filter }`.
+  - When it is on, the server masks blocked words in `body` before storing it: every letter of a
+    match becomes `★`, so the length stays the same. The original text is never stored.
+  - **What counts as a match:**
+    - A whole word (or a listed phrase), case-insensitive and accent-insensitive.
+    - Common disguises count too: `@→a`, `4→a`, `3→e`, `1/!→i`, `0→o`, `$/5→s`, `7→t`, letters
+      repeated 3 or more times, and separators inside a word (`f.u.c.k`).
+    - Never a substring inside a longer harmless word, so "class", "Scunthorpe" and "assassin" pass.
+  - Word lists for English and French live on the server as data files, and both languages
+    always apply. Staff maintain them in the repo, not in the admin.
+  - The Message object gains `"filtered": true|false`, which is true when masking changed the
+    body. The app tells the sender "Some words were hidden".
+  - Masked messages still count, still notify, and still go through report and delete as usual.
+  - Turning the filter off affects new messages only.
+- **Chat modes (Classroom):**
+  - The Family object gains `"chat_mode": "normal" | "announcements" | "off"` (default `normal`).
+    `PATCH /family { chat_mode }` (admin) is allowed only when `policy.chat.modes_allowed` is true.
+    Otherwise it is 403 `plan_required`.
+  - Policy `chat` gains `"modes_allowed"`: the tier setting `chat.modes_allowed`, true for `classroom` only.
+  - The **effective** mode is `normal` whenever `modes_allowed` is false, for example after a
+    downgrade. The stored value is kept for a later upgrade. `chat_mode` on the Family object is
+    always the effective mode.
+  - **`announcements`:**
+    - Only family admins (the teacher and co-teacher) post.
+    - Other members still read, react and report. When they post, they get 403 `chat_read_only`.
+    - Pushes work as usual.
+  - **`off`:**
+    - Every chat endpoint returns 403 `chat_off` for everyone, admins included.
+    - `GET /family/chat/unread` returns `{ unread: 0 }` instead.
+    - No pushes go out. The app hides the Chat tab.
+    - Admins turn chat back on in the family settings.
+  - Per-member `chat_enabled` still applies on top of the mode.
+- New error codes: `plan_required` (403, "this needs a different plan"), `chat_read_only` (403) and `chat_off` (403).
+
 **Retention:** messages older than the family's `policy.chat.retention_days` are deleted for good
 (hourly job): **free 7 days, Family plan 365 days** (tier settings). After a downgrade the shorter
 period applies from the next run (the app warns the admin on the paywall/chat screen). Account
@@ -953,3 +1049,5 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-11-08 — Theme keys `castle` ("Fairy-Tale Castle"), `arctic` ("Polar Lights"), `robot` ("Robot Lab"): three more worlds, unlock type `family_plan`, sorted after `midnight`.
 - 2026-11-08 — Support messages clarifications (backend built, no shape change): `client_id` is required (UUID, case-insensitive) and unique per user — a retry returns the existing message with 200 and does not count against the limits; only created messages count (5 per rolling hour, 20 per rolling day) and the 429 `rate_limited` carries `retry_after` + `Retry-After`; the 403 check runs before validation (a non-admin gets 403 even with an invalid body), and a family admin whose account has no email also gets 403 `forbidden` (message says to add an email); `message` is normalized like chat text (NFC, CRLF → LF, control characters removed, at most 2 empty lines in a row, trimmed) before the 10–5000 code-point check; `app_version` / `device` are stored on one line (line breaks removed). `/me/export` `support_messages`: `[{ "id", "topic", "message", "status", "app_version", "platform", "device", "created_at", "answered_at", "closed_at", "replies": [{ "body", "sent_at" }] }]` (the user's app messages; staff names not included). Website form messages are not linked to an account: they are not in the export and not deleted with it (they follow the same retention).
 - 2026-11-11 — Goals: GoalPlan gains `everyone` (whole family, newcomers join automatically, default when `members` is absent) and `all_categories` (any category counts, `scopes: []`); POST/PATCH accept both. Chat: Message gains `reactions`; `PUT`/`DELETE /family/chat/messages/{id}/reaction`; `GET /family/chat/reactions?since=` for polling. Clarifications (backend built, no shape change): **goals** — `everyone` defaults to `true` when `members` is absent, `null` or `[]`; `everyone: false` without members → 422 `members`; with `everyone: true` a sent `members` list is the full set of overrides (members not listed get `target_override: null`); newcomers also join paused (not deleted) `everyone` plans, so they are on the team when it resumes; switching `everyone` off keeps the current team until `members` is sent; `all_categories: true` with a non-empty `category_ids` → 422 `category_ids`; on PATCH, sending `category_ids` alone turns `all_categories` off, and `all_categories: false` on a plan without scopes needs `category_ids` (422 otherwise). **reactions** — `PUT` on a deleted message → 422 `validation_failed` (`errors.message`), `DELETE` there → 200 no-op (`reactions: []`); a message past retention → 404; setting the same key again changes nothing; the 60/min limit is shared by `PUT` and `DELETE`; `GET /family/chat/reactions` may list a message again for about 2 s after a change (rows are full snapshots, apply them idempotently; this catches changes that commit late), and the cursor without `since` is "now"; a member who leaves the family loses their reactions (the messages are listed as changed). `/me/export` gains `chat_reactions: [{ "message_id", "key", "created_at" }]` (the user's own reactions).
+- 2026-11-20 — Plans (B12 step 1): tiers `big_clan` and `classroom` next to `free` / `family` (Family now 6 members, Big Clan 12, Classroom 37); per-tier settings table; RevenueCat entitlements and offerings per tier, product ids `brainyclan_{tier}_{period}`; `GET /family/subscription` gains `entitlement`; `GET /pricing` returns `tiers[]` (breaking, website-only consumer); `POST /web/subscribe` and `/family/web-checkout/availability` take `tier`; Paddle prices per tier; `family_plan` world unlock = any paid plan. Clarifications (backend built): `GET /family/subscription` `entitlement` is null unless the shown row is entitled; a RevenueCat event with an empty `entitlement_ids` keeps the stored entitlement (a new row takes the tier named in `product_id` — `brainyclan_{tier}_…` or Play's `brainyclan_{tier}:{base plan}` — else `family`); the RevenueCat sync picks the highest-ranked entitlement that is still on (else the one that ended last); a Paddle event with an unknown price is `ignored` unless it is for the family's stored Paddle subscription (it keeps its tier); `POST /web/subscribe` with an unknown `tier` → 422 (form error), with a tier that has no web prices → the "coming soon" page; the availability endpoint → 422 for an unknown `tier`, `link_allowed: false` for a tier without web prices; `url` is `/subscribe?tier=…&plan=annual&src=app`; `GET /pricing` keeps `currency` and lists the tiers in rank order (USD `per_month`/`saving_percent` computed as before). Terms version bumped to `2026-11-20` (re-acceptance; multiple plans, changing plans).
+- 2026-11-20 — Chat safety (B12 step 2): Family gains `chat_filter` (profanity filter, default on, every plan) and `chat_mode` (`normal` | `announcements` | `off`, Classroom only via `policy.chat.modes_allowed`); Message gains `filtered`; errors `plan_required`, `chat_read_only`, `chat_off`.

@@ -62,7 +62,9 @@ describe('pages', function () {
         $this->get('/')
             ->assertOk()
             ->assertSee('Up to 2 family members, you included')
-            ->assertSee('Up to 7 family members, you included')
+            ->assertSee('Up to 6 family members, you included')
+            ->assertSee('Up to 12 family members, you included')
+            ->assertSee('Up to 37 members: 2 adults (teacher and co-teacher) and 35 students')
             ->assertSee('3 categories')
             ->assertSee('All 20 categories')
             ->assertSee('20 categories to start with')
@@ -80,7 +82,7 @@ describe('pages', function () {
             ->assertSee('<html lang="fr">', false)
             ->assertSee('Bientôt sur l’App Store', false)
             ->assertSee('Aucune publicité pour les enfants, jamais.', false)
-            ->assertSee('Jusqu’à 7 membres de la famille, vous compris', false)
+            ->assertSee('Jusqu’à 6 membres de la famille, vous compris', false)
             ->assertHeader('Content-Language', 'fr');
 
         $this->get('/?lang=en', ['Accept-Language' => 'fr'])->assertOk()->assertSee('<html lang="en">', false);
@@ -174,7 +176,7 @@ describe('landing page v2', function () {
     it('renders every section in both languages', function (string $lang, array $texts) {
         $response = $this->get("/?lang={$lang}")->assertOk();
 
-        foreach (['worlds', 'how', 'games', 'brain-games', 'categories', 'clan', 'unlocks', 'what', 'chat', 'safety', 'plans', 'get'] as $id) {
+        foreach (['worlds', 'how', 'games', 'brain-games', 'categories', 'clan', 'unlocks', 'what', 'chat', 'safety', 'use-cases', 'plans', 'get'] as $id) {
             $response->assertSee('id="'.$id.'"', false);
         }
 
@@ -284,13 +286,13 @@ describe('landing page v2', function () {
         Setting::query()->where('key', 'chat.retention_days')->where('scope_id', 'family')->update(['value' => json_encode(730)]);
 
         $this->get('/?lang=en')->assertOk()
-            ->assertSee('Kept for 30 days on the free plan and 2 years on the Family plan, then deleted.')
+            ->assertSee('Kept for 30 days on the free plan and 2 years on paid plans, then deleted.')
             ->assertSee('Family chat: messages kept for 30 days')
             ->assertSee('Family chat: messages kept for 2 years')
             ->assertSee('a parent can turn it off for a child or remove any message.')
             ->assertDontSee('No chat and no contact with strangers');
         $this->get('/?lang=fr')->assertOk()
-            ->assertSee('Gardés 30 jours avec le forfait gratuit et 2 ans avec le forfait Famille, puis supprimés.')
+            ->assertSee('Gardés 30 jours avec le forfait gratuit et 2 ans avec les forfaits payants, puis supprimés.')
             ->assertSee('Clavardage familial : messages gardés 2 ans');
     });
 
@@ -308,7 +310,7 @@ describe('landing page v2', function () {
 
         $this->get('/?lang=fr')->assertOk()
             ->assertSee('Série de 3 jours pour débloquer', false)
-            ->assertSee('Forfait Famille')
+            ->assertSee('Forfait payant')
             ->assertSee('Mondes exclusifs : Vallée des dinos, Minuit, Château enchanté, Aurores polaires, Labo des robots', false);
     });
 
@@ -426,12 +428,15 @@ describe('help center', function () {
             ->toContain('The code works once, for 15 minutes.')
             ->toContain('A game ends with a win when you reach 10 points.')
             ->toContain('You have 3 lives per game.')
-            ->toContain('Messages are kept for 30 days on the free plan and 1 year on the Family plan, then deleted.')
-            ->toContain('Free plan: up to 2 members, 3 categories, 1 active goal, chat kept 30 days.')
-            ->toContain('Family plan: up to 7 members, all categories, unlimited goals and chat kept 1 year.')
+            ->toContain('Messages are kept for 30 days on the free plan and 1 year on paid plans, then deleted.')
+            ->toContain(': up to 2 members, 3 categories, 1 active goal, chat kept 30 days. Good for trying it out.')
+            ->toContain(': up to 6 members, for parents and kids. $6.99 a month or $49.99 a year (USD).')
+            ->toContain(': up to 12 members, for grandparents, cousins and homeschool groups. $9.99 a month or $69.99 a year (USD).')
+            ->toContain(': up to 37 members (2 adults and 35 students), for teachers, tutors and coaches. $14.99 a month or $119.99 a year (USD).')
+            ->toContain('Every paid plan has all categories, unlimited goals, 3 free second chances per member per day, chat kept 1 year, no ads and the paid plan worlds.')
             ->toContain('Free from the start: Candy Land, Glass, Modern and Classic.')
             ->toContain('Jungle Adventure (75 points)')
-            ->toContain('Included with the Family plan: Dino Valley, Neon Arcade, Midnight, Fairy-Tale Castle, Polar Lights and Robot Lab.')
+            ->toContain('Included with every paid plan: Dino Valley, Neon Arcade, Midnight, Fairy-Tale Castle, Polar Lights and Robot Lab.')
             ->toContain('After 5 wrong passwords in a row, sign-in pauses for 5 minutes, then 1 hour, then 24 hours.')
             ->toContain('Open the link within 60 minutes')
             // No streak world is active, so that step is left out instead of reading "…: .".
@@ -439,7 +444,7 @@ describe('help center', function () {
 
         $this->get('/help?lang=fr')->assertOk()
             ->assertSee('Un code d’invitation sert une seule fois et reste valide 5 jours.', false)
-            ->assertSee('Les messages sont gardés 30 jours avec le forfait gratuit et 1 an avec le forfait Famille, puis supprimés.', false)
+            ->assertSee('Les messages sont gardés 30 jours avec le forfait gratuit et 1 an avec les forfaits payants, puis supprimés.', false)
             ->assertSee('Aventure dans la jungle (75 points)', false)
             ->assertSee('la connexion se met en pause 5 minutes, puis 1 heure, puis 24 heures.', false);
     });
@@ -626,7 +631,7 @@ describe('partners page', function () {
 
         config()->set('billing.paddle.api_key', 'pdl_test_key');
         config()->set('billing.paddle.webhook_secret', 'whsec');
-        config()->set('billing.paddle.price_ids', ['monthly' => 'pri_1', 'semiannual' => 'pri_2', 'annual' => 'pri_3']);
+        config()->set('billing.paddle.legacy_price_ids', ['monthly' => 'pri_1', 'semiannual' => 'pri_2', 'annual' => 'pri_3']); // pre-B12 env names = Family prices
 
         expect((string) $this->get('/partners')->getContent())->toContain('when they subscribe on brainyclan.com');
     });
@@ -763,7 +768,8 @@ it('has a sticky section menu on the home page whose links all reach a section',
 
     preg_match_all('/href="#([a-z-]+)"/', $menu[1], $anchors);
 
-    expect($anchors[1])->toHaveCount(12)
+    expect($anchors[1])->toHaveCount(13)
+        ->and($anchors[1])->toContain('use-cases')
         ->and($anchors[1])->toBe(array_values(array_unique($anchors[1])));
 
     $previous = -1;
@@ -788,9 +794,76 @@ it('mentions PayPal only when web checkout is configured', function () {
     config([
         'billing.paddle.api_key' => 'test_key',
         'billing.paddle.webhook_secret' => 'whsec',
-        'billing.paddle.price_ids' => ['monthly' => 'pri_1', 'semiannual' => 'pri_2', 'annual' => 'pri_3'],
+        'billing.paddle.price_ids' => paddlePriceIds(['family']),
     ]);
 
     $this->get('/')->assertOk()->assertSee('pay by card or PayPal');
     $this->get('/help')->assertOk()->assertSee('pay by card or PayPal (handled by Paddle)', false);
+});
+
+/**
+ * B12 step 1: the plans section with 4 cards (prices from config) and the use-case slider.
+ */
+describe('plans and use cases (B12)', function () {
+    it('shows four plan cards with members, best-for, prices and the right calls to action', function () {
+        $html = (string) $this->get('/?lang=en')->assertOk()->getContent();
+
+        foreach (['free', 'family', 'big_clan', 'classroom'] as $tier) {
+            expect($html)->toContain('id="plan-'.$tier.'"');
+        }
+
+        expect($html)->toContain('Best for parents and kids')
+            ->toContain('Best for grandparents, cousins and homeschool groups')
+            ->toContain('Best for teachers, tutors and coaches')
+            ->toContain('<strong>$6.99</strong> / month')
+            ->toContain('or $69.99 / year')
+            ->toContain('<strong>$14.99</strong> / month')
+            ->toContain('or $119.99 / year')
+            ->toContain('As many adults and co-admins as you like')
+            ->toContain('Coming soon: teacher tools')
+            ->toContain('/subscribe?lang=en&amp;tier=big_clan')
+            ->toContain('/subscribe?lang=en&amp;tier=classroom')
+            ->toContain('<a class="plan-cta" href="#get">Get the app</a>')
+            ->not->toContain('<script');
+
+        $fr = (string) $this->get('/?lang=fr&currency=CAD')->assertOk()->getContent();
+        expect($fr)->toContain('Grand Clan')
+            ->toContain('<strong>12,99 CA$</strong> / mois')
+            ->toContain('ou 89,99 CA$ / an')
+            ->toContain('tier=classroom&amp;currency=CAD');
+    });
+
+    it('reads the plan member limits from the tier settings', function () {
+        Setting::query()->where('key', 'limits.max_members')->where('scope_id', 'big_clan')->update(['value' => json_encode(15)]);
+
+        $this->get('/?lang=en')->assertOk()->assertSee('Up to 15 family members, you included');
+    });
+
+    it('renders the use-case slider with seven cards, their suggested plan, arrows and dots', function (string $lang, array $cards) {
+        $html = (string) $this->get("/?lang={$lang}")->assertOk()->getContent();
+
+        expect(preg_match('#<section id="use-cases".*?</section>#s', $html, $section))->toBe(1);
+        $slider = $section[0];
+
+        expect(substr_count($slider, '<li id="uc-'))->toBe(7)
+            ->and(substr_count($slider, '<a href="#uc-'))->toBe(7 + 12) // 7 dots + 6 next and 6 previous arrows
+            ->and($slider)->toContain('class="uc-track" tabindex="0"')
+            ->and(strpos($html, '<section id="use-cases"'))->toBeLessThan(strpos($html, '<section id="plans"'));
+
+        foreach ($cards as [$title, $tier]) {
+            expect($slider)->toMatch('#<h3>'.preg_quote(e($title), '#').'</h3>.*?href="\#plan-'.$tier.'"#s');
+        }
+    })->with([
+        'en' => ['en', [['Just us four', 'family'], ['Grandma plays too', 'big_clan'], ['Cousins across the country', 'big_clan'], ['Homeschool group', 'big_clan'], ['Tutor or coach', 'classroom'], ['My class of 28', 'classroom'], ['Trying it out', 'free']]],
+        'fr' => ['fr', [['Juste nous quatre', 'family'], ['Grand-maman joue aussi', 'big_clan'], ['Ma classe de 28', 'classroom'], ['Juste pour essayer', 'free']]],
+    ]);
+
+    it('keeps the slider usable without motion and on small screens', function () {
+        $html = (string) $this->get('/')->assertOk()->getContent();
+
+        expect($html)->toContain('@media (prefers-reduced-motion: no-preference) { .uc-track { scroll-behavior: smooth; } }')
+            ->toContain('scroll-snap-type: x mandatory')
+            ->toContain('.uc-track:focus-visible')
+            ->toContain('grid-auto-columns: clamp(240px, 78vw, 300px)');
+    });
 });

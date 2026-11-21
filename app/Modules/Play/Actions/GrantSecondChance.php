@@ -10,7 +10,7 @@ use App\Modules\Policy\PolicyResolver;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Second chance after hitting the blunder cap: `free` (Family plan, limited per day) or `ad`
+ * Second chance after hitting the blunder cap: `free` (paid plans, limited per day) or `ad`
  * (rewarded ad, free tier, never for children). Resets mistakes and tops up items.
  *
  * Ad rewards (docs/API.md "Rewarded ads"): `reward_ref` must match an unused {@see AdReward} that

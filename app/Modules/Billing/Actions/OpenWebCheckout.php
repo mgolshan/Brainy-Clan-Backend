@@ -13,7 +13,7 @@ use RuntimeException;
 
 /**
  * `GET /subscribe/checkout?token=…` (the emailed link): checks the family can still buy, creates
- * the Paddle transaction — the plan's price, `custom_data { family_id, affiliate_code?,
+ * the Paddle transaction — the price of the link's tier and billing period, `custom_data { family_id, affiliate_code?,
  * affiliate_source? }` and the code's Paddle discount — and returns the Paddle checkout URL.
  *
  * A link creates at most one transaction: opening it again before it expires returns to the same
@@ -34,7 +34,7 @@ class OpenWebCheckout
      */
     public function handle(string $token): array
     {
-        if (! PaddleConfig::webCheckoutAvailable()) {
+        if (! PaddleConfig::anyTierAvailable()) {
             return ['state' => 'unavailable'];
         }
 
@@ -45,6 +45,10 @@ class OpenWebCheckout
 
             if ($request === null || ! $request->isUsable() || $request->user === null) {
                 return ['state' => 'invalid'];
+            }
+
+            if (! PaddleConfig::webCheckoutAvailable($request->tier)) {
+                return ['state' => 'unavailable', 'locale' => $request->locale];
             }
 
             $member = $request->user->activeMembership();
@@ -91,7 +95,7 @@ class OpenWebCheckout
         ], fn (mixed $value): bool => $value !== null);
 
         return array_filter([
-            'items' => [['price_id' => PaddleConfig::priceId($request->plan), 'quantity' => 1]],
+            'items' => [['price_id' => PaddleConfig::priceId($request->tier, $request->plan), 'quantity' => 1]],
             'custom_data' => $customData,
             'collection_mode' => 'automatic',
             'discount_id' => $code?->paddle_discount_id,

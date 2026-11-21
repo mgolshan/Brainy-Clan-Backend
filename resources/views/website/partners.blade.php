@@ -162,7 +162,7 @@
                 </li>
                 <li class="card">
                     <h3>{{ $fr ? 'Touchez une commission' : 'Earn' }}</h3>
-                    <p>{{ $fr ? 'Quand une famille utilise votre code et paie le forfait Famille, vous touchez une commission selon les conditions ci-dessous.' : 'When a family uses your code and pays for the Family plan, you earn a commission on the terms below.' }}</p>
+                    <p>{{ $fr ? 'Quand une famille utilise votre code et paie un forfait (Famille, Grand Clan ou Classe), vous touchez une commission selon les conditions ci-dessous.' : 'When a family uses your code and pays for a plan (Family, Big Clan or Classroom), you earn a commission on the terms below.' }}</p>
                 </li>
             </ol>
         </div>

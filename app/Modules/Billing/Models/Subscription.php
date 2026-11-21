@@ -2,6 +2,7 @@
 
 namespace App\Modules\Billing\Models;
 
+use App\Modules\Billing\Support\BillingTiers;
 use App\Modules\Family\Models\Family;
 use Database\Factories\SubscriptionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -13,8 +14,9 @@ use Illuminate\Support\Carbon;
 
 /**
  * A family's subscription from one provider: RevenueCat (store purchases) or Paddle (web
- * checkout). One row per family and provider; the family tier is `family` while any of its rows is
- * entitled (`ApplyFamilyTier`). The API shows the {@see Subscription::currentFor()} row.
+ * checkout). One row per family and provider; `entitlement` holds the RevenueCat entitlement id of
+ * the row's plan tier ({@see BillingTiers}). The family tier is the highest-ranked tier of its
+ * entitled rows, else `free` (`ApplyFamilyTier`). The API shows the {@see Subscription::currentFor()} row.
  *
  * @property int $id
  * @property int $family_id
@@ -22,7 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string $app_user_id
  * @property string|null $external_id Paddle subscription id
  * @property string|null $customer_id Paddle customer id
- * @property string $entitlement
+ * @property string $entitlement RevenueCat entitlement id of the plan tier (`family`, `big_clan`, `classroom`)
  * @property string $status
  * @property string|null $store
  * @property string|null $product_id
@@ -125,6 +127,16 @@ class Subscription extends Model
     {
         return self::query()->where('family_id', $familyId)->where('provider', '!=', $provider)->get()
             ->first(fn (self $row): bool => $row->isEntitled());
+    }
+
+    /**
+     * The paid tier this row is for. Rows written before B12 (or with an entitlement that is no
+     * longer configured) count as `family`.
+     */
+    public function tier(): string
+    {
+        return BillingTiers::tierForEntitlement($this->entitlement)
+            ?? (Family::isPaidTier((string) $this->entitlement) ? (string) $this->entitlement : Family::TIER_FAMILY);
     }
 
     public function isPaddle(): bool

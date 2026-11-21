@@ -10,6 +10,8 @@ use App\Modules\Billing\Models\FamilyAttribution;
 use App\Modules\Billing\Support\PaddleConfig;
 use App\Modules\Billing\Support\PricingCatalog;
 use App\Modules\Core\Support\Website;
+use App\Modules\Family\Models\Family;
+use App\Modules\Policy\PolicyResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -18,7 +20,8 @@ use Illuminate\Http\Response;
  * The website's web checkout pages (docs/API.md "Web checkout (Paddle) and pricing (B10)"); no
  * password on the web:
  *
- * - `/subscribe` — plans, email and an optional referral code ("coming soon" without Paddle keys);
+ * - `/subscribe?tier=…&plan=…` — tier and period pickers, email and an optional referral code
+ *   ("coming soon" without Paddle keys, per tier without that tier's prices);
  * - `POST /web/subscribe` — always the same "check your email" page (`RequestWebCheckout`);
  * - `/subscribe/checkout?token=…` — the emailed link: creates the Paddle transaction and redirects
  *   to Paddle's checkout (`OpenWebCheckout`), or explains why not;
@@ -32,9 +35,11 @@ class SubscribePageController
     {
         $code = AffiliateCode::findUsable($request->query('code'));
         $plan = $request->query('plan');
+        $tier = $request->query('tier');
 
-        return $this->page($request, PaddleConfig::webCheckoutAvailable() ? 'form' : 'unavailable', [
+        return $this->page($request, PaddleConfig::anyTierAvailable() ? 'form' : 'unavailable', [
             'selectedPlan' => is_string($plan) && in_array($plan, PricingCatalog::planIds(), true) ? $plan : 'annual',
+            'selectedTier' => is_string($tier) && in_array($tier, PricingCatalog::tierIds(), true) ? $tier : Family::TIER_FAMILY,
             'code' => $code?->code,
             'src' => $request->query('src') === FamilyAttribution::SOURCE_LINK ? FamilyAttribution::SOURCE_LINK : null,
         ]);
@@ -45,7 +50,7 @@ class SubscribePageController
      */
     public function store(SubscribePageRequest $request, RequestWebCheckout $requestCheckout): Response
     {
-        if (! PaddleConfig::webCheckoutAvailable()) {
+        if (! PaddleConfig::webCheckoutAvailable($request->tier())) {
             return $this->page($request, 'unavailable');
         }
 
@@ -57,6 +62,7 @@ class SubscribePageController
                 $request->input('src') === FamilyAttribution::SOURCE_LINK ? FamilyAttribution::SOURCE_LINK : FamilyAttribution::SOURCE_WEB_CHECKOUT,
                 Website::locale($request),
                 $request->ip(),
+                $request->tier(),
             );
         }
 
@@ -106,6 +112,18 @@ class SubscribePageController
     }
 
     /**
+     * Member limit per tier (`free` too), for the plan copy.
+     *
+     * @return array<string, int>
+     */
+    private function members(): array
+    {
+        $policy = app(PolicyResolver::class);
+
+        return array_combine(Family::TIERS, array_map(fn (string $tier): int => $policy->maxMembersFor($tier), Family::TIERS));
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     private function page(Request $request, string $state, array $data = []): Response
@@ -122,6 +140,8 @@ class SubscribePageController
             'pricing' => PricingCatalog::forCurrency($currency),
             'currencies' => PricingCatalog::currencies(),
             'selectedPlan' => 'annual',
+            'selectedTier' => Family::TIER_FAMILY,
+            'members' => $this->members(),
             'code' => null,
             'src' => null,
             'reason' => null,

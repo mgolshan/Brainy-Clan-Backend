@@ -90,3 +90,24 @@ function unlockAllWorlds(FamilyMember $member): FamilyMember
 
     return $member;
 }
+
+/**
+ * Paddle price ids for `billing.paddle.price_ids` (B12: per tier and billing period). Family keeps
+ * the pre-B12 test ids (`pri_monthly`, `pri_semi`, `pri_annual`); the other tiers get
+ * `pri_{tier}_{period}`. Only the given tiers are configured.
+ *
+ * @param  list<string>  $tiers
+ * @return array<string, array<string, string>>
+ */
+function paddlePriceIds(array $tiers = Family::PAID_TIERS): array
+{
+    $ids = [];
+
+    foreach ($tiers as $tier) {
+        $ids[$tier] = $tier === Family::TIER_FAMILY
+            ? ['monthly' => 'pri_monthly', 'semiannual' => 'pri_semi', 'annual' => 'pri_annual']
+            : ['monthly' => "pri_{$tier}_monthly", 'semiannual' => "pri_{$tier}_semiannual", 'annual' => "pri_{$tier}_annual"];
+    }
+
+    return $ids;
+}

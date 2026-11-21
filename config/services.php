@@ -80,7 +80,16 @@ return [
 
     'revenuecat' => [
         'webhook_secret' => env('REVENUECAT_WEBHOOK_SECRET'),
-        'entitlement' => env('REVENUECAT_ENTITLEMENT', 'family'),
+        /*
+         * RevenueCat entitlement id per plan tier (B12): one entitlement per tier. With several
+         * active entitlements the family gets the highest-ranked tier. REVENUECAT_ENTITLEMENT is
+         * the pre-B12 name of the Family one.
+         */
+        'entitlements' => [
+            'family' => env('REVENUECAT_ENTITLEMENT_FAMILY', env('REVENUECAT_ENTITLEMENT', 'family')),
+            'big_clan' => env('REVENUECAT_ENTITLEMENT_BIG_CLAN', 'big_clan'),
+            'classroom' => env('REVENUECAT_ENTITLEMENT_CLASSROOM', 'classroom'),
+        ],
         'api_key' => env('REVENUECAT_API_KEY'),
         'api_url' => env('REVENUECAT_API_URL', 'https://api.revenuecat.com/v1'),
         'reconcile_after_minutes' => (int) env('REVENUECAT_RECONCILE_AFTER_MINUTES', 60),

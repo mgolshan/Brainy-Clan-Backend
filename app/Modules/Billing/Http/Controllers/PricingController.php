@@ -12,15 +12,17 @@ use Illuminate\Validation\Rule;
 class PricingController
 {
     /**
-     * Family plan prices (website).
+     * Paid plan prices per tier (website).
      *
      * Public. Display prices from server config, mirroring the store and Paddle prices; the app shows
      * the store prices from the RevenueCat offering instead. `?currency=CAD` for Canadian dollars
-     * (default `USD`). `per_month` and `saving_percent` (against the monthly plan) are computed.
+     * (default `USD`). One entry per paid tier (`family`, `big_clan`, `classroom`, in rank order):
+     * `members` is the tier's `limits.max_members`, `available` is false when web checkout isn't
+     * configured for that tier. `per_month` and `saving_percent` (against the monthly plan) are computed.
      *
      * @unauthenticated
      *
-     * @response array{data: array{currency: string, plans: list<array{id: 'monthly'|'semiannual'|'annual', price: string, per_month: string, saving_percent: int, trial_days: int, highlighted: bool}>}}
+     * @response array{data: array{currency: string, tiers: list<array{id: 'family'|'big_clan'|'classroom', members: int, highlighted: bool, available: bool, plans: list<array{id: 'monthly'|'semiannual'|'annual', price: string, per_month: string, saving_percent: int, trial_days: int, highlighted: bool}>}>}}
      */
     public function __invoke(Request $request): JsonResponse
     {

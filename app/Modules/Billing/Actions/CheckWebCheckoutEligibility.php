@@ -8,7 +8,7 @@ use App\Modules\Identity\Models\User;
 use App\Modules\Policy\PolicyResolver;
 
 /**
- * Who may buy the Family plan on the web (docs/API.md "Web checkout"): an adult admin of a family
+ * Who may buy a paid plan (Family, Big Clan or Classroom) on the web (docs/API.md "Web checkout"): an adult admin of a family
  * (`purchases_allowed`) without an active plan — neither a store plan (RevenueCat) nor a web plan
  * (Paddle). A family holds at most one active plan from one source.
  */

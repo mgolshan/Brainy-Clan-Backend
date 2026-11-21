@@ -2,6 +2,7 @@
 
 namespace App\Modules\Support\Mail;
 
+use App\Modules\Family\Models\Family;
 use App\Modules\Support\Models\SupportMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -66,7 +67,7 @@ class SupportMessageReceived extends Mailable implements ShouldQueue
         ];
 
         if ($message->source === SupportMessage::SOURCE_APP) {
-            $rows['Family'] = $message->family !== null ? '#'.$message->family->id.' ('.$message->family->tier.' plan)' : '—';
+            $rows['Family'] = $message->family !== null ? '#'.$message->family->id.' ('.Family::tierLabel($message->family->tier).' plan)' : '—';
             $rows['App'] = trim(implode(' · ', array_filter([$message->app_version, $message->platform, $message->device])));
         }
 

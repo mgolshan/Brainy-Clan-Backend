@@ -4,6 +4,7 @@ namespace App\Modules\Billing\Http\Requests;
 
 use App\Modules\Billing\Models\AffiliateCode;
 use App\Modules\Billing\Support\PricingCatalog;
+use App\Modules\Family\Models\Family;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -23,6 +24,7 @@ class SubscribePageRequest extends FormRequest
 
         return [
             'email' => ['required', 'string', 'email', 'max:255'],
+            'tier' => ['nullable', 'string', Rule::in(PricingCatalog::tierIds())],
             'plan' => ['required', 'string', Rule::in(PricingCatalog::planIds())],
             'code' => ['nullable', 'string', 'max:20', function (string $attribute, mixed $value, Closure $fail) use ($fr): void {
                 if (is_string($value) && trim($value) !== '' && AffiliateCode::findUsable($value) === null) {
@@ -32,6 +34,16 @@ class SubscribePageRequest extends FormRequest
             'src' => ['nullable', 'string', 'max:10'],
             'website' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    /**
+     * The plan tier to buy (`family` when not sent).
+     */
+    public function tier(): string
+    {
+        $tier = $this->input('tier');
+
+        return is_string($tier) && $tier !== '' ? $tier : Family::TIER_FAMILY;
     }
 
     public function isBot(): bool

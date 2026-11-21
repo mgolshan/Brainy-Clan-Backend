@@ -13,7 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class FamilySubscriptionResource extends JsonResource
 {
     /**
-     * @return array{tier: string, status: string, store: string|null, product_id: string|null, expires_at: string|null, will_renew: bool, revenuecat_app_user_id: string}
+     * @return array{tier: string, entitlement: string|null, status: string, store: string|null, product_id: string|null, expires_at: string|null, will_renew: bool, revenuecat_app_user_id: string}
      */
     public function toArray(Request $request): array
     {
@@ -22,6 +22,8 @@ class FamilySubscriptionResource extends JsonResource
 
         return [
             'tier' => $family->tier,
+            // The RevenueCat entitlement id behind the paid tier (`family`, `big_clan`, `classroom`); null on the free tier.
+            'entitlement' => $subscription !== null && $subscription->isEntitled() ? $subscription->entitlement : null,
             'status' => $subscription !== null ? $subscription->status : Subscription::STATUS_NONE,
             'store' => $subscription?->apiStore(),
             'product_id' => $subscription?->product_id,

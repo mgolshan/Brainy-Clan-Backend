@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Resources\Families\FamilyResource;
+use App\Filament\Support\PlanTiers;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Family\Models\Family;
 use Filament\Actions\Action;
@@ -34,7 +35,8 @@ class RecentFamilies extends TableWidget
             ->columns([
                 TextColumn::make('name')->weight('medium'),
                 TextColumn::make('tier')->label('Plan')->badge()
-                    ->color(fn (string $state): string => $state === Family::TIER_FAMILY ? 'success' : 'gray'),
+                    ->formatStateUsing(fn (string $state): string => PlanTiers::label($state))
+                    ->color(fn (string $state): string => PlanTiers::color($state)),
                 TextColumn::make('subscription.status')->label('Subscription')->badge()->default(Subscription::STATUS_NONE)
                     ->color(fn (string $state): string => match ($state) {
                         Subscription::STATUS_ACTIVE => 'success',

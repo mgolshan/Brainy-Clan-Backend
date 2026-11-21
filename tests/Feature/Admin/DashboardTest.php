@@ -211,7 +211,8 @@ it('computes the activity figures from a known dataset', function () {
     expect($activity)->toMatchArray([
         'families' => 3,
         'families_new_week' => 2,
-        'families_on_family_plan' => 1,
+        'families_paid' => 1,
+        'families_by_tier' => ['family' => 1, 'big_clan' => 0, 'classroom' => 0],
         'members' => 5,
         'players_today' => 2,
         'players_week' => 2,
@@ -268,7 +269,8 @@ it('computes subscription and content figures', function () {
         ->assertSee('Paying subscriptions')
         ->assertSee('1 in trial · 1 in grace period')
         ->assertSee('33%')
-        ->assertSee('1 of 3 families')
+        ->assertSee('Paid plans')
+        ->assertSee('1 of 3 families · Family 1 · Big Clan 0 · Classroom 0')
         ->assertSee('en 3 · fr 2')
         ->assertSee('1 AI batches to review');
 });
@@ -390,4 +392,22 @@ it('runs no aggregate queries while the cache is warm', function () {
 
         expect($tables)->toBeEmpty();
     }
+});
+
+it('counts paid families per tier (B12: paid = any tier but free) in the same query', function () {
+    dashboardDataset();
+    familyOwner(['tier' => Family::TIER_BIG_CLAN]);
+    familyOwner(['tier' => Family::TIER_BIG_CLAN]);
+    familyOwner(['tier' => Family::TIER_CLASSROOM]);
+
+    $activity = app(DashboardMetrics::class)->activity();
+
+    expect($activity['families'])->toBe(6)
+        ->and($activity['families_paid'])->toBe(4)
+        ->and($activity['families_by_tier'])->toBe(['family' => 1, 'big_clan' => 2, 'classroom' => 1]);
+
+    Livewire::test(BusinessStats::class)
+        ->assertSee('67%')
+        ->assertSee('4 of 6 families · Family 1 · Big Clan 2 · Classroom 1')
+        ->assertSee('/admin/families?filters', false);
 });

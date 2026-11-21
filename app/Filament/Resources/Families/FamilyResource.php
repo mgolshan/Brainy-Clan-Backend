@@ -8,6 +8,7 @@ use App\Filament\Resources\Families\Pages\ViewFamily;
 use App\Filament\Resources\Families\RelationManagers\AllMembersRelationManager;
 use App\Filament\Resources\Families\RelationManagers\ConsentsRelationManager;
 use App\Filament\Resources\Families\RelationManagers\InvitesRelationManager;
+use App\Filament\Support\PlanTiers;
 use App\Filament\Support\ReadOnlyForSupport;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Family\Models\Family;
@@ -50,7 +51,7 @@ class FamilyResource extends Resource
             TextInput::make('name')->required()->maxLength(80),
             TextInput::make('timezone')->required()->rule('timezone:all'),
             TextInput::make('country_code')->required()->length(2),
-            Select::make('tier')->options(array_combine(Family::TIERS, Family::TIERS))->required()
+            Select::make('tier')->label('Plan')->options(PlanTiers::options())->required()
                 ->helperText('Normally set by Billing; change only for support.'),
         ]);
     }
@@ -61,7 +62,9 @@ class FamilyResource extends Resource
             TextEntry::make('name'),
             TextEntry::make('owner.display_name')->label('Owner'),
             TextEntry::make('owner.email')->label('Owner email'),
-            TextEntry::make('tier')->badge(),
+            TextEntry::make('tier')->label('Plan')->badge()
+                ->formatStateUsing(fn (string $state): string => PlanTiers::label($state))
+                ->color(fn (string $state): string => PlanTiers::color($state)),
             TextEntry::make('timezone'),
             TextEntry::make('country_code'),
             TextEntry::make('created_at')->dateTime(),
@@ -78,6 +81,7 @@ class FamilyResource extends Resource
                         }),
                     TextEntry::make('subscription.store')->label('Store')->placeholder('—'),
                     TextEntry::make('subscription.product_id')->label('Product')->placeholder('—'),
+                    TextEntry::make('subscription.entitlement')->label('Entitlement')->placeholder('—'),
                     TextEntry::make('subscription.environment')->label('Environment')->placeholder('—'),
                     TextEntry::make('subscription.expires_at')->label('Expires')->dateTime()->placeholder('—'),
                     TextEntry::make('subscription.grace_expires_at')->label('Grace period ends')->dateTime()->placeholder('—'),
@@ -113,14 +117,16 @@ class FamilyResource extends Resource
                 TextColumn::make('id')->sortable(),
                 TextColumn::make('name')->searchable(),
                 TextColumn::make('owner.email')->label('Owner')->searchable(),
-                TextColumn::make('tier')->badge()->sortable(),
+                TextColumn::make('tier')->label('Plan')->badge()->sortable()
+                    ->formatStateUsing(fn (string $state): string => PlanTiers::label($state))
+                    ->color(fn (string $state): string => PlanTiers::color($state)),
                 TextColumn::make('members_count')->counts('members')->label('Members'),
                 TextColumn::make('timezone')->toggleable(),
                 TextColumn::make('country_code')->label('Country'),
                 TextColumn::make('created_at')->dateTime()->sortable(),
             ])
             ->filters([
-                SelectFilter::make('tier')->options(array_combine(Family::TIERS, Family::TIERS)),
+                SelectFilter::make('tier')->label('Plan')->multiple()->options(PlanTiers::options()),
             ])
             ->recordActions([ViewAction::make(), EditAction::make()]);
     }

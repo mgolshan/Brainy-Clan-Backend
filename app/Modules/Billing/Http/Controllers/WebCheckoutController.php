@@ -9,6 +9,7 @@ use App\Modules\Billing\Http\Requests\ReferralCodeRequest;
 use App\Modules\Billing\Http\Requests\WebCheckoutAvailabilityRequest;
 use App\Modules\Core\Docs\ApiErrors;
 use App\Modules\Core\Http\CurrentMember;
+use App\Modules\Family\Models\Family;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,17 +23,23 @@ class WebCheckoutController
      * May the app link to web checkout? (admin)
      *
      * `storefront` is the store country from StoreKit / Play Billing (ISO 3166-1 alpha-3, e.g.
-     * `USA`). `link_allowed` is true only for storefronts the server allows (none by default — store
-     * rules), with web checkout configured and when the family could buy now; `url` then opens the
-     * website subscribe page. When false the app shows no web prices or links.
+     * `USA`). `tier` is the plan tier to buy (`family`, `big_clan`, `classroom`; default `family`).
+     * `link_allowed` is true only for storefronts the server allows (none by default — store
+     * rules), with web checkout configured for that tier and when the family could buy now; `url`
+     * then opens the website subscribe page for that tier (`?tier=…&plan=annual&src=app`). When false the app shows no web prices or links.
      *
      * @response array{data: array{link_allowed: bool, url: string|null}}
      */
     public function availability(WebCheckoutAvailabilityRequest $request, CheckWebCheckoutAvailability $check): JsonResponse
     {
         $storefront = $request->validated('storefront');
+        $tier = $request->validated('tier');
 
-        return response()->json(['data' => $check->handle($this->currentMember($request), is_string($storefront) ? $storefront : null)]);
+        return response()->json(['data' => $check->handle(
+            $this->currentMember($request),
+            is_string($storefront) ? $storefront : null,
+            is_string($tier) ? $tier : Family::TIER_FAMILY,
+        )]);
     }
 
     /**

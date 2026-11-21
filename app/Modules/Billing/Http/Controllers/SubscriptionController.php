@@ -18,7 +18,8 @@ class SubscriptionController
     /**
      * The family subscription (admin).
      *
-     * `status` is `none` when the family never subscribed. `store` is `paddle` for a plan bought on
+     * `tier` is the entitled plan tier (`free`, `family`, `big_clan`, `classroom`) and `entitlement`
+     * the RevenueCat entitlement id behind it (null on the free tier). `status` is `none` when the family never subscribed. `store` is `paddle` for a plan bought on
      * the web (the app then hides the paywall and offers "Manage" via `manage-link`). The app passes
      * `revenuecat_app_user_id` to `Purchases.logIn()`.
      */
@@ -31,8 +32,8 @@ class SubscriptionController
      * Sync the subscription from RevenueCat now (admin).
      *
      * For a faster tier switch after a purchase or restore: fetches the subscriber `family-{id}`
-     * from the RevenueCat REST API (when `REVENUECAT_API_KEY` is configured) and applies the
-     * `family` entitlement. Without a key, or when RevenueCat can't be reached, it returns the
+     * from the RevenueCat REST API (when `REVENUECAT_API_KEY` is configured) and applies its plan
+     * entitlement (the highest-ranked active one). Without a key, or when RevenueCat can't be reached, it returns the
      * current state. Same response as `GET /family/subscription`.
      */
     public function sync(Request $request, SyncSubscription $sync): FamilySubscriptionResource

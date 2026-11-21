@@ -4,9 +4,11 @@ namespace App\Modules\Core\Http\Controllers;
 
 use App\Modules\Billing\Models\AffiliateCode;
 use App\Modules\Billing\Support\PaddleConfig;
+use App\Modules\Billing\Support\PricingCatalog;
 use App\Modules\Core\Http\Middleware\SecurityHeaders;
 use App\Modules\Core\Support\HelpCenter;
 use App\Modules\Core\Support\Website;
+use App\Modules\Family\Models\Family;
 use App\Modules\Policy\PolicyResolver;
 use App\Modules\Policy\Support\ThemeWorldCatalog;
 use App\Modules\Support\Actions\SubmitWebsiteSupportMessage;
@@ -36,21 +38,22 @@ class WebsiteController
      */
     public function home(Request $request, PolicyResolver $policy, ThemeWorldCatalog $worlds): Response
     {
-        return $this->page($request, 'website.home', $this->homeData($policy, $worlds));
+        return $this->page($request, 'website.home', $this->homeData($request, $policy, $worlds));
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function homeData(PolicyResolver $policy, ThemeWorldCatalog $worlds): array
+    private function homeData(Request $request, PolicyResolver $policy, ThemeWorldCatalog $worlds): array
     {
+        $currency = strtoupper((string) $request->query('currency', ''));
+        $currency = in_array($currency, PricingCatalog::currencies(), true) ? $currency : PricingCatalog::defaultCurrency();
+
         return [
-            'plans' => [
-                'free' => $this->plan($policy, 'free'),
-                'family' => $this->plan($policy, 'family'),
-            ],
+            'plans' => array_combine(Family::TIERS, array_map(fn (string $tier): array => $this->plan($policy, $tier), Family::TIERS)),
+            'pricing' => PricingCatalog::forCurrency($currency),
             'worlds' => $worlds->all(),
-            'webCheckout' => PaddleConfig::webCheckoutAvailable(),
+            'webCheckout' => PaddleConfig::anyTierAvailable(),
             'referral' => null,
         ];
     }
@@ -66,12 +69,12 @@ class WebsiteController
         $affiliateCode = AffiliateCode::findUsable($code);
 
         return $this->page($request, 'website.home', [
-            ...$this->homeData($policy, $worlds),
+            ...$this->homeData($request, $policy, $worlds),
             'canonicalRoute' => 'website.home',
             'referral' => $affiliateCode !== null ? [
                 'code' => $affiliateCode->code,
                 'has_offer_code' => ($affiliateCode->store_offer_codes ?? []) !== [],
-                'subscribe_url' => PaddleConfig::webCheckoutAvailable()
+                'subscribe_url' => PaddleConfig::anyTierAvailable()
                     ? Website::route('website.subscribe', ['code' => $affiliateCode->code, 'src' => 'link', ...(Website::locale($request) === 'fr' ? ['lang' => 'fr'] : [])])
                     : null,
             ] : null,
@@ -183,7 +186,7 @@ class WebsiteController
                 'minimum' => array_map(fn (string $currency, mixed $amount): string => number_format((float) $amount, 2, '.', '').' '.$currency, array_keys($minimum), $minimum),
                 'methods' => array_values(array_intersect(['paypal', 'interac', 'bank'], (array) ($payout['methods'] ?? []))),
             ],
-            'webCheckout' => PaddleConfig::webCheckoutAvailable(),
+            'webCheckout' => PaddleConfig::anyTierAvailable(),
         ]);
     }
 

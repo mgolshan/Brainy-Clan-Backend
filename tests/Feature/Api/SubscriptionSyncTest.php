@@ -93,7 +93,7 @@ it('returns the current state without an API key', function () {
     $this->postJson('/api/v1/family/subscription/sync')
         ->assertOk()
         ->assertExactJson(['data' => [
-            'tier' => 'free', 'status' => 'none', 'store' => null, 'product_id' => null, 'expires_at' => null,
+            'tier' => 'free', 'entitlement' => null, 'status' => 'none', 'store' => null, 'product_id' => null, 'expires_at' => null,
             'will_renew' => false, 'revenuecat_app_user_id' => 'family-'.$this->family->id,
         ]]);
 

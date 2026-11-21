@@ -27,8 +27,11 @@ Milestones are defined in `docs/PLAN.md`.
 | B11 Ops hardening | Done | Staff roles `admin`/`support` (read-only) replacing `is_staff`, staff child export/deletion actions, `/api/v1/health/deep` (token), scheduler heartbeat, Horizon long-wait + failed-job alert mails, `horizon:snapshot`, AdMob SSV rejection counts on the dashboard. Moe: set `HEALTH_DEEP_TOKEN`, uptime monitor, SMTP for alerts |
 | Support inbox (2026-11-08) | Done | In-app support messages (family admins), website contact form (no mailto), Filament Support inbox + dashboard card, export/erasure/retention. Moe: set up the `support@` mailbox |
 | Everyone goals + chat reactions (2026-11-11) | Done | Goal plans `everyone` (newcomers join plan + open period via `MemberJoined`) and `all_categories`; chat reactions (fixed set of 6), `PUT`/`DELETE …/reaction`, cursor polling `GET /family/chat/reactions`, export, cleanup on leave/erase |
+| B12 Plans — step 1 plan tiers (2026-11-20) | Done | Tiers `big_clan` / `classroom` (+ rank helpers), per-tier settings (Family 7 → 6), RevenueCat entitlement → tier map (highest rank wins, `entitlement` in the subscription), Paddle prices per tier, web subscribe + availability with `tier`, `GET /pricing` `tiers[]`, any paid tier unlocks `family_plan` worlds, admin badges/filter/metrics, website plans (4 cards) + use-case slider + subscribe tier picker, help center, terms 2026-11-20, README. Next: step 2 (chat safety) |
 
 ## Next up
+
+**B12 (2026-11-20):** step 1 (plan tiers) done — next is step 2 (chat safety: profanity filter en/fr, Classroom chat modes), then step 3 (Classroom tools). Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
 
 **Start of next session (2026-10-24 wrap-up):** run the full backend suite first — the last full run was cut short when Docker stopped. The order-dependent `WebCheckoutTest` / `AccountDeletionPageTest` failure after `WebsiteTest` is fixed (2026-10-25: Livewire's static "component rendered" flag leaked between tests; `TestCase` now calls `Livewire::flushState()`). Moe's open items: content audit decisions (docs/CONTENT_AUDIT_2026-10-24.md, 36 items), lawyer review (terms/privacy 2026-10-24, partner agreement), server region, accounts weekend, when /partners goes public.
 0. **State at last stop (session 17, 2026-10-17, launch question bank + French content):** done (see log). Dev DB:
@@ -381,6 +384,55 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-11-20 B12 step 1: plan tiers (Family, Big Clan, Classroom)
+- **Tiers:** `Family::TIER_BIG_CLAN`, `TIER_CLASSROOM`, `TIERS`, `PAID_TIERS`, `TIER_LABELS(_FR)`,
+  `isPaidTier()`, `tierRank()`, `highestTier()`, `tierLabel()` (one place). Settings per the API table
+  in `PolicySeeder`; data migration `2026_11_20_100000_add_big_clan_and_classroom_tier_settings`
+  (insert-or-ignore for the new tiers; Family `limits.max_members` 7 → 6 only while it is still 7).
+  `PolicyResolver::maxMembersFor()`.
+- **Billing:** `services.revenuecat.entitlements` (env `REVENUECAT_ENTITLEMENT_FAMILY|BIG_CLAN|CLASSROOM`,
+  the old `REVENUECAT_ENTITLEMENT` still sets Family) + `BillingTiers` map; `ApplyFamilyTier` = highest
+  tier of the entitled rows; RevenueCat webhook picks the best entitlement of the event (none of ours
+  → `ignored`, empty list → stored/product-id tier), stores it in `subscriptions.entitlement`;
+  `SyncSubscription` reads all three (highest active). `Subscription::tier()`. Paddle:
+  `billing.paddle.price_ids.{tier}.{period}` (env `PADDLE_PRICE_{TIER}_{PERIOD}`, legacy names = Family),
+  `PaddleConfig::priceId(tier, plan)`, `tierAndPlanForPrice()`, `webCheckoutAvailable(tier)`,
+  `availableTiers()`; webhook maps price → tier (unknown price ignored). Web checkout: `tier` on
+  `POST /web/subscribe` + `/subscribe?tier=`, migration `2026_11_20_100100_add_tier_to_web_checkout_requests`
+  (the emailed link carries the tier), mail names the plan, availability takes `tier`.
+  `GET /pricing` → `{ currency, tiers: [{ id, members, highlighted, available, plans }] }`, prices
+  exactly per the PLAN table (`config/billing.php` `tiers` + `prices.{cur}.{tier}`). Affiliates and
+  commissions unchanged (they work on revenue events, any tier). `GET /family/subscription` gains
+  `entitlement`.
+- **Worlds:** `family_plan` = any paid tier.
+- **Admin:** `PlanTiers` helper (labels, colours); Families tier column/infolist badges, multi-select
+  "Plan" filter, subscription entitlement; Recent families badges; dashboard `families_paid` +
+  `families_by_tier` (same single query, cache key v2), "Paid plans" stat with a per-tier breakdown;
+  support inbox/mail show the plan label.
+- **Website:** 4 plan cards (members, best for, features, monthly price + "or $X/year" from config,
+  `?currency=CAD` works, CTA `/subscribe?tier=…`, Free → app download); new **use-case slider**
+  (`#use-cases`, in the section menu before Plans; 7 cards with a plan pill linking to the plan card;
+  CSS scroll-snap, anchor dots and per-card prev/next arrows — no script, the site CSP forbids
+  scripts; smooth scroll only without reduced motion); subscribe page with tier radio cards ("coming
+  soon on the web" per tier) + period picker (prices follow the tier via `:has()`, all listed
+  without it); "Family plan"/"up to 7" copy now reads config/policy; unlock labels "Paid plan".
+- **Help center (en + fr):** plans section rewritten ("Which plan is right for us?", "Big Clan or
+  Classroom?", subscribe, restore, change plan, cancel) with new placeholders (`big_clan_members`,
+  `classroom_members/_adults/_students`, `price_{tier}`, `trial_days`); other mentions fixed.
+  Support FAQ and partners page updated.
+- **Legal:** terms (en + fr) describe the three paid plans and changing plans → **terms version
+  `2026-11-20`** (re-acceptance, pre-launch). Privacy wording "Family plan" → "paid plans" (no
+  version bump: naming only). README RevenueCat + Paddle sections and checklist, `.env.example`,
+  DEPLOYMENT_GUIDE (both copies identical), OPERATIONS_HANDBOOK env list.
+- **Tests:** InviteTest member limits per paid tier; new `tests/Feature/Api/PlanTiersTest.php` (28: rank, settings per tier + data migration,
+  `/me` limits, worlds per tier, entitlement mapping/override/rank/plan change/product inference,
+  store + web highest tier, sync, Paddle price → tier, pricing shape, web subscribe tier + Paddle
+  price, availability tier url, subscribe page picker); website plans + slider + section menu;
+  dashboard per-tier counts; pinned tests updated (pricing, subscription JSON, availability url,
+  7 → 6 members, copy). `paddlePriceIds()` helper in `tests/Pest.php`.
+- Dev DB: `migrate` (2 migrations), config cached, opcache cleared, horizon + scheduler restarted.
+- Full suite: 1211 passed (325979 assertions), 1562 s. Pint and PHPStan clean. (First run: 1 failure, `InviteTest` pinned the old Family limit 7 — now a Family 6 / Big Clan 12 dataset.)
 
 ### 2026-11-11 goals that explain themselves + chat reactions (backend)
 docs/PLAN.md decision "Goals that explain themselves + chat reactions", API.md changelog 2026-11-11

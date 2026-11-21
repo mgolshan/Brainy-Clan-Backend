@@ -7,6 +7,7 @@ use App\Filament\Resources\SupportMessages\Pages\ListSupportMessages;
 use App\Filament\Resources\SupportMessages\Pages\ViewSupportMessage;
 use App\Filament\Support\ReadOnlyForSupport;
 use App\Filament\Support\StaffAccess;
+use App\Modules\Family\Models\Family;
 use App\Modules\Support\Actions\ChangeSupportMessageStatus;
 use App\Modules\Support\Actions\ReplyToSupportMessage;
 use App\Modules\Support\Actions\SupportInboxStats;
@@ -117,7 +118,7 @@ class SupportMessageResource extends Resource
             ]),
             Section::make('Details')->columns(3)->collapsible()->schema([
                 TextEntry::make('family_id')->label('Family')->placeholder('—')
-                    ->formatStateUsing(fn (?int $state, SupportMessage $record): string => '#'.$state.($record->family !== null ? ' ('.$record->family->tier.' plan)' : ''))
+                    ->formatStateUsing(fn (?int $state, SupportMessage $record): string => '#'.$state.($record->family !== null ? ' ('.Family::tierLabel($record->family->tier).' plan)' : ''))
                     ->url(fn (SupportMessage $record): ?string => $record->family_id !== null ? FamilyResource::getUrl('view', ['record' => $record->family_id]) : null),
                 TextEntry::make('app_version')->label('App version')->placeholder('—'),
                 TextEntry::make('platform')->placeholder('—'),

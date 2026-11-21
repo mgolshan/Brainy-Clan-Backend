@@ -35,10 +35,10 @@ return [
 
     'documents' => [
         'terms' => [
-            'version' => '2026-10-24',
+            'version' => '2026-11-20',
             'summary' => [
-                'en' => 'New: buying the Family plan on our website through Paddle (merchant of record), refunds for web purchases, and partner referral codes.',
-                'fr' => 'Nouveau : achat du forfait Famille sur notre site Web par Paddle (marchand officiel), remboursement des achats sur le Web et codes de parrainage des partenaires.',
+                'en' => 'New: three paid plans (Family, Big Clan and Classroom) with the same features and different member limits, and how to change plans.',
+                'fr' => 'Nouveau : trois forfaits payants (Famille, Grand Clan et Classe) avec les mêmes fonctions et des limites de membres différentes, et comment changer de forfait.',
             ],
         ],
         'privacy' => [

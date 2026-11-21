@@ -54,6 +54,37 @@
     ];
     $free = $plans['free'];
     $family = $plans['family'];
+    /** Plan names and the display prices (GET /pricing, same config). */
+    $planName = fn (string $tier): string => \App\Modules\Family\Models\Family::tierLabel($tier, $fr ? 'fr' : 'en');
+    $pricingTiers = collect($pricing['tiers'])->keyBy('id')->all();
+    $priceOf = fn (string $tier, string $period): ?array => collect($pricingTiers[$tier]['plans'] ?? [])->firstWhere('id', $period);
+    $currencySymbol = match ($pricing['currency']) { 'USD' => '$', 'CAD' => 'CA$', default => $pricing['currency'].' ' };
+    $money = fn (string $amount): string => $fr ? str_replace('.', ',', $amount).' '.rtrim($currencySymbol) : $currencySymbol.$amount;
+    /** Classroom adult seats: teacher + co-teacher (docs/PLAN.md B12). */
+    $classroomAdults = 2;
+    $bestFor = [
+        'family' => $fr ? 'Pour les parents et les enfants' : 'Best for parents and kids',
+        'big_clan' => $fr ? 'Pour les grands-parents, les cousins et les groupes d’école-maison' : 'Best for grandparents, cousins and homeschool groups',
+        'classroom' => $fr ? 'Pour les enseignants, les tuteurs et les entraîneurs' : 'Best for teachers, tutors and coaches',
+    ];
+    /** Use-case slider: [anchor, emoji, title, scenario, suggested tier]. */
+    $useCases = $fr ? [
+        ['just-us', '👨‍👩‍👧‍👦', 'Juste nous quatre', 'Deux parents, deux enfants et une soirée quiz chaque semaine. Chacun joue à son niveau.', 'family'],
+        ['grandma', '👵', 'Grand-maman joue aussi', 'Les grands-parents se joignent à la partie avec leur propre compte, et tout le monde vise le même objectif.', 'big_clan'],
+        ['cousins', '🗺️', 'Des cousins partout au pays', 'Des familles loin les unes des autres restent proches avec un défi commun et un clavardage de famille.', 'big_clan'],
+        ['homeschool', '🏡', 'Groupe d’école-maison', 'Quelques familles apprennent ensemble : plusieurs parents aident à gérer le groupe.', 'big_clan'],
+        ['tutor', '🎓', 'Tuteur ou entraîneur', 'Un petit groupe d’élèves fait de courts défis entre les séances, et vous suivez leurs progrès.', 'classroom'],
+        ['class', '🏫', 'Ma classe de 28', 'Une classe entière joue avec un enseignant et un co-enseignant, et tout le monde vise un objectif de classe.', 'classroom'],
+        ['trying', '🌱', 'Juste pour essayer', 'Vous voulez d’abord voir si Brainy Clan plaît à la maison ? Commencez gratuitement, sans carte.', 'free'],
+    ] : [
+        ['just-us', '👨‍👩‍👧‍👦', 'Just us four', 'Two parents, two kids and a quiz night every week. Everyone plays at their own level.', 'family'],
+        ['grandma', '👵', 'Grandma plays too', 'Grandparents join in with their own accounts, and the whole family works toward the same goal.', 'big_clan'],
+        ['cousins', '🗺️', 'Cousins across the country', 'Families far apart stay close with a shared challenge and one family chat.', 'big_clan'],
+        ['homeschool', '🏡', 'Homeschool group', 'A few families learn together, with several parents helping to run the group.', 'big_clan'],
+        ['tutor', '🎓', 'Tutor or coach', 'A small group of learners does short challenges between sessions, and you see how they are doing.', 'classroom'],
+        ['class', '🏫', 'My class of 28', 'A whole class plays along with a teacher and a co-teacher, working toward a class goal.', 'classroom'],
+        ['trying', '🌱', 'Trying it out', 'Want to see if Brainy Clan is a hit at home first? Start for free, no card needed.', 'free'],
+    ];
     $allCategories = count($categories);
 
     /** World key => [image, name en, name fr, look en, look fr] (names as in the app). */
@@ -82,7 +113,7 @@
         return match ($world['unlock_type']) {
             'points' => $fr ? $world['required'].' points' : $world['required'].' points',
             'streak' => $fr ? 'Série de '.$world['required'].' jours' : $world['required'].'-day streak',
-            'family_plan' => $fr ? 'Forfait Famille' : 'Family plan',
+            'family_plan' => $fr ? 'Forfait payant' : 'Paid plan',
             default => $fr ? 'Gratuit' : 'Free',
         };
     };
@@ -113,6 +144,7 @@
     };
     $chatFree = $keptFor($plans['free']['chat_days']);
     $chatFamily = $keptFor($plans['family']['chat_days']);
+    $chatPaid = collect(\App\Modules\Family\Models\Family::PAID_TIERS)->map(fn (string $tier): int => $plans[$tier]['chat_days'])->unique()->count() === 1 ? $chatFamily : null;
     /** Brain games: [image, width, height, name, text, alt] (crops of the app's game screens). */
     $brainGames = $fr ? [
         ['brain-memory', 333, 403, 'Jeu de mémoire', 'Retournez deux cartes à la fois et retrouvez chaque paire d’amis du Clan, de 3 à 10 paires.', 'Le jeu de mémoire dans le monde Aventure dans la jungle : une paire de renards trouvée, 3 essais sur 12.'],
@@ -163,6 +195,7 @@
         'what' => ['About', 'À propos'],
         'chat' => ['Family chat', 'Clavardage'],
         'safety' => ['Safety', 'Sécurité'],
+        'use-cases' => ['Which plan?', 'Quel forfait ?'],
         'plans' => ['Plans', 'Forfaits'],
         'get' => ['Get the app', 'Obtenir l’app'],
     ] as $anchor => [$en, $frLabel])
@@ -375,7 +408,40 @@
     .checks li { padding-left: 2.1em; }
     .checks li::before { width: 1.4em; height: 1.4em; border-radius: 50%; background: #dcf5e7; color: #13623c; display: grid; place-items: center; font-size: .8em; top: .15em; left: 0; }
 
+    /* Use-case slider (no scripts — the site CSP forbids them: scroll-snap, anchor dots and per-card prev/next arrows) */
+    .uc-slider { position: relative; }
+    .uc-track { display: grid; grid-auto-flow: column; grid-auto-columns: clamp(240px, 78vw, 300px); gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; padding: 12px 16px 22px; margin: 0 -16px; list-style: none; scrollbar-width: thin; anchor-name: --usecases; overscroll-behavior-x: contain; }
+    @media (prefers-reduced-motion: no-preference) { .uc-track { scroll-behavior: smooth; } }
+    .uc-track:focus-visible { outline: 3px solid var(--brand); outline-offset: -3px; border-radius: 16px; }
+    .uc-card { scroll-snap-align: center; scroll-margin-top: 30vh; display: flex; flex-direction: column; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 26px; padding: 22px 20px 16px; box-shadow: var(--card-shadow); position: relative; overflow: hidden; transition: transform .25s; }
+    .uc-card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 92px; background: var(--uc-tint, var(--pop-soft)); z-index: 0; }
+    .uc-card > * { position: relative; z-index: 1; }
+    .uc-card.uc-family { --uc-tint: #dcf5e7; } .uc-card.uc-big_clan { --uc-tint: #e3ecff; } .uc-card.uc-classroom { --uc-tint: #fff1d6; } .uc-card.uc-free { --uc-tint: #ffe3ec; }
+    @media (prefers-color-scheme: dark) { .uc-card.uc-family, .uc-card.uc-big_clan, .uc-card.uc-classroom, .uc-card.uc-free { --uc-tint: var(--pop-soft); } }
+    @media (prefers-reduced-motion: no-preference) { .uc-card:hover { transform: translateY(-5px) rotate(-1deg); } }
+    .uc-art { width: 76px; height: 76px; display: grid; place-items: center; border-radius: 50%; background: var(--surface); box-shadow: var(--card-shadow); font-size: 2.4rem; line-height: 1; margin-bottom: 6px; }
+    .uc-card h3 { margin: 0; font-size: 1.2rem; }
+    .uc-card p { margin: 0; color: var(--muted); font-size: .95rem; line-height: 1.45; flex: 1; }
+    .uc-pill { align-self: flex-start; display: inline-block; font-weight: 800; font-size: .85rem; border-radius: 999px; padding: 5px 12px; text-decoration: none; border: 1px solid var(--border); background: var(--surface); }
+    .uc-pill.family { color: #13623c; background: #dcf5e7; border-color: #a9e2c3; }
+    .uc-pill.big_clan { color: #1e3f8a; background: #e3ecff; border-color: #b9ccf7; }
+    .uc-pill.classroom { color: #8a4b00; background: #fff1d6; border-color: #f4d29a; }
+    .uc-pill.free { color: #9b1c4a; background: #ffe3ec; border-color: #f5b4c8; }
+    .uc-pill:focus-visible, .uc-step a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+    .uc-step { display: flex; justify-content: flex-end; gap: 8px; min-height: 36px; }
+    .uc-step a { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--brand-soft); color: var(--fg); font-weight: 900; text-decoration: none; }
+
     /* Plans + final CTA */
+    .plans-4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+    .plan { display: flex; flex-direction: column; scroll-margin-top: 90px; }
+    .plan:target { outline: 3px solid var(--brand); outline-offset: 3px; }
+    .plan .best { margin: 0 0 6px; color: var(--muted); font-weight: 700; }
+    .plan .price-line { margin: 0 0 8px; font-size: 1.05rem; }
+    .plan .price-line strong { font-size: 1.6rem; font-weight: 900; }
+    .plan .price-line span { display: block; color: var(--muted); font-size: .92rem; }
+    .plan ul { flex: 1; }
+    .plan-cta { display: block; margin-top: 12px; text-align: center; font-weight: 800; border-radius: 14px; padding: 11px 16px; background: var(--brand); color: #1b2a4a; text-decoration: none; }
+    .plan-cta:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
     .card { border-radius: 22px; box-shadow: var(--card-shadow); }
     .plan.featured { position: relative; }
     .plan.featured::after { content: "★"; position: absolute; top: -14px; right: 18px; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--brand); color: #1b2a4a; font-weight: 900; }
@@ -608,10 +674,10 @@
                 <span class="eyebrow">{{ $fr ? 'Une raison de revenir' : 'A reason to come back' }}</span>
                 <h2 id="unlocks-title">{{ $fr ? 'Jouez, gagnez des points, débloquez des mondes' : 'Play, earn points, unlock worlds' }}</h2>
                 <p class="lead">{{ $fr
-                    ? 'Les points et les séries de jours débloquent de nouveaux mondes, et ils restent débloqués. Quelques mondes spéciaux viennent avec le forfait Famille.'
-                    : 'Points and daily streaks unlock new worlds, and they stay unlocked. A few special worlds come with the Family plan.' }}</p>
+                    ? 'Les points et les séries de jours débloquent de nouveaux mondes, et ils restent débloqués. Quelques mondes spéciaux viennent avec chaque forfait payant (Famille, Grand Clan et Classe).'
+                    : 'Points and daily streaks unlock new worlds, and they stay unlocked. A few special worlds come with every paid plan (Family, Big Clan and Classroom).' }}</p>
                 <ul class="ways">
-                    @foreach (['free' => [$fr ? 'Dès le départ' : 'From day one', 'free'], 'points' => [$fr ? 'Avec des points' : 'With points', 'points'], 'streak' => [$fr ? 'Avec une série de jours' : 'With a streak', 'streak'], 'family_plan' => [$fr ? 'Avec le forfait Famille' : 'With the Family plan', 'family_plan']] as $type => [$title, $class])
+                    @foreach (['free' => [$fr ? 'Dès le départ' : 'From day one', 'free'], 'points' => [$fr ? 'Avec des points' : 'With points', 'points'], 'streak' => [$fr ? 'Avec une série de jours' : 'With a streak', 'streak'], 'family_plan' => [$fr ? 'Avec un forfait payant' : 'With a paid plan', 'family_plan']] as $type => [$title, $class])
                         @if ($byUnlock[$type] !== [])
                             <li><span class="tag {{ $class }}">{{ $title }}</span><span class="list">{{ implode(', ', $byUnlock[$type]) }}</span></li>
                         @endif
@@ -672,7 +738,7 @@
                     <li><span class="ico" aria-hidden="true">🔒</span><span><strong>{{ $fr ? 'Seulement votre famille' : 'Only your family' }}</strong><span>{{ $fr ? 'Seuls les membres de votre famille peuvent lire le clavardage. Aucun inconnu, jamais.' : 'Only the members of your family can read it. No strangers, ever.' }}</span></span></li>
                     <li><span class="ico" aria-hidden="true">🛡️</span><span><strong>{{ $fr ? 'Les parents décident' : 'Parents are in control' }}</strong><span>{{ $fr ? 'Un parent peut désactiver le clavardage pour un enfant ou retirer n’importe quel message.' : 'A parent can turn chat off for a child or remove any message.' }}</span></span></li>
                     <li><span class="ico" aria-hidden="true">💬</span><span><strong>{{ $fr ? 'Du texte et des émojis' : 'Just text and emoji' }}</strong><span>{{ $fr ? 'Pas de liens cliquables, pas de photos, pas de fichiers.' : 'No clickable links, no photos, no files.' }}</span></span></li>
-                    <li><span class="ico" aria-hidden="true">🕒</span><span><strong>{{ $fr ? 'Des messages qui ne s’accumulent pas' : 'Messages don’t pile up' }}</strong><span>{{ $fr ? 'Gardés '.$chatFree.' avec le forfait gratuit et '.$chatFamily.' avec le forfait Famille, puis supprimés.' : 'Kept for '.$chatFree.' on the free plan and '.$chatFamily.' on the Family plan, then deleted.' }}</span></span></li>
+                    <li><span class="ico" aria-hidden="true">🕒</span><span><strong>{{ $fr ? 'Des messages qui ne s’accumulent pas' : 'Messages don’t pile up' }}</strong><span>{{ $fr ? 'Gardés '.$chatFree.' avec le forfait gratuit et '.($chatPaid ?? $chatFamily).' avec les forfaits payants, puis supprimés.' : 'Kept for '.$chatFree.' on the free plan and '.($chatPaid ?? $chatFamily).' on paid plans, then deleted.' }}</span></span></li>
                 </ul>
             </div>
             <div class="chat-phone">
@@ -714,14 +780,56 @@
         </div>
     </section>
 
+    <section id="use-cases" aria-labelledby="use-cases-title">
+        <div class="wrap">
+            <div class="section-head center">
+                <span class="eyebrow">{{ $fr ? 'Quel forfait vous va ?' : 'Which plan fits you?' }}</span>
+                <h2 id="use-cases-title">{{ $fr ? 'Trouvez le forfait de votre groupe' : 'Find the plan for your group' }}</h2>
+                <p class="lead">{{ $fr
+                    ? 'Une petite famille, toute la parenté ou une classe entière : faites glisser les cartes pour voir ce qui vous convient.'
+                    : 'A small family, the whole extended family or a full class: swipe through the cards to see what fits you.' }}</p>
+            </div>
+            <div class="uc-slider">
+                <ul class="uc-track" tabindex="0" aria-label="{{ $fr ? 'Exemples de groupes et le forfait conseillé (faites défiler)' : 'Example groups and the plan we suggest (scroll sideways)' }}">
+                    @foreach ($useCases as $i => [$key, $emoji, $title, $text, $tier])
+                        <li id="uc-{{ $key }}" class="uc-card uc-{{ $tier }}" aria-label="{{ ($i + 1).' / '.count($useCases) }}">
+                            <span class="uc-art" aria-hidden="true">{{ $emoji }}</span>
+                            <h3>{{ $title }}</h3>
+                            <p>{{ $text }}</p>
+                            <a class="uc-pill {{ $tier }}" href="#plan-{{ $tier }}">{{ $fr ? 'Conseillé : ' : 'We suggest: ' }}{{ $planName($tier) }}</a>
+                            <span class="uc-step">
+                                @if ($i > 0)
+                                    <a href="#uc-{{ $useCases[$i - 1][0] }}" aria-label="{{ $fr ? 'Exemple précédent' : 'Previous example' }}">←</a>
+                                @endif
+                                @if ($i < count($useCases) - 1)
+                                    <a href="#uc-{{ $useCases[$i + 1][0] }}" aria-label="{{ $fr ? 'Exemple suivant' : 'Next example' }}">→</a>
+                                @endif
+                            </span>
+                        </li>
+                    @endforeach
+                </ul>
+                <nav class="dots" aria-label="{{ $fr ? 'Aller à un exemple' : 'Go to an example' }}">
+                    @foreach ($useCases as [$key, $emoji, $title])
+                        <a href="#uc-{{ $key }}"><span class="sr">{{ $title }}</span></a>
+                    @endforeach
+                </nav>
+            </div>
+        </div>
+    </section>
+
     <section id="plans" class="band-pop" aria-labelledby="plans-title">
         <div class="wrap">
             <div class="section-head center">
                 <h2 id="plans-title">{{ $fr ? 'Forfaits' : 'Plans' }}</h2>
+                <p class="lead">{{ $fr
+                    ? 'Tous les forfaits payants offrent les mêmes jeux et fonctions ; ils changent seulement par le nombre de membres. La sécurité n’est jamais un supplément : elle vient avec chaque forfait.'
+                    : 'Every paid plan has the same games and features; they only differ in how many members they fit. Safety is never an extra: it comes with every plan.' }}</p>
             </div>
-            <div class="plans">
-                <div class="card plan">
-                    <h3>{{ $fr ? 'Gratuit' : 'Free' }}</h3>
+            <div class="plans plans-4">
+                <div class="card plan" id="plan-free">
+                    <h3>{{ $planName('free') }}</h3>
+                    <p class="best">{{ $fr ? 'Pour essayer Brainy Clan' : 'Best for trying it out' }}</p>
+                    <p class="price-line"><strong>{{ $fr ? '0 $' : '$0' }}</strong></p>
                     <ul>
                         <li>{{ $fr ? 'Jusqu’à '.$free['members'].' membres de la famille, vous compris' : 'Up to '.$free['members'].' family members, you included' }}</li>
                         <li>{{ $free['categories'] >= $allCategories
@@ -735,39 +843,71 @@
                             : 'Second chance: a redemption round, or a short ad (teens and adults only)' }}</li>
                         <li>{{ $fr ? 'Clavardage familial : messages gardés '.$chatFree : 'Family chat: messages kept for '.$chatFree }}</li>
                     </ul>
+                    <a class="plan-cta" href="#get">{{ $fr ? 'Obtenir l’application' : 'Get the app' }}</a>
                 </div>
-                <div class="card plan featured">
-                    <h3>{{ $fr ? 'Forfait Famille' : 'Family plan' }}</h3>
-                    <ul>
-                        <li>{{ $fr ? 'Jusqu’à '.$family['members'].' membres de la famille, vous compris' : 'Up to '.$family['members'].' family members, you included' }}</li>
-                        <li>{{ $family['categories'] >= $allCategories
-                            ? ($fr ? 'Les '.$allCategories.' catégories' : 'All '.$allCategories.' categories')
-                            : ($fr ? $family['categories'].' catégories' : $family['categories'].' categories') }}</li>
-                        <li>{{ $family['goals'] === null
-                            ? ($fr ? 'Objectifs familiaux illimités' : 'Unlimited family goals')
-                            : ($fr ? $family['goals'].' objectifs familiaux actifs' : $family['goals'].' active family goals') }}</li>
-                        @if ($family['free_second_chances'] > 0)
-                            <li>{{ $fr
-                                ? $family['free_second_chances'].' secondes chances gratuites par membre et par jour'
-                                : $family['free_second_chances'].' free second chances per member per day' }}</li>
+                @foreach (['family', 'big_clan', 'classroom'] as $tier)
+                    @php
+                        $limits = $plans[$tier];
+                        $monthly = $priceOf($tier, 'monthly');
+                        $annual = $priceOf($tier, 'annual');
+                    @endphp
+                    <div class="card plan{{ ($pricingTiers[$tier]['highlighted'] ?? false) ? ' featured' : '' }}" id="plan-{{ $tier }}">
+                        <h3>{{ $planName($tier) }}</h3>
+                        <p class="best">{{ $bestFor[$tier] }}</p>
+                        @if ($monthly !== null)
+                            <p class="price-line"><strong>{{ $money($monthly['price']) }}</strong> {{ $fr ? '/ mois' : '/ month' }}
+                                @if ($annual !== null)
+                                    <span>{{ $fr ? 'ou '.$money($annual['price']).' / an' : 'or '.$money($annual['price']).' / year' }}</span>
+                                @endif
+                            </p>
                         @endif
-                        <li>{{ $fr ? 'Clavardage familial : messages gardés '.$chatFamily : 'Family chat: messages kept for '.$chatFamily }}</li>
-                        @unless ($family['ads'])
-                            <li>{{ $fr ? 'Aucune publicité' : 'No ads' }}</li>
-                        @endunless
-                        @if ($byUnlock['family_plan'] !== [])
-                            <li>{{ ($fr ? 'Mondes exclusifs : ' : 'Exclusive worlds: ').implode(', ', $byUnlock['family_plan']) }}</li>
-                        @endif
-                    </ul>
-                    <p class="note">{{ $fr
-                        ? 'Un abonnement acheté par un adulte dans l’application couvre toute la famille.'
-                        : 'One subscription, bought by an adult in the app, covers the whole family.' }}</p>
-                    @if ($webCheckout ?? false)
-                        <p class="note">{{ $fr ? 'Aussi offert sur le Web :' : 'Also available on the web:' }}
-                            <a href="{{ route('website.subscribe', $lang) }}">{{ $fr ? 'payez par carte ou PayPal' : 'pay by card or PayPal' }}</a>.</p>
-                    @endif
-                </div>
+                        <ul>
+                            @if ($tier === 'classroom')
+                                <li>{{ $fr
+                                    ? 'Jusqu’à '.$limits['members'].' membres : '.$classroomAdults.' adultes (enseignant et co-enseignant) et '.max(0, $limits['members'] - $classroomAdults).' élèves'
+                                    : 'Up to '.$limits['members'].' members: '.$classroomAdults.' adults (teacher and co-teacher) and '.max(0, $limits['members'] - $classroomAdults).' students' }}</li>
+                            @else
+                                <li>{{ $fr ? 'Jusqu’à '.$limits['members'].' membres de la famille, vous compris' : 'Up to '.$limits['members'].' family members, you included' }}</li>
+                            @endif
+                            @if ($tier === 'big_clan')
+                                <li>{{ $fr ? 'Autant d’adultes et de co-administrateurs que vous voulez' : 'As many adults and co-admins as you like' }}</li>
+                            @endif
+                            <li>{{ $limits['categories'] >= $allCategories
+                                ? ($fr ? 'Les '.$allCategories.' catégories' : 'All '.$allCategories.' categories')
+                                : ($fr ? $limits['categories'].' catégories' : $limits['categories'].' categories') }}</li>
+                            <li>{{ $limits['goals'] === null
+                                ? ($fr ? 'Objectifs familiaux illimités' : 'Unlimited family goals')
+                                : ($fr ? $limits['goals'].' objectifs familiaux actifs' : $limits['goals'].' active family goals') }}</li>
+                            @if ($limits['free_second_chances'] > 0)
+                                <li>{{ $fr
+                                    ? $limits['free_second_chances'].' secondes chances gratuites par membre et par jour'
+                                    : $limits['free_second_chances'].' free second chances per member per day' }}</li>
+                            @endif
+                            <li>{{ $fr ? 'Clavardage familial : messages gardés '.$keptFor($limits['chat_days']) : 'Family chat: messages kept for '.$keptFor($limits['chat_days']) }}</li>
+                            @unless ($limits['ads'])
+                                <li>{{ $fr ? 'Aucune publicité' : 'No ads' }}</li>
+                            @endunless
+                            @if ($byUnlock['family_plan'] !== [])
+                                <li>{{ ($fr ? 'Mondes exclusifs : ' : 'Exclusive worlds: ').implode(', ', $byUnlock['family_plan']) }}</li>
+                            @endif
+                            @if ($tier === 'classroom')
+                                <li>{{ $fr
+                                    ? 'Bientôt : outils pour l’enseignant (liste d’élèves, cartes de codes de connexion, export, remise à zéro pour la nouvelle année et clavardage en mode annonces)'
+                                    : 'Coming soon: teacher tools (class roster, sign-in code cards, export, new-year reset and announcement-only chat)' }}</li>
+                            @endif
+                        </ul>
+                        <a class="plan-cta" href="{{ route('website.subscribe', [...$lang, 'tier' => $tier, ...($pricing['currency'] !== 'USD' ? ['currency' => $pricing['currency']] : [])]) }}">{{ $fr ? 'Choisir '.$planName($tier) : 'Choose '.$planName($tier) }}</a>
+                    </div>
+                @endforeach
             </div>
+            <p class="note center">{{ $fr
+                ? 'Un abonnement acheté par un adulte dans l’application couvre tout le groupe. Essai gratuit de 7 jours sur les forfaits 6 mois et annuel.'
+                : 'One subscription, bought by an adult in the app, covers the whole group. 7-day free trial on the 6-month and annual plans.' }}
+                @if ($webCheckout ?? false)
+                    {{ $fr ? 'Aussi offert sur le Web :' : 'Also available on the web:' }}
+                    <a href="{{ route('website.subscribe', $lang) }}">{{ $fr ? 'payez par carte ou PayPal' : 'pay by card or PayPal' }}</a>.
+                @endif
+            </p>
         </div>
     </section>
 

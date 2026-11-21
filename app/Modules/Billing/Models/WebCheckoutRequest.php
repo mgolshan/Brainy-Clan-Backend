@@ -19,7 +19,8 @@ use Illuminate\Support\Carbon;
  * @property string $email_hash
  * @property int|null $user_id
  * @property int|null $family_id
- * @property string $plan
+ * @property string $tier Plan tier: family | big_clan | classroom
+ * @property string $plan Billing period: monthly | semiannual | annual
  * @property string|null $affiliate_code
  * @property string|null $affiliate_source
  * @property string|null $token_hash
@@ -34,7 +35,7 @@ use Illuminate\Support\Carbon;
  * @property-read Family|null $family
  */
 #[Fillable([
-    'email_hash', 'user_id', 'family_id', 'plan', 'affiliate_code', 'affiliate_source', 'token_hash', 'status',
+    'email_hash', 'user_id', 'family_id', 'tier', 'plan', 'affiliate_code', 'affiliate_source', 'token_hash', 'status',
     'reason', 'locale', 'transaction_id', 'expires_at', 'opened_at', 'ip_hash',
 ])]
 class WebCheckoutRequest extends Model

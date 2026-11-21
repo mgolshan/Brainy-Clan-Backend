@@ -228,7 +228,7 @@ class PolicyResolver
     }
 
     /**
-     * Whether this member's age band may buy the Family plan (`purchases_allowed`; adults only by
+     * Whether this member's age band may buy a paid plan (`purchases_allowed`; adults only by
      * default). The same rule as `policy.purchases_allowed`; used by web checkout (Billing).
      */
     public function purchasesAllowedFor(FamilyMember $member): bool
@@ -243,6 +243,14 @@ class PolicyResolver
     public function maxMembers(Family $family): int
     {
         return (int) $this->setting('limits.max_members', $family->tier);
+    }
+
+    /**
+     * Member limit of a tier (`limits.max_members`), e.g. for plan cards and `GET /pricing`.
+     */
+    public function maxMembersFor(string $tier): int
+    {
+        return (int) $this->setting('limits.max_members', $tier);
     }
 
     public function maxCategories(Family $family): int

@@ -18,7 +18,7 @@ class WorldController
      *
      * The world catalog in display order with how each world unlocks and whether it is unlocked
      * for me: `free` (always), `points` (lifetime points ≥ `required`), `streak` (longest streak
-     * in days ≥ `required`) or `family_plan` (the family is on the paid plan: active, trial or
+     * in days ≥ `required`) or `family_plan` (the family is on any paid plan — Family, Big Clan or Classroom: active, trial or
      * grace). `required` and `progress` only for `points` / `streak`. Points and streak worlds
      * stay unlocked once reached; family plan worlds lock again when the plan ends.
      */

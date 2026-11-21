@@ -29,16 +29,22 @@ it('enforces the tier member limit (members + pending invites)', function () {
         ->assertJsonPath('code', 'member_limit_reached');
 });
 
-it('allows more members on the family plan', function () {
-    $owner = familyOwner(['tier' => 'family']);
+it('allows more members on the paid plans (Family 6, Big Clan 12)', function (string $tier, int $limit) {
+    $owner = familyOwner(['tier' => $tier]);
     actingAsMember($owner);
 
-    foreach (range(1, 6) as $i) {
+    // The owner is one of the members.
+    foreach (range(1, $limit - 1) as $i) {
         $this->postJson('/api/v1/family/invites', ['nickname' => "Kid {$i}", 'birth_year' => 2015, 'birth_month' => 1, 'parental_consent' => true])->assertCreated();
     }
 
-    $this->postJson('/api/v1/family/invites', ['nickname' => 'Kid 7', 'birth_year' => 2015, 'birth_month' => 1, 'parental_consent' => true])->assertStatus(403);
-});
+    $this->postJson('/api/v1/family/invites', ['nickname' => "Kid {$limit}", 'birth_year' => 2015, 'birth_month' => 1, 'parental_consent' => true])
+        ->assertStatus(403)
+        ->assertJsonPath('code', 'member_limit_reached');
+})->with([
+    'family' => ['family', 6],
+    'big_clan' => ['big_clan', 12],
+]);
 
 it('lists only pending invites and deletes them', function () {
     $owner = familyOwner(['tier' => 'family']);

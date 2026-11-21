@@ -103,6 +103,7 @@ beforeEach(function () {
         'billing.paddle.webhook_secret' => PADDLE_TEST_SECRET,
         'billing.paddle.api_key' => 'pdl_test_key',
         'billing.paddle.environment' => 'sandbox',
+        'billing.paddle.price_ids' => paddlePriceIds(),
     ]);
     $this->owner = familyOwner();
     $this->family = $this->owner->family;

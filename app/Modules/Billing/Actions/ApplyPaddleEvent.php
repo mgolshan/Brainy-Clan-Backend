@@ -6,6 +6,7 @@ use App\Modules\Billing\Events\RevenueRecorded;
 use App\Modules\Billing\Models\CommissionEntry;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Models\WebhookEvent;
+use App\Modules\Billing\Support\PaddleConfig;
 use App\Modules\Billing\Support\PaddleSubscriptionState;
 use App\Modules\Family\Models\Family;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -18,7 +19,8 @@ use Illuminate\Support\Facades\Log;
  *
  * - `subscription.created|activated|updated|past_due|paused|resumed|canceled` → the family's
  *   `paddle` subscription row ({@see PaddleSubscriptionState}) and tier ({@see ApplyFamilyTier});
- *   events older than the last applied one are `stale`.
+ *   the price maps to (tier, period) — an unknown price is `ignored` (unless it is the stored
+ *   subscription, which keeps its tier); events older than the last applied one are `stale`.
  * - `transaction.completed` → a sale ({@see RevenueRecorded}; attribution from `custom_data`).
  * - `adjustment.created|updated` → an approved refund / chargeback (negative) or chargeback
  *   reversal ({@see RevenueRecorded}); the subscription state comes from subscription events.
@@ -118,6 +120,12 @@ class ApplyPaddleEvent
 
         $subscription = Subscription::query()->where('family_id', $family->id)->where('provider', Subscription::PROVIDER_PADDLE)->lockForUpdate()->first()
             ?? new Subscription(['family_id' => $family->id, 'provider' => Subscription::PROVIDER_PADDLE]);
+
+        $knownSubscription = $subscription->exists && $subscription->external_id !== null && $subscription->external_id === $subscriptionId;
+
+        if (PaddleConfig::tierAndPlanForPrice(PaddleSubscriptionState::priceId($data)) === null && ! $knownSubscription) {
+            return [WebhookEvent::OUTCOME_IGNORED, 'Unknown price.', $family->id];
+        }
 
         $incomingEntitled = in_array($data['status'] ?? null, PaddleSubscriptionState::ENTITLED_STATUSES, true);
 

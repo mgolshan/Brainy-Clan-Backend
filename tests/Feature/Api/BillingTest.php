@@ -181,6 +181,7 @@ it('shows the family subscription to admins', function () {
         ->assertOk()
         ->assertExactJson(['data' => [
             'tier' => Family::TIER_FREE,
+            'entitlement' => null,
             'status' => Subscription::STATUS_NONE,
             'store' => null,
             'product_id' => null,
@@ -197,6 +198,7 @@ it('shows the family subscription to admins', function () {
     $this->getJson('/api/v1/family/subscription')
         ->assertOk()
         ->assertJsonPath('data.tier', Family::TIER_FAMILY)
+        ->assertJsonPath('data.entitlement', 'family')
         ->assertJsonPath('data.status', Subscription::STATUS_ACTIVE)
         ->assertJsonPath('data.store', 'app_store')
         ->assertJsonPath('data.product_id', 'brainy_family_monthly')

@@ -3,6 +3,8 @@
 namespace App\Modules\Core\Support;
 
 use App\Modules\Billing\Support\PaddleConfig;
+use App\Modules\Billing\Support\PricingCatalog;
+use App\Modules\Family\Models\Family;
 use App\Modules\Policy\PolicyResolver;
 use App\Modules\Policy\Support\ThemeWorldCatalog;
 use Illuminate\Support\HtmlString;
@@ -24,6 +26,9 @@ use Normalizer;
  */
 class HelpCenter
 {
+    /** Classroom adult seats: teacher + co-teacher (docs/PLAN.md B12). */
+    private const int CLASSROOM_ADULTS = 2;
+
     /** Longest query the search looks at (characters) and most terms it uses. */
     public const int MAX_QUERY_LENGTH = 100;
 
@@ -257,7 +262,15 @@ class HelpCenter
             'lives' => (string) max(1, (int) ceil(max(1, (int) $this->policy->setting('play.target_points', 'free')) * (int) $this->policy->setting('play.blunder_cap_pct', 'free') / 100)),
             'redemption_items' => (string) max(1, (int) $this->policy->setting('play.redemption_items', 'free')),
             'free_members' => (string) (int) $this->policy->setting('limits.max_members', 'free'),
-            'family_members' => (string) (int) $this->policy->setting('limits.max_members', 'family'),
+            'family_members' => (string) $this->policy->maxMembersFor(Family::TIER_FAMILY),
+            'big_clan_members' => (string) $this->policy->maxMembersFor(Family::TIER_BIG_CLAN),
+            'classroom_members' => (string) $this->policy->maxMembersFor(Family::TIER_CLASSROOM),
+            'classroom_adults' => (string) self::CLASSROOM_ADULTS,
+            'classroom_students' => (string) max(0, $this->policy->maxMembersFor(Family::TIER_CLASSROOM) - self::CLASSROOM_ADULTS),
+            'price_family' => self::priceText(Family::TIER_FAMILY, $fr),
+            'price_big_clan' => self::priceText(Family::TIER_BIG_CLAN, $fr),
+            'price_classroom' => self::priceText(Family::TIER_CLASSROOM, $fr),
+            'trial_days' => (string) (int) config('billing.plans.annual.trial_days', 0),
             'free_categories' => (string) (int) $this->policy->setting('limits.max_categories', 'free'),
             'free_goals' => (string) ($this->policy->maxActiveGoalsFor('free') ?? ''),
             'family_second_chances' => (string) (int) $this->policy->setting('second_chance.free_per_day', 'family'),
@@ -273,8 +286,30 @@ class HelpCenter
             'lock_third' => self::duration((int) ($lockout[2] ?? 86400), $fr),
             'reset_minutes' => (string) (int) config('auth.passwords.users.expire', 60),
             // Empty (the step is dropped) until web checkout (Paddle) is configured.
-            'web_checkout' => PaddleConfig::webCheckoutAvailable() ? Brand::domain().'/subscribe' : '',
+            'web_checkout' => PaddleConfig::anyTierAvailable() ? Brand::domain().'/subscribe' : '',
         ];
+    }
+
+    /**
+     * "$6.99 a month or $49.99 a year (USD)" for a paid tier, from the display prices in
+     * `config/billing.php` (default currency); '' when the tier has no prices.
+     */
+    private static function priceText(string $tier, bool $fr): string
+    {
+        $currency = PricingCatalog::defaultCurrency();
+        $plans = collect(PricingCatalog::plansFor($tier, $currency))->keyBy('id');
+        $monthly = $plans->get('monthly')['price'] ?? null;
+        $annual = $plans->get('annual')['price'] ?? null;
+
+        if ($monthly === null || $annual === null) {
+            return '';
+        }
+
+        $money = fn (string $amount): string => $fr ? str_replace('.', ',', $amount).' $' : '$'.$amount;
+
+        return $fr
+            ? $money($monthly).' par mois ou '.$money($annual).' par année ('.$currency.')'
+            : $money($monthly).' a month or '.$money($annual).' a year ('.$currency.')';
     }
 
     /**

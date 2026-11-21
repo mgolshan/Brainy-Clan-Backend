@@ -6,6 +6,7 @@ use App\Modules\Billing\Mail\WebCheckoutMail;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Models\WebCheckoutRequest;
 use App\Modules\Core\Support\Website;
+use App\Modules\Family\Models\Family;
 use App\Modules\Identity\Actions\RecordConsent;
 use App\Modules\Identity\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,8 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 /**
- * The website subscribe form (`POST /web/subscribe`): stores a request (email only as an HMAC)
+ * The website subscribe form (`POST /web/subscribe`): stores a request (email only as an HMAC,
+ * with the plan tier and billing period)
  * and emails the address, queued so the page answers equally fast in every case:
  *
  * - an adult admin of a family that can buy now gets a one-time link (30 minutes) to
@@ -27,7 +29,7 @@ class RequestWebCheckout
 {
     public function __construct(private readonly CheckWebCheckoutEligibility $eligibility) {}
 
-    public function handle(string $email, string $plan, ?string $affiliateCode, ?string $affiliateSource, string $locale = 'en', ?string $ipAddress = null): WebCheckoutRequest
+    public function handle(string $email, string $plan, ?string $affiliateCode, ?string $affiliateSource, string $locale = 'en', ?string $ipAddress = null, string $tier = Family::TIER_FAMILY): WebCheckoutRequest
     {
         $email = strtolower(trim($email));
         $emailHash = WebCheckoutRequest::hashEmail($email);
@@ -36,7 +38,7 @@ class RequestWebCheckout
         $member = $user?->activeMembership();
         $token = $reason === null ? Str::random(64) : null;
 
-        $request = DB::transaction(function () use ($emailHash, $user, $member, $reason, $token, $plan, $affiliateCode, $affiliateSource, $locale, $ipAddress): WebCheckoutRequest {
+        $request = DB::transaction(function () use ($emailHash, $user, $member, $reason, $token, $tier, $plan, $affiliateCode, $affiliateSource, $locale, $ipAddress): WebCheckoutRequest {
             WebCheckoutRequest::query()
                 ->where('email_hash', $emailHash)
                 ->whereIn('status', [WebCheckoutRequest::STATUS_PENDING, WebCheckoutRequest::STATUS_OPENED])
@@ -46,6 +48,7 @@ class RequestWebCheckout
                 'email_hash' => $emailHash,
                 'user_id' => $user?->id,
                 'family_id' => $member?->family_id,
+                'tier' => $tier,
                 'plan' => $plan,
                 'affiliate_code' => $affiliateCode,
                 'affiliate_source' => $affiliateCode !== null ? $affiliateSource : null,
@@ -64,13 +67,13 @@ class RequestWebCheckout
 
         if ($token !== null) {
             $url = Website::route('website.subscribe.checkout', ['token' => $token, ...($locale === 'en' ? [] : ['lang' => $locale])]);
-            Mail::to($email)->queue(new WebCheckoutMail($locale, $plan, $url, null, null));
+            Mail::to($email)->queue(new WebCheckoutMail($locale, $plan, $url, null, null, $tier));
         } else {
             $store = $reason === CheckWebCheckoutEligibility::STORE_PLAN_ACTIVE && $member !== null
                 ? $this->eligibility->activePlan($member->family_id)?->store
                 : null;
 
-            Mail::to($email)->queue(new WebCheckoutMail($locale, $plan, null, $reason, in_array($store, ['app_store', 'play_store'], true) ? $store : null));
+            Mail::to($email)->queue(new WebCheckoutMail($locale, $plan, null, $reason, in_array($store, ['app_store', 'play_store'], true) ? $store : null, $tier));
         }
 
         return $request;

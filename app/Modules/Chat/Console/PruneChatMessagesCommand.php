@@ -9,7 +9,7 @@ class PruneChatMessagesCommand extends Command
 {
     protected $signature = 'chat:prune';
 
-    protected $description = 'Delete family chat messages older than each family\'s retention (free 7 days, Family plan 365 days)';
+    protected $description = 'Delete family chat messages older than each family\'s retention (free 7 days, paid plans 365 days)';
 
     public function handle(PruneChatMessages $prune): int
     {

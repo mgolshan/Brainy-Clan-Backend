@@ -397,10 +397,10 @@ monitor on `https://brainyclan.com/`.
 | Sentry | `SENTRY_LARAVEL_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` | yes | DEPLOY.md §10 |
 | Monitoring | `HEALTH_DEEP_TOKEN`, `OPS_ALERT_EMAIL` (default support@), `OPS_ALERT_WEBHOOK_URL` (optional) | yes / optional | DEPLOY.md §8 |
 | Google / Facebook / Apple sign-in | `GOOGLE_CLIENT_ID_WEB/_IOS/_ANDROID`, `FACEBOOK_CLIENT_ID/_SECRET`, `APPLE_CLIENT_IDS`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` | Apple yes (if Google/Facebook offered) | README sign-in sections |
-| RevenueCat | `REVENUECAT_WEBHOOK_SECRET`, `REVENUECAT_API_KEY`, `REVENUECAT_ENTITLEMENT=family` | yes | README "RevenueCat" |
+| RevenueCat | `REVENUECAT_WEBHOOK_SECRET`, `REVENUECAT_API_KEY`, `REVENUECAT_ENTITLEMENT_FAMILY=family`, `REVENUECAT_ENTITLEMENT_BIG_CLAN=big_clan`, `REVENUECAT_ENTITLEMENT_CLASSROOM=classroom` (defaults; the old `REVENUECAT_ENTITLEMENT` still sets the Family one) | yes | README "RevenueCat" |
 | Expo push | `EXPO_ACCESS_TOKEN` (only with Enhanced push security) | optional | README "Expo push notifications" |
 | AdMob SSV | none (`ADMOB_SSV_KEYS_URL` optional) — point the ad units' SSV URL at `/api/v1/webhooks/admob-ssv` | — | README "AdMob rewarded ads" |
-| Paddle | `PADDLE_ENVIRONMENT`, `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRICE_MONTHLY/_SEMIANNUAL/_ANNUAL`, `PADDLE_HOSTED_CHECKOUT_URL` or `PADDLE_CLIENT_TOKEN`, `WEB_CHECKOUT_LINK_STOREFRONTS` (empty) | no — empty = "coming soon" | README "Web checkout (Paddle) — setup" |
+| Paddle | `PADDLE_ENVIRONMENT`, `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRICE_{FAMILY/BIG_CLAN/CLASSROOM}_{MONTHLY/SEMIANNUAL/ANNUAL}` (9 price ids; a tier without its 3 prices shows "coming soon"; the old `PADDLE_PRICE_MONTHLY/_SEMIANNUAL/_ANNUAL` still work as the Family prices), `PADDLE_HOSTED_CHECKOUT_URL` or `PADDLE_CLIENT_TOKEN`, `WEB_CHECKOUT_LINK_STOREFRONTS` (empty) | no — empty = "coming soon" | README "Web checkout (Paddle) — setup" |
 | AI generator | `ANTHROPIC_API_KEY` (+ optional `CONTENT_AI_*`) | optional | README "AI batch generator" |
 | Backups | `BACKUP_PASSPHRASE`, `BACKUP_RETENTION_DAYS`, `BACKUP_CRON`, `BACKUP_RCLONE_REMOTE`, `RCLONE_CONFIG_STORAGEBOX_*` | yes | DEPLOY.md §9 |
 

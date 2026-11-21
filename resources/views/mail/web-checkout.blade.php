@@ -6,7 +6,7 @@
 
 Bonjour,
 
-Voici votre lien pour vous abonner au forfait Famille de Brainy Clan sur le Web (valide {{ $minutes }} minutes, pour votre famille seulement).
+Voici votre lien pour vous abonner au forfait {{ $planName }} de Brainy Clan sur le Web (valide {{ $minutes }} minutes, pour votre famille seulement).
 
 <x-mail::button :url="$checkoutUrl">
 Passer au paiement
@@ -27,7 +27,7 @@ Votre famille a déjà un abonnement Brainy Clan acheté dans {{ $storeLabel }}.
 @elseif ($reason === 'web_plan_active')
 Votre famille a déjà un abonnement Brainy Clan acheté sur le Web. Pour le gérer (carte, factures, annulation), ouvrez l’écran Abonnement de l’application, ou utilisez le lien dans votre reçu Paddle.
 @elseif ($reason === 'not_admin' || $reason === 'purchases_not_allowed')
-Seul un administrateur adulte de votre famille peut acheter le forfait Famille. Demandez-lui de s’abonner avec l’adresse courriel de son compte.
+Seul un administrateur adulte de votre famille peut acheter un forfait payant. Demandez-lui de s’abonner avec l’adresse courriel de son compte.
 @elseif ($reason === 'no_family')
 Votre compte n’appartient encore à aucune famille. Créez votre famille dans l’application Brainy Clan, puis revenez vous abonner.
 @else
@@ -44,7 +44,7 @@ Si vous n’avez pas fait cette demande, ignorez ce courriel. Des questions ? [{
 
 Hello,
 
-Here is your link to subscribe to the Brainy Clan Family plan on the web (valid for {{ $minutes }} minutes, for your family only).
+Here is your link to subscribe to the Brainy Clan {{ $planName }} plan on the web (valid for {{ $minutes }} minutes, for your family only).
 
 <x-mail::button :url="$checkoutUrl">
 Continue to payment
@@ -65,7 +65,7 @@ Your family already has a Brainy Clan subscription bought in {{ $storeLabel }}. 
 @elseif ($reason === 'web_plan_active')
 Your family already has a Brainy Clan subscription bought on the web. To manage it (card, invoices, cancellation), open the Subscription screen in the app, or use the link in your Paddle receipt.
 @elseif ($reason === 'not_admin' || $reason === 'purchases_not_allowed')
-Only an adult admin of your family can buy the Family plan. Ask them to subscribe with the email address of their account.
+Only an adult admin of your family can buy a paid plan. Ask them to subscribe with the email address of their account.
 @elseif ($reason === 'no_family')
 Your account does not belong to a family yet. Create your family in the Brainy Clan app, then come back to subscribe.
 @else

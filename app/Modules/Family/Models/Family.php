@@ -42,7 +42,77 @@ class Family extends Model
 
     public const string TIER_FAMILY = 'family';
 
-    public const array TIERS = [self::TIER_FREE, self::TIER_FAMILY];
+    public const string TIER_BIG_CLAN = 'big_clan';
+
+    public const string TIER_CLASSROOM = 'classroom';
+
+    /** All tiers, cheapest first (docs/API.md "Plans and tiers"). */
+    public const array TIERS = [self::TIER_FREE, self::TIER_FAMILY, self::TIER_BIG_CLAN, self::TIER_CLASSROOM];
+
+    /** Paid tiers in rank order: `family` < `big_clan` < `classroom`. */
+    public const array PAID_TIERS = [self::TIER_FAMILY, self::TIER_BIG_CLAN, self::TIER_CLASSROOM];
+
+    /** Plan names for the admin, emails and the website. */
+    public const array TIER_LABELS = [
+        self::TIER_FREE => 'Free',
+        self::TIER_FAMILY => 'Family',
+        self::TIER_BIG_CLAN => 'Big Clan',
+        self::TIER_CLASSROOM => 'Classroom',
+    ];
+
+    /** French plan names (website, help center, emails). */
+    public const array TIER_LABELS_FR = [
+        self::TIER_FREE => 'Gratuit',
+        self::TIER_FAMILY => 'Famille',
+        self::TIER_BIG_CLAN => 'Grand Clan',
+        self::TIER_CLASSROOM => 'Classe',
+    ];
+
+    public static function isPaidTier(string $tier): bool
+    {
+        return in_array($tier, self::PAID_TIERS, true);
+    }
+
+    /**
+     * Rank of a tier: 0 for `free` (and unknown values), 1 `family`, 2 `big_clan`, 3 `classroom`.
+     * When several subscriptions are entitled the highest rank wins.
+     */
+    public static function tierRank(string $tier): int
+    {
+        $index = array_search($tier, self::PAID_TIERS, true);
+
+        return $index === false ? 0 : $index + 1;
+    }
+
+    /**
+     * The highest-ranked tier of the given ones; `free` when none is paid.
+     *
+     * @param  iterable<string|null>  $tiers
+     */
+    public static function highestTier(iterable $tiers): string
+    {
+        $best = self::TIER_FREE;
+
+        foreach ($tiers as $tier) {
+            if ($tier !== null && self::tierRank($tier) > self::tierRank($best)) {
+                $best = $tier;
+            }
+        }
+
+        return $best;
+    }
+
+    public static function tierLabel(string $tier, string $locale = 'en'): string
+    {
+        $labels = $locale === 'fr' ? self::TIER_LABELS_FR : self::TIER_LABELS;
+
+        return $labels[$tier] ?? ucwords(str_replace('_', ' ', $tier));
+    }
+
+    public function isPaid(): bool
+    {
+        return self::isPaidTier($this->tier);
+    }
 
     protected function casts(): array
     {

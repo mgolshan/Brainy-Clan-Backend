@@ -44,7 +44,7 @@ class ThemeWorldResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        $types = array_combine(ThemeWorld::UNLOCK_TYPES, ['Free', 'Lifetime points', 'Longest streak (days)', 'Family plan']);
+        $types = array_combine(ThemeWorld::UNLOCK_TYPES, ['Free', 'Lifetime points', 'Longest streak (days)', 'Any paid plan (family_plan)']);
 
         return $schema->columns(2)->components([
             Select::make('key')->label('World')->options(AgeBand::THEME_LABELS)->required()->unique(ignoreRecord: true),

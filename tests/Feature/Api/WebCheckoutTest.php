@@ -22,7 +22,7 @@ function configurePaddle(array $extra = []): void
         'billing.paddle.environment' => 'sandbox',
         'billing.paddle.api_key' => 'pdl_test_key',
         'billing.paddle.webhook_secret' => 'pdl_secret',
-        'billing.paddle.price_ids' => ['monthly' => 'pri_monthly', 'semiannual' => 'pri_semi', 'annual' => 'pri_annual'],
+        'billing.paddle.price_ids' => paddlePriceIds(),
         'billing.paddle.hosted_checkout_url' => 'https://sandbox-pay.paddle.io/checkout/hsc_test',
         ...$extra,
     ]);
@@ -63,16 +63,17 @@ beforeEach(function () {
 it('serves the display prices in USD and CAD', function () {
     $this->getJson('/api/v1/pricing')->assertOk()
         ->assertHeader('Cache-Control', 'max-age=300, public')
-        ->assertExactJson(['data' => ['currency' => 'USD', 'plans' => [
+        ->assertJsonPath('data.currency', 'USD')
+        ->assertJsonPath('data.tiers.0', ['id' => 'family', 'members' => 6, 'highlighted' => true, 'available' => false, 'plans' => [
             ['id' => 'annual', 'price' => '49.99', 'per_month' => '4.17', 'saving_percent' => 40, 'trial_days' => 7, 'highlighted' => true],
             ['id' => 'semiannual', 'price' => '29.99', 'per_month' => '5.00', 'saving_percent' => 28, 'trial_days' => 7, 'highlighted' => false],
             ['id' => 'monthly', 'price' => '6.99', 'per_month' => '6.99', 'saving_percent' => 0, 'trial_days' => 0, 'highlighted' => false],
-        ]]]);
+        ]]);
 
     $this->getJson('/api/v1/pricing?currency=CAD')->assertOk()
         ->assertJsonPath('data.currency', 'CAD')
-        ->assertJsonPath('data.plans.0.price', '64.99')
-        ->assertJsonPath('data.plans.2.price', '8.99');
+        ->assertJsonPath('data.tiers.0.plans.0.price', '64.99')
+        ->assertJsonPath('data.tiers.0.plans.2.price', '8.99');
 
     $this->getJson('/api/v1/pricing?currency=EUR')->assertUnprocessable()->assertJsonPath('code', 'validation_failed');
 });
@@ -290,7 +291,7 @@ it('allows the in-app web checkout link only for configured storefronts of eligi
 
     $this->getJson('/api/v1/family/web-checkout/availability?storefront=usa')->assertOk()
         ->assertJsonPath('data.link_allowed', true)
-        ->assertJsonPath('data.url', fn (string $url) => str_ends_with($url, '/subscribe?plan=annual&src=app'));
+        ->assertJsonPath('data.url', fn (string $url) => str_ends_with($url, '/subscribe?tier=family&plan=annual&src=app'));
     $this->getJson('/api/v1/family/web-checkout/availability?storefront=CAN')->assertOk()->assertJsonPath('data.link_allowed', false);
     $this->getJson('/api/v1/family/web-checkout/availability')->assertOk()->assertJsonPath('data.link_allowed', false);
     $this->getJson('/api/v1/family/web-checkout/availability?storefront=US')->assertUnprocessable();

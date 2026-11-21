@@ -2,8 +2,12 @@
 
 namespace App\Modules\Billing\Support;
 
+use App\Modules\Family\Models\Family;
+
 /**
- * Reads the Paddle part of `config/billing.php`.
+ * Reads the Paddle part of `config/billing.php`. Prices are configured per paid tier and billing
+ * period (`billing.paddle.price_ids.{tier}.{plan}`); the pre-B12 `legacy_price_ids` still count as
+ * the Family prices.
  */
 final class PaddleConfig
 {
@@ -33,25 +37,40 @@ final class PaddleConfig
     }
 
     /**
-     * Paddle price id of a plan (`monthly`, `semiannual`, `annual`), or '' when not configured.
+     * Paddle price id of a tier's billing period (`monthly`, `semiannual`, `annual`), or '' when
+     * not configured.
      */
-    public static function priceId(string $plan): string
+    public static function priceId(string $tier, string $plan): string
     {
-        return self::string("billing.paddle.price_ids.{$plan}");
+        if (! Family::isPaidTier($tier)) {
+            return '';
+        }
+
+        $priceId = self::string("billing.paddle.price_ids.{$tier}.{$plan}");
+
+        if ($priceId === '' && $tier === Family::TIER_FAMILY) {
+            return self::string("billing.paddle.legacy_price_ids.{$plan}");
+        }
+
+        return $priceId;
     }
 
     /**
-     * The plan (`annual`, …) a Paddle price id belongs to, or null.
+     * The tier and billing period a Paddle price id belongs to, or null for an unknown price.
+     *
+     * @return array{tier: string, plan: string}|null
      */
-    public static function planForPrice(?string $priceId): ?string
+    public static function tierAndPlanForPrice(?string $priceId): ?array
     {
         if ($priceId === null || $priceId === '') {
             return null;
         }
 
-        foreach (array_keys((array) config('billing.plans', [])) as $plan) {
-            if (self::priceId((string) $plan) === $priceId) {
-                return (string) $plan;
+        foreach (Family::PAID_TIERS as $tier) {
+            foreach (PricingCatalog::planIds() as $plan) {
+                if (self::priceId($tier, $plan) === $priceId) {
+                    return ['tier' => $tier, 'plan' => $plan];
+                }
             }
         }
 
@@ -59,21 +78,37 @@ final class PaddleConfig
     }
 
     /**
-     * Web checkout can be offered: API key, webhook secret and a price id for every plan.
+     * Web checkout can be offered for a tier: API key, webhook secret and a price id for each of
+     * the tier's billing periods.
      */
-    public static function webCheckoutAvailable(): bool
+    public static function webCheckoutAvailable(string $tier = Family::TIER_FAMILY): bool
     {
-        if (self::apiKey() === '' || self::webhookSecret() === '') {
+        if (self::apiKey() === '' || self::webhookSecret() === '' || ! Family::isPaidTier($tier)) {
             return false;
         }
 
-        foreach (array_keys((array) config('billing.plans', [])) as $plan) {
-            if (self::priceId((string) $plan) === '') {
+        foreach (PricingCatalog::planIds() as $plan) {
+            if (self::priceId($tier, $plan) === '') {
                 return false;
             }
         }
 
         return true;
+    }
+
+    /**
+     * The paid tiers web checkout is configured for, in rank order.
+     *
+     * @return list<string>
+     */
+    public static function availableTiers(): array
+    {
+        return array_values(array_filter(Family::PAID_TIERS, fn (string $tier): bool => self::webCheckoutAvailable($tier)));
+    }
+
+    public static function anyTierAvailable(): bool
+    {
+        return self::availableTiers() !== [];
     }
 
     public static function hostedCheckoutUrl(): string

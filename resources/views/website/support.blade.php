@@ -98,10 +98,10 @@
             </details>
 
             <details id="subscription">
-                <summary>{{ $fr ? 'Comment gérer ou annuler le forfait Famille ?' : 'How do I manage or cancel the Family plan?' }}</summary>
+                <summary>{{ $fr ? 'Comment gérer, changer ou annuler mon forfait ?' : 'How do I manage, change or cancel my plan?' }}</summary>
                 <p>{{ $fr
-                    ? 'L’abonnement est géré par la boutique où il a été acheté : réglages d’abonnement de l’App Store (Apple) ou de Google Play. Si l’abonnement prend fin, votre famille garde ses données et repasse au forfait gratuit.'
-                    : 'The subscription is managed by the store you bought it from: your App Store (Apple) or Google Play subscription settings. If it ends, your family keeps its data and goes back to the free plan.' }}</p>
+                    ? 'L’abonnement est géré par la boutique où il a été acheté : réglages d’abonnement de l’App Store (Apple) ou de Google Play, où vous pouvez aussi passer à un autre forfait. Un forfait acheté sur le Web se gère dans le portail client de Paddle : pour changer de forfait, résiliez-le puis abonnez-vous au nouveau. Si l’abonnement prend fin, votre famille garde ses données et repasse au forfait gratuit.'
+                    : 'The subscription is managed by the store you bought it from: your App Store (Apple) or Google Play subscription settings, where you can also switch to another plan. A plan bought on the web is managed in the Paddle customer portal: to switch plans, cancel it and subscribe to the new one. If it ends, your family keeps its data and goes back to the free plan.' }}</p>
             </details>
 
             <details id="privacy">

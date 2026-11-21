@@ -33,6 +33,16 @@ class FamilyFactory extends Factory
         return $this->state(fn () => ['tier' => Family::TIER_FAMILY]);
     }
 
+    public function bigClanTier(): static
+    {
+        return $this->state(fn () => ['tier' => Family::TIER_BIG_CLAN]);
+    }
+
+    public function classroomTier(): static
+    {
+        return $this->state(fn () => ['tier' => Family::TIER_CLASSROOM]);
+    }
+
     /**
      * Also create the owner's admin membership.
      */

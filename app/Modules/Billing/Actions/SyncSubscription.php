@@ -4,6 +4,7 @@ namespace App\Modules\Billing\Actions;
 
 use App\Modules\Billing\Contracts\RevenueCatClient;
 use App\Modules\Billing\Models\Subscription;
+use App\Modules\Billing\Support\BillingTiers;
 use App\Modules\Family\Models\Family;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -11,8 +12,8 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
- * Pulls the family's subscriber (`family-{id}`) from the RevenueCat REST API and applies the
- * `family` entitlement to `subscriptions` and the family tier (`POST /family/subscription/sync`,
+ * Pulls the family's subscriber (`family-{id}`) from the RevenueCat REST API and applies its plan
+ * entitlement (`family`, `big_clan` or `classroom`; {@see self::pick()}) to `subscriptions` and the family tier (`POST /family/subscription/sync`,
  * scheduled reconciliation). Without `REVENUECAT_API_KEY`, or when RevenueCat cannot be reached,
  * nothing changes. The API reflects the current state, so the sync counts as the newest event
  * (older webhooks delivered afterwards are recorded as `stale`).
@@ -49,9 +50,8 @@ class SyncSubscription
             /** @var Family $family */
             $family = Family::query()->lockForUpdate()->findOrFail($family->id);
             $subscription = Subscription::query()->where('family_id', $family->id)->where('provider', Subscription::PROVIDER_REVENUECAT)->lockForUpdate()->first();
-            $entitlementId = (string) config('services.revenuecat.entitlement', 'family');
             $entitlements = is_array($subscriber['entitlements'] ?? null) ? $subscriber['entitlements'] : [];
-            $entitlement = is_array($entitlements[$entitlementId] ?? null) ? $entitlements[$entitlementId] : null;
+            [$entitlementId, $entitlement] = $this->pick($entitlements, $fetchedAt);
 
             if ($entitlement === null) {
                 // Never had the entitlement: keep a missing row missing; end a stored one.
@@ -68,6 +68,7 @@ class SyncSubscription
                     'entitlement' => $entitlementId,
                 ]);
 
+                $subscription->fill(['entitlement' => $entitlementId]);
                 $this->fill($subscription, $entitlement, $subscriber, $fetchedAt);
             }
 
@@ -80,6 +81,43 @@ class SyncSubscription
         });
 
         return true;
+    }
+
+    /**
+     * Of the subscriber's entitlements that are ours (one per tier), the highest-ranked one that is
+     * still on (not expired, or within its grace period); else the one that ended last. [null, null]
+     * when the subscriber never had any of them.
+     *
+     * @param  array<mixed>  $entitlements  `subscriber.entitlements`
+     * @return array{0: string, 1: array<string, mixed>}|array{0: null, 1: null}
+     */
+    private function pick(array $entitlements, Carbon $now): array
+    {
+        $active = [];
+        $ended = null;
+        $endedAt = null;
+
+        foreach ($entitlements as $id => $entitlement) {
+            if (! is_array($entitlement) || BillingTiers::tierForEntitlement((string) $id) === null) {
+                continue;
+            }
+
+            $expiresAt = $this->time($entitlement['expires_date'] ?? null);
+            $graceAt = $this->time($entitlement['grace_period_expires_date'] ?? null);
+
+            if ($expiresAt === null || $expiresAt->greaterThan($now) || ($graceAt !== null && $graceAt->greaterThan($now))) {
+                $active[] = (string) $id;
+            } elseif ($endedAt === null || $expiresAt->greaterThan($endedAt)) {
+                [$ended, $endedAt] = [(string) $id, $expiresAt];
+            }
+        }
+
+        $best = BillingTiers::bestOf($active)['entitlement'] ?? $ended;
+
+        /** @var array<string, mixed>|null $chosen */
+        $chosen = $best !== null && is_array($entitlements[$best] ?? null) ? $entitlements[$best] : null;
+
+        return $best !== null && $chosen !== null ? [$best, $chosen] : [null, null];
     }
 
     /**

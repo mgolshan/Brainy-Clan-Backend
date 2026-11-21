@@ -483,6 +483,112 @@ Build decisions (backend, 2026-10-24):
   export goes only to the family owner's account email and is sent synchronously (never queued
   with the data); both staff privacy actions apply to child accounts (no own login) only.
 
+### B12 — Plans: Family, Big Clan and Classroom (2026-11-20, Moe)
+Moe's decision (2026-11-20): four plans, built now, before launch. This is pre-launch, so there
+are no existing paying families to protect. Done in steps; after each step the docs are updated
+and both repos are committed.
+
+| Plan (`tier`) | For | Members | USD mo / 6 mo / yr | CAD mo / 6 mo / yr |
+|---|---|---|---|---|
+| Free (`free`) | trying it | 2 | – | – |
+| Family (`family`) | parents + kids | 6 (was 7) | 6.99 / 29.99 / 49.99 | 8.99 / 39.99 / 64.99 |
+| Big Clan (`big_clan`) | grandparents, cousins, homeschool groups | 12 | 9.99 / 39.99 / 69.99 | 12.99 / 52.99 / 89.99 |
+| Classroom (`classroom`) | teachers, tutors, coaches | 37 (1 teacher + 1 co-teacher + 35 students) | 14.99 / 69.99 / 119.99 | 19.99 / 89.99 / 159.99 |
+
+- **What each plan includes:**
+  - All paid plans have the same features: categories, goals, second chances, no ads, 365-day chat and `family_plan` worlds.
+  - 7-day trial on 6-month and annual.
+  - Founding-family offer unchanged.
+- **Why Big Clan rather than Classroom:**
+  - Classroom is the most expensive plan and allows only **2 adults**.
+  - Big Clan allows any number of adults and co-admins (grandparents each with their own account).
+  - Classroom adds group-management tools that a family doesn't need.
+- **Profanity filter is in every plan, on by default.** Safety is never a paid upsell. The
+  Classroom-only chat tool is "Announcements only".
+- **Steps:**
+  1. **Plan tiers:**
+     - Tier values, per-tier settings, and RevenueCat entitlements and offerings per tier.
+     - Store product ids `brainyclan_{tier}_{monthly|6months|annual}`. The App Store puts them in
+       one subscription group, so up- and downgrades are handled by Apple.
+     - Paddle prices per tier, and the web subscribe flow with `tier`.
+     - `GET /pricing` per tier; the app paywall gets a plan picker.
+     - Website: plans section with 4 cards, a **use-case slider**, and the subscribe page with a tier picker.
+     - Help center, READMEs, terms wording and admin.
+  2. **Chat safety:**
+     - Server-side profanity filter (en + fr word lists, masked with ★), a family setting, on by default.
+     - Classroom chat modes: `normal`, `announcements` (only the teacher and co-teacher post;
+       students read and react) and `off`.
+  3. **Classroom tools:**
+     - The 2-adult cap (teacher + co-teacher) with an "adult seats" limit.
+     - Roster bulk add (paste names) and printable sign-in code cards.
+     - Class summary export (CSV + PDF: nicknames, points, games, accuracy, streaks).
+     - **"Archive & start new year"**: a guided reset with checkboxes for students, points and
+       history, chat, and goals. The export is offered first. It cannot be undone; the teacher
+       retypes the class name to confirm.
+     - The teacher's consent statement at Classroom sign-up ("I'm authorised by my school, or I
+       have parents' consent"), stored with a version.
+     - A draft Classroom terms page. **The lawyer reviews it before launch.**
+  4. **FTUE (first-time user experience) per plan.** Planned here; to be built after steps 1–3.
+- **Later, not planned yet:** changing the tier of a plan bought on the web (Paddle). For now it
+  is cancel and resubscribe; store plans change tier inside the store.
+
+#### FTUE plan (step 4, not built yet)
+Goal: nobody feels lost after signing up. These are the principles; each plan and role then has its own flow.
+
+**Principles**
+- Short and skippable.
+- Never blocks play.
+- Server-stored progress, so a second device doesn't repeat it.
+- i18n en/fr.
+- Respects reduced motion and the member's world.
+- Measured only with our own counters, never a third-party SDK.
+
+**Building blocks**
+- **Server:** `GET /me/onboarding` → `{ steps: { key: done_at|null }, dismissed_at }`; `POST /me/onboarding/{step}` marks a step done; `POST /me/onboarding/dismiss`. Step keys are per flow.
+- **App:**
+  - A "Getting started" checklist card on Home (n / m, dismissible).
+  - One-time coach marks the first time someone opens Play, Goals and Chat.
+  - Celebration on the last step.
+
+**Flows**
+- **Family / Big Clan owner (and Free):**
+  1. Welcome, three cards: play together, family goals, safe chat.
+  2. Create the family.
+  3. Pick your world.
+  4. Add the first member: invite, or a child with a sign-in code.
+  5. First quick game (5 questions).
+  6. Suggested first goal: the "Pizza Friday" template, everyone, all categories.
+  7. Say hi in chat.
+  - Big Clan adds "invite another adult as co-admin".
+- **Member joining by invite (kid / teen / adult / senior):**
+  1. Welcome from the family's name.
+  2. Avatar and world.
+  3. First game.
+  4. "Here's your family goal".
+  - Seniors get larger text by default; kids get fewer words and icons.
+- **Classroom teacher:**
+  1. Classroom welcome.
+  2. Class name, grade and the consent statement.
+  3. Paste the roster.
+  4. Print the code cards.
+  5. Choose a chat mode (default: Announcements only).
+  6. First class goal.
+  7. "How the end of the year works" (export, then archive & new year).
+  - Optional: invite a co-teacher.
+- **Classroom student:**
+  1. Sign in with a code card.
+  2. Avatar.
+  3. First game.
+  4. The class goal.
+  - There is no chat step when chat is in announcements or off mode.
+- **Paid upgrade (any plan):**
+  - A one-time "what's new for you" sheet after the tier switches, e.g. Big Clan: "invite up to 12".
+- **Get ready for it in steps 1–3:**
+  - Flows are keyed by `policy.tier` plus role and age band, so the app can choose the flow from
+    `/me` alone.
+  - Classroom setup state (consent done, roster added, codes printed) must be readable from
+    the API so FTUE can tick those steps.
+
 ## Open questions
 - **Answered by Moe (2026-10-22)** — see "Decisions (2026-10-22)" above: iPhone + iPad; Play
   target audience includes children (Families Policy); website `brainyclan.com`, support

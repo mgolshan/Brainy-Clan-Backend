@@ -9,6 +9,7 @@ use App\Modules\Content\Models\ContentBatch;
 use App\Modules\Content\Models\ContentItem;
 use App\Modules\Content\Support\CategoryTree;
 use App\Modules\Family\Models\AccountDeletionRequest;
+use App\Modules\Family\Models\Family;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Notifications\Jobs\DeliverPushNotification;
 use Carbon\CarbonImmutable;
@@ -34,13 +35,13 @@ class DashboardMetrics
     /** Days in the short window (sparklines, "7 d" figures). */
     public const int WEEK_DAYS = 7;
 
-    private const string CACHE_PREFIX = 'admin:dashboard:v1:';
+    private const string CACHE_PREFIX = 'admin:dashboard:v2:';
 
     /**
      * Families, members, active players, plays and points.
      *
      * @return array{
-     *     families: int, families_new_week: int, families_on_family_plan: int,
+     *     families: int, families_new_week: int, families_paid: int, families_by_tier: array<string, int>,
      *     members: int, players_today: int, players_week: int,
      *     plays_today: int, plays_week: int, plays_daily: array<string, int>,
      *     points_today: int, points_week: int, points_daily: array<string, int>
@@ -55,9 +56,21 @@ class DashboardMetrics
             $families = DB::table('families')
                 ->whereNull('deleted_at')
                 ->selectRaw('COUNT(*) AS total')
-                ->selectRaw('COALESCE(SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END), 0) AS new_week', [$weekStart])
-                ->selectRaw("COALESCE(SUM(CASE WHEN tier = 'family' THEN 1 ELSE 0 END), 0) AS family_plan")
-                ->first();
+                ->selectRaw('COALESCE(SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END), 0) AS new_week', [$weekStart]);
+
+            // One count per paid tier in the same query (paid = any tier but free).
+            foreach (Family::PAID_TIERS as $tier) {
+                $families->selectRaw("COALESCE(SUM(CASE WHEN tier = ? THEN 1 ELSE 0 END), 0) AS tier_{$tier}", [$tier]);
+            }
+
+            $families = $families->first();
+
+            /** @var array<string, int> $byTier */
+            $byTier = [];
+
+            foreach (Family::PAID_TIERS as $tier) {
+                $byTier[$tier] = (int) ($families->{"tier_{$tier}"} ?? 0);
+            }
 
             $players = DB::table('play_sessions')
                 ->where('started_at', '>=', $weekStart)
@@ -79,7 +92,8 @@ class DashboardMetrics
             return [
                 'families' => (int) $families?->total,
                 'families_new_week' => (int) $families?->new_week,
-                'families_on_family_plan' => (int) $families?->family_plan,
+                'families_paid' => array_sum($byTier),
+                'families_by_tier' => $byTier,
                 'members' => FamilyMember::query()->where('status', FamilyMember::STATUS_ACTIVE)->count(),
                 'players_today' => (int) $players?->today,
                 'players_week' => (int) $players?->week,

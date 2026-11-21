@@ -38,8 +38,8 @@ error until its keys are in `.env`.
 | --- | --- | --- |
 | Google and Facebook sign-in | [Google and Facebook sign-in — setup](#google-and-facebook-sign-in--setup) | `GOOGLE_CLIENT_ID_*`, `FACEBOOK_CLIENT_*` |
 | Sign in with Apple + token revocation | [Sign in with Apple — setup](#sign-in-with-apple--setup) | `APPLE_CLIENT_IDS`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` |
-| Subscriptions (RevenueCat) | [RevenueCat](#revenuecat-family-plan-subscription) | `REVENUECAT_WEBHOOK_SECRET`, `REVENUECAT_API_KEY` |
-| Web checkout (Paddle) | [Web checkout (Paddle) — setup](#web-checkout-paddle--setup) | `PADDLE_*`, `WEB_CHECKOUT_LINK_STOREFRONTS` |
+| Subscriptions (RevenueCat) | [RevenueCat](#revenuecat-plan-subscriptions-family-big-clan-classroom) | `REVENUECAT_WEBHOOK_SECRET`, `REVENUECAT_API_KEY`, `REVENUECAT_ENTITLEMENT_*` |
+| Web checkout (Paddle) | [Web checkout (Paddle) — setup](#web-checkout-paddle--setup) | `PADDLE_*` (incl. `PADDLE_PRICE_{TIER}_{PERIOD}`), `WEB_CHECKOUT_LINK_STOREFRONTS` |
 | Affiliate program | [Affiliate program — admin guide](#affiliate-program--admin-guide) | none |
 | Rewarded ads (AdMob SSV) | [AdMob rewarded ads](#admob-rewarded-ads-free-tier-second-chance) | none required (`ADMOB_SSV_KEYS_URL` optional) |
 | Push notifications (Expo) | [Expo push notifications](#expo-push-notifications) | none required (`EXPO_ACCESS_TOKEN` optional) |
@@ -656,19 +656,42 @@ The server decides the tier, ad rewards and notifications; the app only reports.
 services are involved. Everything below works locally without them (tests fake all three); you
 need real accounts only to try it on a device.
 
-### RevenueCat (Family plan subscription)
+### RevenueCat (plan subscriptions: Family, Big Clan, Classroom)
+
+Four plans (docs/PLAN.md B12, docs/API.md "Plans and tiers"): `free`, and the paid tiers `family`
+(6 members), `big_clan` (12) and `classroom` (37), ranked `family` < `big_clan` < `classroom`. All
+paid plans have the same features; only the member limits differ (tier settings, Policy).
 
 1. **Create the project** at [app.revenuecat.com](https://app.revenuecat.com) → *Projects* → *New
    project* "Brainy Clan". Add the apps: *App Store* (bundle ID `app.brainyclan`, plus the App Store
    Connect in-app purchase key) and *Play Store* (package name, plus the Google Play service account
    JSON). Follow RevenueCat's own wizard for the store credentials.
-2. **Products:** create the subscriptions in App Store Connect and Google Play Console first, with
-   the same product IDs in both stores: `brainyclan_family_monthly`, `brainyclan_family_6months` and
-   `brainyclan_family_annual` (B10 plans: monthly, 6 months, annual), then *Product catalog →
-   Products → Import*.
-3. **Entitlement:** *Product catalog → Entitlements → New* with identifier **`family`** (must match
-   `REVENUECAT_ENTITLEMENT`) and attach every Family product. Create an *Offering* (`default`) with
-   the packages the paywall shows.
+2. **Products — 9 product ids**, `brainyclan_{tier}_{monthly|6months|annual}`:
+
+   | Tier | Monthly | 6 months (7-day trial) | Annual (7-day trial) | USD mo / 6 mo / yr | CAD mo / 6 mo / yr |
+   | --- | --- | --- | --- | --- | --- |
+   | Family | `brainyclan_family_monthly` | `brainyclan_family_6months` | `brainyclan_family_annual` | 6.99 / 29.99 / 49.99 | 8.99 / 39.99 / 64.99 |
+   | Big Clan | `brainyclan_big_clan_monthly` | `brainyclan_big_clan_6months` | `brainyclan_big_clan_annual` | 9.99 / 39.99 / 69.99 | 12.99 / 52.99 / 89.99 |
+   | Classroom | `brainyclan_classroom_monthly` | `brainyclan_classroom_6months` | `brainyclan_classroom_annual` | 14.99 / 69.99 / 119.99 | 19.99 / 89.99 / 159.99 |
+
+   - **App Store Connect:** put all 9 in **one subscription group** ("Brainy Clan plans") so Apple
+     handles up- and downgrades (and never sells two plans at once). Set the **levels** from the
+     top: level 1 = the three `classroom` products, level 2 = `big_clan`, level 3 = `family`
+     (Apple: an upgrade is immediate and prorated, a downgrade starts at the next renewal).
+   - **Google Play Console:** one **subscription per tier** (`brainyclan_family`, `brainyclan_big_clan`,
+     `brainyclan_classroom`) with **3 base plans** each (monthly, 6 months, annual; trial offers on
+     the 6-month and annual base plans). RevenueCat names the products
+     `<subscription>:<base plan>`; use base plan ids `monthly`, `6months`, `annual`. The app passes
+     the old product when changing plan (Play's replacement mode).
+   - Then *Product catalog → Products → Import* in RevenueCat.
+3. **Entitlements — one per tier:** *Product catalog → Entitlements → New* with identifiers
+   **`family`**, **`big_clan`** and **`classroom`** (the server's entitlement → tier map,
+   `REVENUECAT_ENTITLEMENT_FAMILY|BIG_CLAN|CLASSROOM`, defaults are these ids). Attach each tier's 3
+   products to its own entitlement only. With several active entitlements the family gets the
+   highest-ranked tier; events with none of the three are `ignored`.
+   **Offerings — one per tier:** identifiers `family`, `big_clan` and `classroom`, each with that
+   tier's 3 packages (monthly, 6 months, annual). Make **`family` the current offering**; the app
+   reads `offerings.all[tier]` for its plan picker.
 4. **App user id:** the app calls `Purchases.logIn("family-{family_id}")` with
    `revenuecat_app_user_id` from `GET /api/v1/family/subscription`, so one purchase upgrades the whole
    family. Nothing to configure, just don't use anonymous ids for purchases.
@@ -746,25 +769,36 @@ account for Android) — that is configured on the app side, not here.
 
 ## Web checkout (Paddle) — setup
 
-Families can also buy the Family plan on the website (`/subscribe`). **Paddle is the merchant of
+Families can also buy a paid plan (Family, Big Clan or Classroom) on the website (`/subscribe?tier=…`). **Paddle is the merchant of
 record**: it sells, charges and remits sales tax / GST / HST / QST / VAT, sends receipts and runs
 the customer portal (cancel, card, invoices, refunds). Our server only creates the checkout and
 listens to Paddle's webhooks. Without the keys below the subscribe page says "coming soon".
 
-How it works: the parent types their account email + plan (+ optional referral code) on
-`/subscribe` → we email a one-time link (30 min) → `/subscribe/checkout?token=…` creates a Paddle
-transaction (`custom_data: { family_id, affiliate_code?, affiliate_source? }`, the code's Paddle
+How it works: the parent picks a tier and a billing period and types their account email (+
+optional referral code) on `/subscribe` → we email a one-time link (30 min; it carries the tier and
+period) → `/subscribe/checkout?token=…` creates a Paddle transaction with that tier's price (`custom_data: { family_id, affiliate_code?, affiliate_source? }`, the code's Paddle
 discount) and redirects to Paddle's checkout → Paddle returns to `/subscribe/thanks` → the webhook
-switches the family to the Family plan. Store plan active → no link, the email explains why (one
+switches the family to the tier of the paid price (unknown prices are ignored). Store plan active → no link, the email explains why (one
 active plan per family). The app asks `GET /family/web-checkout/availability` before showing any
-web link (none by default).
+web link (none by default; `tier` picks the plan). Changing tier on the web = cancel in the Paddle
+customer portal, then subscribe again (store plans change tier inside the store).
 
 ### Step 1 – sandbox account (always first)
 1. Create a **sandbox** account at https://sandbox-vendors.paddle.com (separate from the live one).
-2. **Catalog → Products → New product** "Brainy Clan Family plan" (tax category *Standard digital
-   goods*), then three **prices** (recurring): monthly US$6.99 (+ CAD 8.99 price override),
-   every 6 months US$29.99 / CA$39.99 with a **7-day trial**, yearly US$49.99 / CA$64.99 with a
-   **7-day trial** — the same as `config/billing.php` and the stores. Copy each `pri_…` id.
+2. **Catalog → Products — 3 products × 3 prices.** One product per tier (tax category *Standard
+   digital goods*): "Brainy Clan Family plan", "Brainy Clan Big Clan plan", "Brainy Clan Classroom
+   plan". Each gets three recurring **prices** with a CAD price override; the 6-month and yearly
+   prices have a **7-day trial** — the same as `config/billing.php` and the stores:
+
+   | Product | Monthly | Every 6 months | Yearly | Env names |
+   | --- | --- | --- | --- | --- |
+   | Family | US$6.99 / CA$8.99 | US$29.99 / CA$39.99 | US$49.99 / CA$64.99 | `PADDLE_PRICE_FAMILY_MONTHLY`, `_SEMIANNUAL`, `_ANNUAL` |
+   | Big Clan | US$9.99 / CA$12.99 | US$39.99 / CA$52.99 | US$69.99 / CA$89.99 | `PADDLE_PRICE_BIG_CLAN_MONTHLY`, `_SEMIANNUAL`, `_ANNUAL` |
+   | Classroom | US$14.99 / CA$19.99 | US$69.99 / CA$89.99 | US$119.99 / CA$159.99 | `PADDLE_PRICE_CLASSROOM_MONTHLY`, `_SEMIANNUAL`, `_ANNUAL` |
+
+   Copy each `pri_…` id. A tier is offered on the web (`GET /pricing` `available: true`) only when
+   all 3 of its prices are set; the others show "coming soon" on `/subscribe`. The pre-B12 names
+   `PADDLE_PRICE_MONTHLY|SEMIANNUAL|ANNUAL` still work as the Family prices.
 3. Optional launch offer: **Catalog → Discounts** "Founding families" 50 % for 12 months (recurring,
    12 billing periods); copy the `dsc_…` id into an affiliate code (or keep it for marketing).
 4. **Developer tools → Authentication**: create an **API key** (permissions: transactions write,
@@ -791,9 +825,15 @@ web link (none by default).
 PADDLE_ENVIRONMENT=sandbox          # production on the live account
 PADDLE_API_KEY=pdl_sdbx_apikey_…
 PADDLE_WEBHOOK_SECRET=pdl_ntfset_…
-PADDLE_PRICE_MONTHLY=pri_…
-PADDLE_PRICE_SEMIANNUAL=pri_…
-PADDLE_PRICE_ANNUAL=pri_…
+PADDLE_PRICE_FAMILY_MONTHLY=pri_…
+PADDLE_PRICE_FAMILY_SEMIANNUAL=pri_…
+PADDLE_PRICE_FAMILY_ANNUAL=pri_…
+PADDLE_PRICE_BIG_CLAN_MONTHLY=pri_…
+PADDLE_PRICE_BIG_CLAN_SEMIANNUAL=pri_…
+PADDLE_PRICE_BIG_CLAN_ANNUAL=pri_…
+PADDLE_PRICE_CLASSROOM_MONTHLY=pri_…
+PADDLE_PRICE_CLASSROOM_SEMIANNUAL=pri_…
+PADDLE_PRICE_CLASSROOM_ANNUAL=pri_…
 PADDLE_HOSTED_CHECKOUT_URL=https://sandbox-pay.paddle.io/checkout/hsc_…   # or leave empty and set:
 PADDLE_CLIENT_TOKEN=test_…                                                 # (for /subscribe/pay)
 WEB_CHECKOUT_LINK_STOREFRONTS=      # e.g. USA — only after re-checking Apple 3.1.1/3.1.3 and Play policy
@@ -801,12 +841,12 @@ WEB_CHECKOUT_LINK_STOREFRONTS=      # e.g. USA — only after re-checking Apple 
 Then `docker compose exec app php artisan config:cache` (production) and restart Horizon.
 
 ### Step 3 – test
-1. Sign in to the app (or seed data) as an adult family admin, open http://localhost:8080/subscribe,
-   enter that email; the link arrives in Mailpit (http://localhost:8025).
+1. Sign in to the app (or seed data) as an adult family admin, open
+   http://localhost:8080/subscribe?tier=big_clan, pick a period and enter that email; the link arrives in Mailpit (http://localhost:8025).
 2. Open it → Paddle checkout. Sandbox test card **4242 4242 4242 4242**, any future date, CVC 100
    (3-D Secure test card 4000 0038 0000 0446). After paying you land on `/subscribe/thanks`.
-3. Admin → Billing → Webhook events shows `paddle` events `applied`; the family is on the Family plan
-   and `GET /family/subscription` says `"store": "paddle"`. `POST /family/subscription/manage-link`
+3. Admin → Billing → Webhook events shows `paddle` events `applied`; the family is on the Big Clan
+   plan and `GET /family/subscription` says `"store": "paddle"`, `"tier": "big_clan"`. `POST /family/subscription/manage-link`
    returns a customer-portal link.
 4. Refund the transaction in the sandbox dashboard → `adjustment.updated` (approved) adds a negative
    commission entry if the family had a code. Cancel in the portal → `subscription.canceled` at the
@@ -819,10 +859,15 @@ Then `docker compose exec app php artisan config:cache` (production) and restart
       product, pricing (`/subscribe`), terms with refund policy (`/terms`), privacy (`/privacy`) and a
       support email — all live and lawyer-reviewed (`LEGAL_DRAFT=false`).
 - [ ] Hosted checkout approved on live (or default payment link `/subscribe/pay` + domain approved).
-- [ ] Live products/prices/discount recreated (sandbox ids don't carry over), live API key, webhook
-      destination + secret, `.env.prod` with `PADDLE_ENVIRONMENT=production`.
+- [ ] Live products/prices/discount recreated (3 products × 3 prices; sandbox ids don't carry over),
+      the 9 `PADDLE_PRICE_{TIER}_{PERIOD}` ids, live API key, webhook destination + secret,
+      `.env.prod` with `PADDLE_ENVIRONMENT=production`.
 - [ ] One real purchase + refund on production with your own card.
-- [ ] Prices still equal to the App Store / Google Play / RevenueCat offering and `config/billing.php`.
+- [ ] Prices of all 3 tiers still equal to the App Store / Google Play / RevenueCat offerings and
+      `config/billing.php`; `GET /api/v1/pricing` shows `available: true` for every tier you sell on the web.
+- [ ] RevenueCat: 3 entitlements, 3 offerings (`family` current), 9 products; App Store: one
+      subscription group with levels classroom > big_clan > family; Google Play: one subscription
+      per tier with 3 base plans.
 
 ## Affiliate program — admin guide
 

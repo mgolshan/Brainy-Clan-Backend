@@ -25,7 +25,7 @@ class SubscriptionFactory extends Factory
             'entitlement' => 'family',
             'status' => Subscription::STATUS_ACTIVE,
             'store' => 'app_store',
-            'product_id' => 'brainy_family_monthly',
+            'product_id' => 'brainyclan_family_monthly',
             'period_type' => 'normal',
             'environment' => 'PRODUCTION',
             'will_renew' => true,
@@ -34,6 +34,17 @@ class SubscriptionFactory extends Factory
             'last_event_ms' => now()->subDays(3)->getTimestampMs(),
             'last_event_type' => 'INITIAL_PURCHASE',
         ];
+    }
+
+    /**
+     * A subscription to another paid tier (`big_clan`, `classroom`): its entitlement and product id.
+     */
+    public function forTier(string $tier): static
+    {
+        return $this->state(fn () => [
+            'entitlement' => $tier,
+            'product_id' => 'brainyclan_'.$tier.'_monthly',
+        ]);
     }
 
     public function expired(): static
