@@ -4,6 +4,7 @@
     under public/images. Pages add their own CSS with @section('styles'); only a page served with
     SecurityHeaders:script may add a same-origin script (with its CSP nonce) in @section('scripts').
     Light/dark follows the system setting. $locale is en|fr; links carry ?lang= so the choice sticks.
+    Header and site menu: website/partials/site-header (same on every page, no JavaScript).
 --}}
 @php
     $fr = $locale === 'fr';
@@ -39,12 +40,12 @@
     <style>
         :root {
             --bg: #fffaf3; --surface: #ffffff; --fg: #1b2a4a; --muted: #4a5873; --accent: #1d5fc0;
-            --brand: #ff8a3d; --brand-soft: #ffe9c9; --border: #eadfce; --ok: #1f7a4d;
+            --brand: #ff8a3d; --brand-soft: #ffe9c9; --border: #eadfce; --ok: #1f7a4d; --sn-sea: #dff4f2; --sn-pop: #efe6ff;
         }
         @media (prefers-color-scheme: dark) {
             :root {
                 --bg: #0f1626; --surface: #172138; --fg: #eef2f8; --muted: #b3bdd0; --accent: #8db8ff;
-                --brand: #ff9a55; --brand-soft: #3a2a1a; --border: #2a3654; --ok: #6fd3a0;
+                --brand: #ff9a55; --brand-soft: #3a2a1a; --border: #2a3654; --ok: #6fd3a0; --sn-sea: #123a3d; --sn-pop: #2c2350;
             }
         }
         * { box-sizing: border-box; }
@@ -55,23 +56,104 @@
         .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
         .skip { position: absolute; left: -10000px; }
         .skip:focus { left: 16px; top: 8px; background: var(--surface); padding: 8px 12px; border-radius: 8px; z-index: 2; }
-        header.site { position: sticky; top: 0; z-index: 10; padding: 10px 0; background: var(--bg); border-bottom: 1px solid var(--border); box-shadow: 0 2px 10px rgba(0, 0, 0, .05); }
-        header.site .wrap { display: flex; align-items: center; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
-        .logo { display: flex; align-items: center; gap: 10px; color: var(--fg); text-decoration: none; font-weight: 800; font-size: 1.2rem; }
+        /* Site header (website/partials/site-header): mobile-first compact bar + full-width menu sheet;
+           dropdown panels from 960px on devices with a mouse. No JavaScript (see the partial). */
+        header.site { position: sticky; top: 0; z-index: 10; background: var(--bg); border-bottom: 1px solid var(--border); box-shadow: 0 2px 10px rgba(0, 0, 0, .05); }
+        .sn-bar { display: flex; align-items: center; gap: 8px; height: 60px; }
+        .logo { display: flex; align-items: center; gap: 10px; margin-right: auto; color: var(--fg); text-decoration: none; font-weight: 800; font-size: 1.15rem; white-space: nowrap; }
         .logo img { width: 40px; height: 40px; }
-        nav.top { display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: 0.95rem; }
-        /* Section menu (pages that define a sectionNav section): one row of pills; scrolls sideways on phones. */
-        nav.sections { flex-basis: 100%; min-width: 0; }
-        nav.sections ul { display: flex; gap: 6px; margin: 0; padding: 2px 0 4px; list-style: none; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-        nav.sections ul::-webkit-scrollbar { display: none; }
-        nav.sections a { display: block; white-space: nowrap; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--fg); font-size: 0.88rem; font-weight: 600; text-decoration: none; }
-        nav.sections a:hover { border-color: var(--brand); background: var(--brand-soft); }
-        nav.sections a.cta { background: var(--brand); border-color: var(--brand); color: #1b2a4a; }
-        @media (min-width: 900px) { nav.sections ul { justify-content: safe center; } }
-        /* Anchored headings land below the sticky header. */
-        html { scroll-padding-top: 80px; }
-        html:has(nav.sections) { scroll-padding-top: 130px; }
-        @media (max-width: 540px) { header.site { padding: 8px 0; } .logo img { width: 34px; height: 34px; } .logo { font-size: 1.05rem; } nav.top { gap: 4px 12px; font-size: 0.85rem; } }
+        .sn ul { list-style: none; margin: 0; padding: 0; }
+        .sn a { color: var(--fg); text-decoration: none; }
+        .sn svg, .sn-toggle svg { width: 20px; height: 20px; flex: none; }
+        .sn-txt { display: flex; flex-direction: column; min-width: 0; }
+        .sn-txt strong { font-weight: 800; line-height: 1.25; }
+        .sn-txt small { color: var(--muted); font-size: 0.82rem; line-height: 1.35; }
+        .sn-ico { flex: none; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 14px; font-size: 1.3rem; line-height: 1; background: var(--sn-tint, var(--brand-soft)); }
+        .sn-dd-families { --sn-tint: var(--sn-sea); }
+        .sn-dd-plans { --sn-tint: var(--sn-pop); }
+        .sn-cta { flex: none; display: inline-flex; align-items: center; height: 44px; padding: 0 16px; border-radius: 999px; background: var(--brand); color: #1b2a4a; font-weight: 800; font-size: 0.92rem; white-space: nowrap; text-decoration: none; box-shadow: 0 3px 0 rgba(27, 42, 74, .18); }
+        .sn-cta:hover { filter: brightness(1.05); }
+        .sn-toggle { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--fg); font-weight: 700; font-size: 0.92rem; text-decoration: none; }
+        .sn-close { display: none; }
+        .sn-btn { font: inherit; }
+        .sn-btn:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+        .sn-util a[aria-current="page"] { background: var(--brand-soft); color: var(--fg); }
+        .sn-code { display: none; font-weight: 800; font-size: 0.8rem; }
+        html { scroll-padding-top: 76px; }
+        @media (max-width: 420px) { .sn-toggle .sn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } .sn-toggle { padding: 0; } .sn-cta { padding: 0 14px; } .logo { font-size: 1.05rem; gap: 8px; } .logo img { width: 34px; height: 34px; } }
+        @media (max-width: 350px) { .logo span { display: none; } }
+
+        /* Phones, tablets, touch screens: the menu is a sheet below the bar while #site-menu is the :target. */
+        @media not all and (min-width: 960px) and (hover: hover) {
+            .sn, .sn-btn { display: none; }
+            .sn:target { display: block; position: fixed; top: 61px; left: 0; right: 0; bottom: 0; z-index: 9; overflow-y: auto; overscroll-behavior: contain; background: var(--bg); padding: 18px 16px calc(28px + env(safe-area-inset-bottom)); }
+            .sn:target ~ .sn-open { display: none; }
+            .sn:target ~ .sn-close { display: inline-flex; background: var(--brand-soft); border-color: var(--brand); }
+            html:has(.sn:target) { overflow: hidden; }
+            .sn-main, .sn-util { max-width: 760px; margin: 0 auto !important; }
+            .sn-main { display: flex; flex-direction: column; gap: 20px; }
+            .sn-about { order: -1; }
+            .sn-about a { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 12px 16px; border-radius: 18px; background: var(--brand-soft); border: 1px solid var(--border); }
+            .sn-about img { width: 40px; height: 40px; }
+            .sn-group { margin: 0 0 8px 4px; font-size: 0.78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+            .sn-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+            .sn-items a { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; height: 100%; min-height: 96px; padding: 14px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 2px 0 var(--border); }
+            .sn-items a:active, .sn-about a:active { transform: translateY(1px); box-shadow: none; }
+            .sn-items small { display: none; }
+            .sn-util { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px !important; padding-top: 18px !important; border-top: 1px solid var(--border); }
+            .sn-util li { flex: 1 1 140px; }
+            .sn-util a { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-weight: 700; }
+            .sn-util svg { color: var(--muted); }
+            @media (min-width: 600px) {
+                .sn-items { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+                .sn-items small { display: block; }
+            }
+            @media (prefers-reduced-motion: no-preference) {
+                .sn:target { animation: sn-sheet .2s ease-out; }
+                @keyframes sn-sheet { from { opacity: 0; transform: translateY(-10px); } }
+            }
+        }
+
+        /* Desktop with a mouse: one row; panels open on hover or keyboard focus. */
+        @media (min-width: 960px) and (hover: hover) {
+            header.site .wrap.sn-bar { max-width: 1240px; height: auto; min-height: 68px; flex-wrap: wrap; gap: 4px 12px; }
+            .logo { margin-right: 0; }
+            .sn-toggle { display: none; }
+            .sn { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; min-width: 0; }
+            .sn-main { display: flex; align-items: center; gap: 2px; margin: 0 auto !important; }
+            .sn-group, .sn-about img, .sn-about small { display: none; }
+            .sn-btn, .sn-about a { display: inline-flex; align-items: center; gap: 2px; height: 40px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--fg); font-size: 0.95rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
+            .sn-about strong { font-weight: 700; }
+            .sn-btn svg { width: 18px; height: 18px; opacity: .7; }
+            .sn-btn:hover, .sn-about a:hover, .sn-dd:hover .sn-btn { background: var(--brand-soft); }
+            .sn-dd { position: relative; }
+            .sn-panel { position: absolute; top: 100%; left: -8px; z-index: 11; padding-top: 12px; opacity: 0; pointer-events: none; transform: translateY(-6px); }
+            .sn-dd:hover > .sn-panel, .sn-dd:has(:focus-visible) > .sn-panel { opacity: 1; pointer-events: auto; transform: none; }
+            .sn-dd:hover .sn-btn svg, .sn-dd:has(:focus-visible) .sn-btn svg { transform: rotate(180deg); }
+            @supports not selector(:has(*)) { .sn-dd:focus-within > .sn-panel { opacity: 1; pointer-events: auto; transform: none; } }
+            .sn-items { display: grid; grid-template-columns: repeat(2, 280px); gap: 4px; padding: 10px; border-radius: 22px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 18px 44px rgba(27, 42, 74, .18); }
+            .sn-dd-plans .sn-items { grid-template-columns: 296px; }
+            .sn-items a { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 16px; }
+            .sn-items a:hover, .sn-items a:focus-visible { background: var(--bg); }
+            .sn-items a:hover strong { color: var(--accent); }
+            .sn-items strong { font-size: 0.95rem; }
+            .sn-util { display: flex; align-items: center; gap: 2px; }
+            .sn-util a { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 10px; border-radius: 999px; color: var(--muted); font-size: 0.86rem; font-weight: 600; white-space: nowrap; }
+            .sn-util a:hover { background: var(--brand-soft); color: var(--fg); }
+            .sn-util svg { width: 18px; height: 18px; }
+            .sn-cta { height: 42px; }
+            html { scroll-padding-top: 88px; }
+            @media (prefers-reduced-motion: no-preference) {
+                .sn-panel { transition: opacity .15s ease, transform .15s ease; }
+                .sn-btn svg { transition: transform .15s ease; }
+            }
+            /* Up to 1239px the utility links show their icon only (name kept for screen readers and as a tooltip). */
+            @media (max-width: 1239px) {
+                .sn-util .sn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+                .sn-util a { padding: 0 9px; }
+                .sn-code { display: inline; }
+            }
+        }
         h1 { font-size: clamp(1.9rem, 5vw, 3rem); line-height: 1.15; margin: 0 0 16px; letter-spacing: -0.01em; }
         h2 { font-size: clamp(1.4rem, 3.2vw, 2rem); line-height: 1.2; margin: 0 0 12px; }
         h3 { font-size: 1.1rem; margin: 0 0 6px; }
@@ -110,24 +192,7 @@
 <body>
 <span id="top"></span>
 <a class="skip" href="#main">{{ $fr ? 'Aller au contenu' : 'Skip to content' }}</a>
-<header class="site">
-    <div class="wrap">
-        <a class="logo" href="{{ route('website.home', $lang) }}">
-            <img src="{{ \App\Modules\Core\Support\Brand::logoUrl() }}" alt="" width="44" height="44">
-            <span>Brainy Clan</span>
-        </a>
-        <nav class="top" aria-label="{{ $fr ? 'Navigation principale' : 'Main navigation' }}">
-            <a href="{{ route('website.help', $lang) }}">{{ $fr ? 'Comment jouer' : 'How to play' }}</a>
-            <a href="{{ route('website.support', $lang) }}">{{ $fr ? 'Aide' : 'Support' }}</a>
-            <a href="{{ request()->url() }}?lang={{ $other }}" hreflang="{{ $other }}" lang="{{ $other }}">{{ $fr ? 'English' : 'Français' }}</a>
-        </nav>
-        @hasSection('sectionNav')
-            <nav class="sections" aria-label="{{ $fr ? 'Sur cette page' : 'On this page' }}">
-                <ul>@yield('sectionNav')</ul>
-            </nav>
-        @endif
-    </div>
-</header>
+@include('website.partials.site-header')
 <main id="main">
     @yield('content')
 </main>

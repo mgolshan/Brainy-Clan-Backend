@@ -117,6 +117,8 @@ class PolicySeeder extends Seeder
             ['global', null, 'second_chance.redemption_enabled', true, 'Redemption round available as a second-chance path.'],
             ['global', null, 'invites.ttl_days', 7, 'Days an invite code stays valid.'],
             ['global', null, 'sign_in_codes.ttl_minutes', 15, 'Minutes an admin-issued sign-in code stays valid.'],
+            ['global', null, 'family.owner_min_age', 16, 'Youngest age that may create (own) a family and sign up without an invite.'],
+            ['global', null, 'classroom.owner_min_age', 18, 'Youngest age of a Classroom family owner (the teacher); checked before a web Classroom purchase.'],
             ['global', null, 'feature_flags', [], 'Feature flags sent to the app (merged global <- tier <- age band).'],
 
             ['tier', 'free', 'limits.max_members', 2, 'Free tier: admin + 1 member.'],

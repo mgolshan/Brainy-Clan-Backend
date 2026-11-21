@@ -39,6 +39,8 @@ class PolicyResolver
         'sign_in_codes.ttl_minutes' => 15,
         'chat.retention_days' => 7,
         'chat.modes_allowed' => false,
+        'family.owner_min_age' => 16,
+        'classroom.owner_min_age' => 18,
         'feature_flags' => [],
     ];
 
@@ -269,6 +271,59 @@ class PolicyResolver
         }
 
         return $minAge;
+    }
+
+    // ---------------------------------------------------------------------------------
+    // Owner ages and self sign-up (docs/API.md "Plans and tiers" → "Owner ages")
+    // ---------------------------------------------------------------------------------
+
+    /**
+     * Youngest age that may create (own) a family (global setting `family.owner_min_age`, seeded 16).
+     */
+    public function familyOwnerMinAge(): int
+    {
+        return max(0, (int) $this->setting('family.owner_min_age'));
+    }
+
+    /**
+     * Youngest age of a Classroom family's owner (global setting `classroom.owner_min_age`, seeded 18).
+     */
+    public function classroomOwnerMinAge(): int
+    {
+        return max(0, (int) $this->setting('classroom.owner_min_age'));
+    }
+
+    /**
+     * Minimum owner age a tier adds on top of `familyOwnerMinAge()`: `classroomOwnerMinAge()` for
+     * `classroom`, null for the other tiers (`GET /pricing` `min_owner_age`).
+     */
+    public function minOwnerAgeFor(string $tier): ?int
+    {
+        return $tier === Family::TIER_CLASSROOM ? $this->classroomOwnerMinAge() : null;
+    }
+
+    /**
+     * Whether the user is at least `$minAge` today. A user without birth data passes: an unknown
+     * age resolves to the adult band everywhere else (e.g. admin staff).
+     */
+    public function userIsAtLeast(User $user, int $minAge): bool
+    {
+        $age = $this->age($user->birth_year, $user->birth_month);
+
+        return $age === null || $age >= $minAge;
+    }
+
+    /**
+     * Whether someone with this birth data may sign up on their own (email/password or social,
+     * without an invite): a band that collects email (adults, seniors) or an age of at least
+     * `familyOwnerMinAge()`, so a 16-year-old can register and create a family. Separate from
+     * `collect_email`, which still decides email for invited members.
+     */
+    public function selfSignUpAllowed(?int $birthYear, ?int $birthMonth): bool
+    {
+        $age = $this->age($birthYear, $birthMonth);
+
+        return $this->collectsEmail($this->bandForAge($age)) || ($age !== null && $age >= $this->familyOwnerMinAge());
     }
 
     // ---------------------------------------------------------------------------------

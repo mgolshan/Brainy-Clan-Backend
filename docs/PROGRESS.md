@@ -387,6 +387,56 @@ curl http://localhost:8080/api/v1/health
 
 ## Log
 
+### 2026-11-20 Owner ages: family 16+, Classroom 18+
+- **Settings** (global, through the PolicyResolver): `family.owner_min_age` = 16, `classroom.owner_min_age` = 18.
+  Migration `2026_11_20_400000_add_owner_min_age_settings` (inserts only missing keys: the unique key does not
+  catch a null `scope_id`), same rows in `PolicySeeder`, resolver defaults. New resolver methods
+  `familyOwnerMinAge()`, `classroomOwnerMinAge()`, `minOwnerAgeFor($tier)`, `userIsAtLeast()`, `selfSignUpAllowed()`.
+- **Self sign-up lowered from 18 to 16:** `RegisterAdult` and new social users (`SignInWithSocial`) now use
+  `selfSignUpAllowed()` = band `collect_email` **or** age ≥ `family.owner_min_age`; the bands are unchanged, so
+  invited members still follow `collect_email`. `EnsureSocialSignInAllowed` uses the same rule (else a 16-year-old
+  Google sign-up could not sign in again; side effect: a 16–17 invited teen with an email login can now link Google).
+  No birth data → adult band → allowed (as everywhere).
+- **`POST /families`:** under 16 → 403 `owner_too_young` with `min_age: 16` (`ApiException::ownerTooYoung()`,
+  `ErrorCodes`, `#[ApiErrors]`), after `already_in_family`.
+- **Classroom:** `CheckWebCheckoutEligibility` takes the tier; reason `owner_too_young` when the **family owner** is
+  under 18 (the buyer is not checked for this; adult admins still need `purchases_allowed`).
+  `GET /family/web-checkout/availability?tier=classroom` → 403 `owner_too_young`, `min_age: 18`; `POST /web/subscribe`
+  emails the reason (mail text en + fr); an emailed Classroom link then answers 403 and creates no Paddle transaction.
+  `GET /pricing` tiers gain `min_owner_age` (classroom 18, others null). RevenueCat webhooks still grant Classroom
+  (paid already) — tested.
+- **Docs/help:** docs/API.md (error table, register, social, `POST /families`, Plans and tiers → "Owner ages",
+  pricing, changelog); help center en + fr (create family 16+, Classroom owner 18+, new placeholders
+  `{family_owner_min_age}`, `{classroom_owner_min_age}`).
+- **Tests:** new `tests/Feature/Api/OwnerAgeTest.php` (16 tests); `SocialSignInTest` (+2: 16-year-old Google
+  sign-up and sign-in again, 17-year-old link), `WebCheckoutTest` pricing shape.
+- **Open for Moe:** Terms (`legal/en|fr/terms.blade.php` line 13) still say only adults 18+ may create an account
+  and a family, privacy has "Adults (18+)"; not changed (legal text). A 16–17 owner is an admin while "only adults
+  can be admins" holds for promotions; teens have `purchases_allowed: false`, so a 16–17 owner cannot buy any paid
+  plan (web: `purchases_not_allowed`; app hides purchases). The subscribe page's "can't subscribe" text has no
+  specific `owner_too_young` line (website views were being edited elsewhere).
+
+### 2026-11-20 website header: grouped menu (replaces the 13-pill row)
+- New `resources/views/website/partials/site-header.blade.php`, included by `website/layout` on
+  every website page (home, help, support, partners, subscribe); the home page's `sectionNav`
+  pill row is gone. Menu links are `#anchor` on the home page (and /r/{code}) and
+  `/?lang=..#anchor` elsewhere; the "Get the app" CTA (`#get`) is always visible.
+- Desktop (≥ 960px with a mouse): one row: logo, "Explore / For families / Plans" dropdown
+  panels (emoji tile + title + one-line description, 2 columns) + "About", utility links (How
+  to play, Support, language; icon-only with tooltip below 1240px) and the orange CTA. Panels
+  open on hover or keyboard focus (`:hover`, `:has(:focus-visible)`), close when pointer/focus
+  leaves. Header wrap widened to 1240px; fr fits at 960px (fr group label "Familles").
+- Phones, tablets and touch screens: 60px sticky bar (logo, CTA, Menu). Menu links to
+  `#site-menu`; the sheet shows while it is the `:target` (2-column tiles, 3 with descriptions
+  from 600px, About tile with the owl, utility links + language at the bottom, page scroll
+  locked). Tapping a tile changes the target, which closes the sheet; Close links to
+  `#close-menu` (no such id, so no scroll); browser Back also closes it.
+- No JavaScript: the home page CSP allows no scripts (tests require it), so it is pure CSS. Only
+  gap vs a JS menu: Escape does not close the mobile sheet. Reduced motion respected; dark mode
+  via the existing tokens (+ `--sn-sea`, `--sn-pop`).
+- Tests: WebsiteTest menu tests rewritten (every section once, CTA, toggles, en/fr labels,
+  links to home sections from /support, /help, /partners, /subscribe, aria-current).
+
 ### 2026-11-20 B12 step 3a: adult seats + adults-only admins
 - **Migration** `2026_11_20_300000_add_max_adults_tier_settings`: tier setting `limits.max_adults` (null =
   unlimited for free / family / big_clan, 2 for classroom; insert-or-ignore, admin edits kept). `PolicySeeder`

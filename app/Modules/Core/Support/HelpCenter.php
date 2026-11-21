@@ -264,6 +264,8 @@ class HelpCenter
             'big_clan_members' => (string) $this->policy->maxMembersFor(Family::TIER_BIG_CLAN),
             'classroom_members' => (string) $this->policy->maxMembersFor(Family::TIER_CLASSROOM),
             'classroom_adults' => (string) $classroomAdults,
+            'family_owner_min_age' => (string) $this->policy->familyOwnerMinAge(),
+            'classroom_owner_min_age' => (string) $this->policy->classroomOwnerMinAge(),
             'classroom_students' => (string) max(0, $this->policy->maxMembersFor(Family::TIER_CLASSROOM) - $classroomAdults),
             'price_family' => self::priceText(Family::TIER_FAMILY, $fr),
             'price_big_clan' => self::priceText(Family::TIER_BIG_CLAN, $fr),

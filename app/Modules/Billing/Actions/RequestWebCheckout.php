@@ -20,7 +20,8 @@ use Illuminate\Support\Str;
  *
  * - an adult admin of a family that can buy now gets a one-time link (30 minutes) to
  *   `/subscribe/checkout?token=…`;
- * - any other address gets an email explaining why not (no account, not an admin, the plan is
+ * - any other address gets an email explaining why not (no account, not an admin, a Classroom
+ *   whose family owner is under 18, the plan is
  *   managed in the App Store / Google Play, already subscribed on the web).
  *
  * Older pending links for the same email stop working. The page never reveals anything.
@@ -34,7 +35,7 @@ class RequestWebCheckout
         $email = strtolower(trim($email));
         $emailHash = WebCheckoutRequest::hashEmail($email);
         $user = User::query()->where('email', $email)->whereNull('erased_at')->first();
-        $reason = $this->eligibility->forUser($user);
+        $reason = $this->eligibility->forUser($user, $tier);
         $member = $user?->activeMembership();
         $token = $reason === null ? Str::random(64) : null;
 

@@ -57,7 +57,7 @@ class OpenWebCheckout
                 return ['state' => 'invalid', 'locale' => $request->locale];
             }
 
-            $reason = $this->eligibility->forMember($member);
+            $reason = $this->eligibility->forMember($member, $request->tier);
 
             if ($reason !== null) {
                 return ['state' => 'ineligible', 'reason' => $reason, 'locale' => $request->locale];

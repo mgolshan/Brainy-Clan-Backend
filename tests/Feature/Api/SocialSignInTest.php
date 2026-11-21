@@ -89,7 +89,7 @@ it('asks for birth data before creating a new user (social_signup_incomplete)', 
     expect(User::query()->count())->toBe(0)->and(SocialAccount::query()->count())->toBe(0);
 });
 
-it('refuses a new social user under the adult age', function (int $age) {
+it('refuses a new social user under the self sign-up age (16)', function (int $age) {
     googleIdentity();
 
     $this->postJson('/api/v1/auth/social/google', socialPayload(['birth_year' => now()->year - $age, 'birth_month' => 1]))
@@ -99,6 +99,27 @@ it('refuses a new social user under the adult age', function (int $age) {
 
     expect(User::query()->count())->toBe(0);
 })->with([9, 15]);
+
+it('signs up a 16-year-old with Google (self sign-up age), who can sign in again', function () {
+    googleIdentity(email: 'sam@gmail.com');
+
+    $this->postJson('/api/v1/auth/social/google', socialPayload(['birth_year' => now()->year - 16, 'birth_month' => 1]))
+        ->assertCreated()
+        ->assertJsonPath('data.policy.age_band', 'teen');
+
+    $this->postJson('/api/v1/auth/social/google', socialPayload())->assertOk();
+
+    expect(User::query()->count())->toBe(1);
+});
+
+it('links a 17-year-old email login on Google sign-in (from the self sign-up age)', function () {
+    $teen = User::factory()->aged(17)->create(['email' => 'older-teen@gmail.com']);
+    googleIdentity(email: 'older-teen@gmail.com');
+
+    $this->postJson('/api/v1/auth/social/google', socialPayload())->assertOk();
+
+    expect($teen->socialAccounts()->count())->toBe(1);
+});
 
 it('creates a user without email when the provider shares none, and never links by email then', function () {
     User::factory()->create(['email' => 'dad@example.com']);
@@ -151,7 +172,7 @@ it('links an existing user with the same verified email and signs in (200)', fun
         ->and(User::query()->count())->toBe(1);
 });
 
-it('never links a non-adult email login (403)', function () {
+it('never links an email login under the self sign-up age (403)', function () {
     $teen = User::factory()->aged(15)->create(['email' => 'teen@gmail.com']);
     googleIdentity(email: 'teen@gmail.com');
 

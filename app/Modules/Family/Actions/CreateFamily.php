@@ -7,13 +7,18 @@ use App\Modules\Family\Events\MemberJoined;
 use App\Modules\Family\Models\Family;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Identity\Models\User;
+use App\Modules\Policy\PolicyResolver;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Creates a family on the free tier; the caller becomes its owner and an admin.
+ * Creates a family on the free tier; the caller becomes its owner and an admin. The caller must be
+ * at least `family.owner_min_age` (16): else 403 `owner_too_young` with `min_age`. A user without
+ * birth data counts as an adult (like everywhere in the PolicyResolver).
  */
 class CreateFamily
 {
+    public function __construct(private readonly PolicyResolver $policy) {}
+
     /**
      * @param  array{name: string, timezone: string, country_code: string}  $data
      */
@@ -21,6 +26,12 @@ class CreateFamily
     {
         if ($user->activeMembership() !== null) {
             throw ApiException::alreadyInFamily();
+        }
+
+        $minAge = $this->policy->familyOwnerMinAge();
+
+        if (! $this->policy->userIsAtLeast($user, $minAge)) {
+            throw ApiException::ownerTooYoung($minAge, "You need to be at least {$minAge} to create a family. Ask a parent to invite you to theirs.");
         }
 
         return DB::transaction(function () use ($user, $data): Family {

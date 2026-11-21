@@ -27,9 +27,12 @@ class WebCheckoutController
      * `link_allowed` is true only for storefronts the server allows (none by default — store
      * rules), with web checkout configured for that tier and when the family could buy now; `url`
      * then opens the website subscribe page for that tier (`?tier=…&plan=annual&src=app`). When false the app shows no web prices or links.
+     * 403 `owner_too_young` (body `min_age`: 18) for `tier=classroom` when the family owner is under
+     * `classroom.owner_min_age`.
      *
      * @response array{data: array{link_allowed: bool, url: string|null}}
      */
+    #[ApiErrors('owner_too_young')]
     public function availability(WebCheckoutAvailabilityRequest $request, CheckWebCheckoutAvailability $check): JsonResponse
     {
         $storefront = $request->validated('storefront');

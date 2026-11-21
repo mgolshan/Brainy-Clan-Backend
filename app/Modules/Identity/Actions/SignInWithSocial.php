@@ -16,10 +16,10 @@ use Illuminate\Support\Str;
  * `POST /auth/social/{provider}`: verifies the provider token, then
  * 1. a linked account → sign in;
  * 2. no link, but a user with the same provider-verified email → link and sign in;
- * 3. otherwise create an adult user (birth data required, age checked like `/auth/register`,
+ * 3. otherwise create a user (birth data required, age checked like `/auth/register`,
  *    `accept_terms` required and recorded as terms + privacy consents);
  *    its email is the provider-verified one, or null when the provider shares none.
- * Returns a device-bound Sanctum token like `/auth/login`. Adults only.
+ * Returns a device-bound Sanctum token like `/auth/login`. Only from the self sign-up age (16: adults and older teens).
  */
 class SignInWithSocial
 {
@@ -93,10 +93,10 @@ class SignInWithSocial
             throw ApiException::socialSignupIncomplete();
         }
 
-        $band = $this->policy->bandForBirth((int) $birthYear, (int) $birthMonth);
+        if (! $this->policy->selfSignUpAllowed((int) $birthYear, (int) $birthMonth)) {
+            $minAge = $this->policy->familyOwnerMinAge();
 
-        if (! $this->policy->collectsEmail($band)) {
-            throw ApiException::validation('birth_year', 'Only adults can create an account. Ask a parent to invite you to the family.');
+            throw ApiException::validation('birth_year', "You need to be at least {$minAge} to create an account. Ask a parent to invite you to the family.");
         }
 
         if (($profile['accept_terms'] ?? false) !== true) {

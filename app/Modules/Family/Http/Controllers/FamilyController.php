@@ -24,9 +24,10 @@ class FamilyController
     /**
      * Create a family.
      *
-     * The caller becomes the owner and an admin; tier `free`. 409 `already_in_family`.
+     * The caller becomes the owner and an admin; tier `free`. 409 `already_in_family`; 403
+     * `owner_too_young` (body `min_age`, 16) when the caller is younger than `family.owner_min_age`.
      */
-    #[ApiErrors('already_in_family')]
+    #[ApiErrors('already_in_family', 'owner_too_young')]
     public function store(CreateFamilyRequest $request, CreateFamily $create): JsonResponse
     {
         /** @var array{name: string, timezone: string, country_code: string} $data */

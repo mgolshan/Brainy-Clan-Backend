@@ -21,10 +21,10 @@ use Illuminate\Http\Response;
 class AuthController
 {
     /**
-     * Register an adult.
+     * Register (self sign-up, no invite).
      *
-     * Email + password sign-up. 422 when the computed age band may not self-register
-     * (`collect_email` false: children, teens) and on `accept_terms` unless it is `true` (the
+     * Email + password sign-up. 422 when the computed age may not self-register: below
+     * `family.owner_min_age` (16) unless the band collects email; and on `accept_terms` unless it is `true` (the
      * acceptance of the current terms + privacy versions is recorded). Creates a device-bound token.
      */
     public function register(RegisterRequest $request, RegisterAdult $register): JsonResponse

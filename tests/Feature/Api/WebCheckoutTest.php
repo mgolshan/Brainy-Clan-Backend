@@ -64,7 +64,7 @@ it('serves the display prices in USD and CAD', function () {
     $this->getJson('/api/v1/pricing')->assertOk()
         ->assertHeader('Cache-Control', 'max-age=300, public')
         ->assertJsonPath('data.currency', 'USD')
-        ->assertJsonPath('data.tiers.0', ['id' => 'family', 'members' => 6, 'highlighted' => true, 'available' => false, 'plans' => [
+        ->assertJsonPath('data.tiers.0', ['id' => 'family', 'members' => 6, 'min_owner_age' => null, 'highlighted' => true, 'available' => false, 'plans' => [
             ['id' => 'annual', 'price' => '49.99', 'per_month' => '4.17', 'saving_percent' => 40, 'trial_days' => 7, 'highlighted' => true],
             ['id' => 'semiannual', 'price' => '29.99', 'per_month' => '5.00', 'saving_percent' => 28, 'trial_days' => 7, 'highlighted' => false],
             ['id' => 'monthly', 'price' => '6.99', 'per_month' => '6.99', 'saving_percent' => 0, 'trial_days' => 0, 'highlighted' => false],

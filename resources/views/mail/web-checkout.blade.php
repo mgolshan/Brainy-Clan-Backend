@@ -26,6 +26,8 @@ Bonjour,
 Votre famille a déjà un abonnement Brainy Clan acheté dans {{ $storeLabel }}. Gérez-le ou annulez-le à cet endroit ; il n’est pas nécessaire de vous abonner de nouveau sur le Web.
 @elseif ($reason === 'web_plan_active')
 Votre famille a déjà un abonnement Brainy Clan acheté sur le Web. Pour le gérer (carte, factures, annulation), ouvrez l’écran Abonnement de l’application, ou utilisez le lien dans votre reçu Paddle.
+@elseif ($reason === 'owner_too_young')
+Le forfait Classe demande que le propriétaire de la famille (l’enseignant) ait au moins {{ $classroomOwnerMinAge }} ans. Choisissez Famille ou Grand Clan, ou demandez à un adulte de créer le groupe de la classe avec son propre compte.
 @elseif ($reason === 'not_admin' || $reason === 'purchases_not_allowed')
 Seul un administrateur adulte de votre famille peut acheter un forfait payant. Demandez-lui de s’abonner avec l’adresse courriel de son compte.
 @elseif ($reason === 'no_family')
@@ -64,6 +66,8 @@ Hello,
 Your family already has a Brainy Clan subscription bought in {{ $storeLabel }}. Manage or cancel it there; there is no need to subscribe again on the web.
 @elseif ($reason === 'web_plan_active')
 Your family already has a Brainy Clan subscription bought on the web. To manage it (card, invoices, cancellation), open the Subscription screen in the app, or use the link in your Paddle receipt.
+@elseif ($reason === 'owner_too_young')
+The Classroom plan needs the family owner (the teacher) to be at least {{ $classroomOwnerMinAge }}. Pick Family or Big Clan instead, or ask an adult to create the class group with their own account.
 @elseif ($reason === 'not_admin' || $reason === 'purchases_not_allowed')
 Only an adult admin of your family can buy a paid plan. Ask them to subscribe with the email address of their account.
 @elseif ($reason === 'no_family')

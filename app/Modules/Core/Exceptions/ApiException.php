@@ -60,6 +60,16 @@ class ApiException extends RuntimeException
         return new self('adult_limit_reached', 'Your plan does not allow more adults in this group.', 403);
     }
 
+    /**
+     * The (family) owner is younger than the rule's minimum age (docs/API.md "Plans and tiers" →
+     * "Owner ages"): `family.owner_min_age` to create a family, `classroom.owner_min_age` for a
+     * Classroom. The body carries `min_age`.
+     */
+    public static function ownerTooYoung(int $minAge, ?string $message = null): self
+    {
+        return new self('owner_too_young', $message ?? "You need to be at least {$minAge} to do this.", 403, extra: ['min_age' => $minAge]);
+    }
+
     public static function inviteInvalid(): self
     {
         return new self('invite_invalid', 'This invite code is unknown, already used or expired.', 422);

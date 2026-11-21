@@ -2,6 +2,7 @@
 
 namespace App\Modules\Billing\Http\Controllers;
 
+use App\Modules\Billing\Actions\CheckWebCheckoutEligibility;
 use App\Modules\Billing\Actions\OpenWebCheckout;
 use App\Modules\Billing\Actions\RequestWebCheckout;
 use App\Modules\Billing\Http\Requests\SubscribePageRequest;
@@ -78,7 +79,10 @@ class SubscribePageController
             return redirect()->away($result['url'], 303)->header('Cache-Control', 'no-store, private');
         }
 
-        return $this->page($request, $result['state'], ['reason' => $result['reason'] ?? null]);
+        $response = $this->page($request, $result['state'], ['reason' => $result['reason'] ?? null]);
+
+        // A Classroom for a family owner under `classroom.owner_min_age` is a hard refusal (docs/API.md "Owner ages").
+        return ($result['reason'] ?? null) === CheckWebCheckoutEligibility::OWNER_TOO_YOUNG ? $response->setStatusCode(403) : $response;
     }
 
     public function thanks(Request $request): Response

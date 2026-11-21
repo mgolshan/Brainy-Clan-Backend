@@ -11,7 +11,7 @@ use App\Modules\Policy\PolicyResolver;
  * from RevenueCat instead.
  *
  * @phpstan-type PlanRow array{id: string, price: string, per_month: string, saving_percent: int, trial_days: int, highlighted: bool}
- * @phpstan-type TierRow array{id: string, members: int, highlighted: bool, available: bool, plans: list<PlanRow>}
+ * @phpstan-type TierRow array{id: string, members: int, min_owner_age: int|null, highlighted: bool, available: bool, plans: list<PlanRow>}
  */
 final class PricingCatalog
 {
@@ -63,6 +63,7 @@ final class PricingCatalog
             $rows[] = [
                 'id' => $tier,
                 'members' => $policy->maxMembersFor($tier),
+                'min_owner_age' => $policy->minOwnerAgeFor($tier),
                 'highlighted' => (bool) config("billing.tiers.{$tier}.highlighted", false),
                 'available' => PaddleConfig::webCheckoutAvailable($tier),
                 'plans' => self::plansFor($tier, $currency),

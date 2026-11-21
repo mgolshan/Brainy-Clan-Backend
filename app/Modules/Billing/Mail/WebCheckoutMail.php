@@ -4,6 +4,7 @@ namespace App\Modules\Billing\Mail;
 
 use App\Modules\Billing\Actions\RequestWebCheckout;
 use App\Modules\Family\Models\Family;
+use App\Modules\Policy\PolicyResolver;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -52,6 +53,7 @@ class WebCheckoutMail extends Mailable implements ShouldQueue
             'storeLabel' => RequestWebCheckout::storeLabel($this->store, $this->pageLocale),
             'minutes' => (int) config('billing.web_checkout.link_ttl_minutes', 30),
             'supportEmail' => (string) config('legal.support_email'),
+            'classroomOwnerMinAge' => app(PolicyResolver::class)->classroomOwnerMinAge(),
         ]);
     }
 }

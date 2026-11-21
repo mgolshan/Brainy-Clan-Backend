@@ -38,6 +38,7 @@ and add a line to the changelog at the bottom.
 | `forbidden` | 403 | Not allowed (e.g. non-admin calling an admin endpoint) |
 | `member_limit_reached` | 403 | Tier member limit reached |
 | `adult_limit_reached` | 403 | Tier adult-seat limit reached (Classroom: 2 adults) |
+| `owner_too_young` | 403 | Too young to own this: a family needs 16+, a Classroom 18+ (`family.owner_min_age` / `classroom.owner_min_age`); body has `min_age` |
 | `classroom_consent_required` | 409 | A teacher must accept the Classroom consent statement first — B12 step 3 |
 | `category_not_allowed` | 403 | Category outside tier/age policy |
 | `no_family` | 409 | Endpoint needs a family membership and the user has none |
@@ -220,9 +221,11 @@ All return `AuthPayload`:
 Every auth call takes `device_name` (string) and `platform` (`ios` | `android` | `web`) and creates
 a `devices` row bound to the new token.
 
-- `POST /auth/register` — adult sign-up. Body: `display_name, email, password (min 8), birth_year,
-  birth_month, locale?, device_name, platform`. 422 if the computed age is below the adult
-  threshold (`collect_email` false for that band). → **201**
+- `POST /auth/register` — self sign-up (no invite). Body: `display_name, email, password (min 8), birth_year,
+  birth_month, locale?, device_name, platform`. 422 `validation_failed` on `birth_year` if the
+  computed age is below the **self sign-up age** = `family.owner_min_age` (16), unless the band
+  collects email (adults). So 16- and 17-year-olds may register and create a family; younger
+  players join with an invite. Invited members are unchanged (`collect_email` per band). → **201**
 - `POST /auth/login` — Body: `email, password, device_name, platform`. → 200, 401 `invalid_credentials`.
 - `POST /auth/join` — join a family with an invite code. Body: `code, device_name, platform,
   email?, password?`. Creates the user from the invite (nickname, birth data) and the membership.
@@ -259,14 +262,15 @@ a `devices` row bound to the new token.
     answers 429 `login_locked`. The `message` is English; the app translates by `code`. Unlock paths for the owner: wait, reset the password
     (`/auth/password/forgot`), social sign-in, or a sign-in code from a family admin.
 
-- `POST /auth/social/{provider}` — sign in or sign up with `google` | `facebook` | `apple` (adults only).
+- `POST /auth/social/{provider}` — sign in or sign up with `google` | `facebook` | `apple` (from the self sign-up age, 16).
   Body: `token` (Google: the **ID token**; Facebook: the **access token**), `device_name, platform`,
   plus for a first-time sign-up `birth_year, birth_month` and optionally `display_name, locale`.
   The server verifies the token with the provider, then: a linked account → sign in (**200**);
   no link but a user with the same provider-verified email → link and sign in (**200**); otherwise
-  create an adult user (**201**). Without birth data on a would-be new user → 422
+  create a user (**201**). Without birth data on a would-be new user → 422
   `social_signup_incomplete` (the app asks for birth year/month and retries with the same token);
-  an age below the self-registration threshold → 422 like `/auth/register`. 401 `social_token_invalid`.
+  an age below the self sign-up age (16) → 422 like `/auth/register`. An existing user below it
+  (and not in an email band) → 403 `forbidden`. 401 `social_token_invalid`.
   Returns `AuthPayload`. Children never use social sign-in.
   Google ID tokens are accepted when `aud` is any of the configured Google client IDs (web,
   Android, iOS — Android and web tokens carry the web client ID, iOS ones may carry the iOS ID).
@@ -332,6 +336,10 @@ members use their invite code (`/auth/join`). No shared passwords, no parent ema
 ### Family
 - `POST /families` (auth) — Body: `name, timezone (IANA), country_code (ISO-2)`. Creates the family
   (tier `free`), the caller becomes owner and `admin`. → **201** `{ data: Family }`, 409 `already_in_family`.
+  The caller must be at least `family.owner_min_age` (global setting, **16**): else **403**
+  `{ "message": "You need to be at least 16 to create a family. …", "code": "owner_too_young", "min_age": 16 }`
+  (checked after `already_in_family`). A user without birth data counts as an adult (unknown age
+  resolves to the adult band everywhere). See Plans and tiers → "Owner ages".
 - `GET /family` (auth, needs family) → `{ data: { family: Family, members: Member[] } }`
 - `PATCH /family` (admin) — `name?, timezone?` → `{ data: Family }`
 - `PATCH /family/members/{member}` (admin) — Body (all optional): `nickname, avatar,
@@ -650,6 +658,23 @@ rank `family` < `big_clan` < `classroom`.
 | `ads.enabled` | true | false | false | false |
 | `chat.retention_days` | 7 | 365 | 365 | 365 |
 
+- **Owner ages (2026-11-20):** two global settings, read through the PolicyResolver.
+  - `family.owner_min_age` = **16**: creating a family (`POST /families`) and self sign-up
+    (`POST /auth/register`, social sign-up). Younger → 403 `owner_too_young` with `"min_age": 16`
+    on `POST /families`, 422 on sign-up.
+  - `classroom.owner_min_age` = **18**: the **family owner** (the teacher) of a Classroom; not the
+    buyer — an adult admin may buy Classroom when the owner is 18+.
+    - `GET /family/web-checkout/availability?tier=classroom` → 403 `owner_too_young`
+      `{ "message": "...", "code": "owner_too_young", "min_age": 18 }` when the owner is younger.
+    - Website: `POST /web/subscribe` with `tier=classroom` still shows the same "check your email"
+      page; the email explains instead of sending a link (reason `owner_too_young`). An emailed
+      Classroom link opened after that → the "can't subscribe" page with HTTP 403. No Paddle
+      transaction is created.
+    - **Store purchases (RevenueCat) are not refused**: the payment has already happened when the
+      webhook arrives, so the webhook still grants `classroom`. The app must hide Classroom when
+      the owner is too young (`GET /pricing` `min_owner_age`).
+  - A user without birth data counts as an adult (unknown age → adult band, as everywhere).
+  - `owner_too_young` bodies always carry `min_age` (int).
 - **The `family_plan` world unlock** now means *any paid plan*: `family`, `big_clan` or
   `classroom`, active, trial or grace. The key is unchanged.
 - **RevenueCat entitlements** are `family`, `big_clan` and `classroom`, one per tier, configured
@@ -670,7 +695,7 @@ rank `family` < `big_clan` < `classroom`.
 - **`GET /pricing` (public) has a new shape:**
 ```json
 { "data": { "currency": "USD", "tiers": [
-  { "id": "family", "members": 6, "highlighted": true, "available": true,
+  { "id": "family", "members": 6, "min_owner_age": null, "highlighted": true, "available": true,
     "plans": [ { "id": "annual", "price": "49.99", "per_month": "4.17", "saving_percent": 40,
                  "trial_days": 7, "highlighted": true }, … ] },
   { "id": "big_clan", … }, { "id": "classroom", … } ] } }
@@ -678,6 +703,9 @@ rank `family` < `big_clan` < `classroom`.
   - `available` is false when web checkout isn't configured for that tier, meaning Paddle
     doesn't have all 3 prices for it.
   - `members` is that tier's `limits.max_members`.
+  - `min_owner_age` (int | null, 2026-11-20): the family owner's minimum age for that tier —
+    `classroom.owner_min_age` (18) for `classroom`, `null` for `family` and `big_clan` (only the
+    general 16+ to own a family applies).
 - **Web subscribe:**
   - `POST /web/subscribe` gains `tier` (`family` | `big_clan` | `classroom`, default `family`).
   - The page accepts `?tier=…&plan=…`.
@@ -1146,3 +1174,4 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-11-20 — Chat safety (B12 step 2): Family gains `chat_filter` (profanity filter, default on, every plan) and `chat_mode` (`normal` | `announcements` | `off`, Classroom only via `policy.chat.modes_allowed`); Message gains `filtered`; errors `plan_required`, `chat_read_only`, `chat_off`. Clarifications (backend built): `PATCH /family { chat_mode: "normal" }` on a plan without modes is a 200 no-op (the stored mode is kept), any other `chat_mode` there is 403 `plan_required` and nothing in the request is saved; bad `chat_mode` / non-boolean `chat_filter` → 422. With chat `off`, `chat_off` comes before `chat_disabled` (unread is `{ unread: 0 }` for every member, chat-disabled ones too) and no `family_chat` / `family_chat_report` pushes go out. In `announcements`, a non-admin's post is 403 `chat_read_only` even when retrying an existing `client_id`. The filter runs on the normalized body; inside a match letters, digits and disguise symbols become `★` while separators, spaces and combining marks stay; a letter doubled (not 3+) is not a disguise, so "cul" never matches "cull"; a few listed phrases are never masked ("cul-de-sac", "cul sec").
 - 2026-11-20 — Classroom tools contract (B12 step 3, **not built yet**): policy `limits.max_adults` (classroom 2) + 403 `adult_limit_reached`; admins must be adults; classroom consent statement (`POST /family/classroom/consent`, `GET /legal` `classroom_consent`, 409 `classroom_consent_required`); Family `classroom` setup state; roster bulk add; card sign-in codes (14 days); class summary JSON + CSV; `POST /family/classroom/new-year` (students / points season / chat / goals).
 - 2026-11-20 — Adult seats (B12 step 3a, backend built): policy `limits.max_adults` (tier setting; `null` = unlimited for free / family / big_clan, `2` for classroom); `POST /family/invites` for an adult (band with `purchases_allowed`: adult, senior) → 403 `adult_limit_reached` when active adults + pending adult invites are at or over the limit (checked after `member_limit_reached`; members over the limit keep their seats); `PATCH /family/members/{member}` with `role: admin` for a child or teen → 422 on `role` ("Only adults can be family admins."), using the birth data sent in the same request, checked only when the role changes (existing child admins and `role: admin` sent for someone already admin are left alone).
+- 2026-11-20 — Owner ages: global settings `family.owner_min_age` (16) and `classroom.owner_min_age` (18). Self sign-up (`POST /auth/register`, social sign-up) now from 16 (was: adult bands, 18+); `POST /families` under 16 → 403 `owner_too_young` with `min_age: 16`; Classroom web checkout for a family owner under 18 → 403 `owner_too_young` with `min_age: 18` on `GET /family/web-checkout/availability?tier=classroom` (website: reason emailed, emailed link page 403); `GET /pricing` tiers gain `min_owner_age` (classroom 18, others null). RevenueCat store purchases are still granted (can't be refused after payment). New error code `owner_too_young` (403).

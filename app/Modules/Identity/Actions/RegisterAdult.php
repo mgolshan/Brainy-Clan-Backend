@@ -8,8 +8,9 @@ use App\Modules\Policy\PolicyResolver;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Adult sign-up with email + password. Refused (422) when the computed age band does not
- * allow collecting an email (children and, by default, teens).
+ * Self sign-up with email + password (no invite). Refused (422) below the self sign-up age
+ * (`PolicyResolver::selfSignUpAllowed()`: `family.owner_min_age`, 16, unless the band collects email),
+ * so a 16- or 17-year-old can register and create a family; younger children and teens are invited.
  */
 class RegisterAdult
 {
@@ -28,10 +29,10 @@ class RegisterAdult
      */
     public function handle(array $data, string $deviceName, string $platform, ?string $appVersion = null, ?string $ipAddress = null): array
     {
-        $band = $this->policy->bandForBirth((int) $data['birth_year'], (int) $data['birth_month']);
+        if (! $this->policy->selfSignUpAllowed((int) $data['birth_year'], (int) $data['birth_month'])) {
+            $minAge = $this->policy->familyOwnerMinAge();
 
-        if (! $this->policy->collectsEmail($band)) {
-            throw ApiException::validation('birth_year', 'Only adults can create an account. Ask a parent to invite you to the family.');
+            throw ApiException::validation('birth_year', "You need to be at least {$minAge} to create an account. Ask a parent to invite you to the family.");
         }
 
         return DB::transaction(function () use ($data, $deviceName, $platform, $appVersion, $ipAddress): array {

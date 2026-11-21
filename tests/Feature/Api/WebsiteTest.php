@@ -760,31 +760,56 @@ it('shows a back-to-top link on long website and legal pages', function (string 
         ->and($html)->not->toContain('onclick');
 })->with(['/', '/help', '/partners', '/support', '/terms', '/privacy', '/help?lang=fr']);
 
-it('has a sticky section menu on the home page whose links all reach a section', function (string $path) {
+it('has a grouped site menu whose links reach every home section, with the CTA and the menu sheet, without scripts', function (string $path, array $labels) {
     $html = (string) $this->get($path)->assertOk()->getContent();
 
-    expect($html)->toContain('html:has(nav.sections) { scroll-padding-top')
-        ->and(preg_match('#<nav class="sections"[^>]*>(.*?)</nav>#s', $html, $menu))->toBe(1);
+    expect(preg_match('#<nav id="site-menu" class="sn"[^>]*>(.*?)</nav>#s', $html, $menu))->toBe(1);
 
     preg_match_all('/href="#([a-z-]+)"/', $menu[1], $anchors);
 
-    expect($anchors[1])->toHaveCount(13)
-        ->and($anchors[1])->toContain('use-cases')
-        ->and($anchors[1])->toBe(array_values(array_unique($anchors[1])));
+    // Every section of the page is in the menu exactly once; "Get the app" is the CTA next to it.
+    expect($anchors[1])->toEqualCanonicalizing(['worlds', 'how', 'games', 'brain-games', 'categories', 'clan', 'unlocks', 'what', 'chat', 'safety', 'use-cases', 'plans'])
+        ->and($html)->toMatch('#<a class="sn-cta" href="\#get">#')
+        ->and(substr_count($html, 'class="sn-dd '))->toBe(3)
+        ->and($html)->toContain('<a class="sn-toggle sn-open" href="#site-menu" aria-controls="site-menu">')
+        ->and($html)->toContain('<a class="sn-toggle sn-close" href="#close-menu" aria-controls="site-menu">')
+        ->and($html)->not->toContain('id="close-menu"')
+        ->and($html)->not->toContain('<script')
+        ->and($html)->toContain('.sn:target {')
+        ->and($html)->toContain('.sn-dd:has(:focus-visible) > .sn-panel');
 
-    $previous = -1;
-    foreach ($anchors[1] as $anchor) {
-        $position = strpos($html, '<section id="'.$anchor.'"');
-        expect($position)->not->toBeFalse("section #{$anchor} exists")
-            ->and($position)->toBeGreaterThan($previous);
-        $previous = $position;
+    foreach ([...$anchors[1], 'get'] as $anchor) {
+        expect($html)->toContain('<section id="'.$anchor.'"');
     }
-})->with(['/', '/?lang=fr']);
 
-it('has no section menu on pages without one', function () {
-    $html = (string) $this->get('/support')->assertOk()->getContent();
+    foreach ($labels as $label) {
+        expect($menu[1])->toContain($label);
+    }
+})->with([
+    'en' => ['/', ['>Explore<', '>For families<', '>Plans<', 'About', 'How to play', 'Support', 'Français', 'Pick a world and make it yours']],
+    'fr' => ['/?lang=fr', ['>Explorer<', '>Familles<', '>Forfaits<', 'À propos', 'Comment jouer', 'Aide', 'English', 'Choisissez un monde à votre goût']],
+]);
 
-    expect($html)->not->toContain('<nav class="sections"');
+it('links the site menu and the CTA to the home page sections from the other pages', function (string $path, string $lang) {
+    $html = (string) $this->get($path)->assertOk()->getContent();
+    $home = route('website.home', ['lang' => $lang]);
+
+    expect(preg_match('#<nav id="site-menu" class="sn"[^>]*>(.*?)</nav>#s', $html, $menu))->toBe(1)
+        ->and($menu[1])->not->toMatch('/href="#/')
+        ->and($menu[1])->toContain('href="'.$home.'#worlds"')
+        ->and($menu[1])->toContain('href="'.$home.'#use-cases"')
+        ->and($html)->toContain('<a class="sn-cta" href="'.$home.'#get">');
+})->with([
+    ['/support', 'en'],
+    ['/help?lang=fr', 'fr'],
+    ['/partners', 'en'],
+    ['/subscribe', 'en'],
+]);
+
+it('marks the current page in the utility links', function () {
+    expect((string) $this->get('/help')->getContent())->toContain('href="'.route('website.help', ['lang' => 'en']).'" title="How to play" aria-current="page"')
+        ->and((string) $this->get('/support')->getContent())->toContain('href="'.route('website.support', ['lang' => 'en']).'" title="Support" aria-current="page"')
+        ->and((string) $this->get('/')->getContent())->not->toContain('" aria-current="page"');
 });
 
 it('mentions PayPal only when web checkout is configured', function () {

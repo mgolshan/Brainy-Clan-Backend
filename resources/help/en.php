@@ -24,7 +24,7 @@ return [
                 'summary' => 'A parent sets up Brainy Clan once for the whole family.',
                 'steps' => [
                     'Open Brainy Clan and tap **I\'m a parent — create account**.',
-                    'Enter your name, email, a password (at least 8 characters) and your birth year and month. You can also **Continue with** Apple, Google or Facebook.',
+                    'Enter your name, email, a password (at least 8 characters) and your birth year and month. You can also **Continue with** Apple, Google or Facebook. You need to be at least {family_owner_min_age} to create a family; younger players join a parent’s family instead.',
                     'Name your family, check the time zone and country, then tap **Create family**.',
                 ],
                 'tip' => 'You are now the family admin: you invite members, set goals and manage the plan. Daily goals end at midnight in the family\'s time zone.',
@@ -529,7 +529,7 @@ return [
                     '**Free**: up to {free_members} members, {free_categories} categories, {free_goals} active goal, chat kept {chat_free}. Good for trying it out.',
                     '**Family**: up to {family_members} members, for parents and kids. {price_family}.',
                     '**Big Clan**: up to {big_clan_members} members, for grandparents, cousins and homeschool groups. {price_big_clan}.',
-                    '**Classroom**: up to {classroom_members} members ({classroom_adults} adults and {classroom_students} students), for teachers, tutors and coaches. {price_classroom}.',
+                    '**Classroom**: up to {classroom_members} members ({classroom_adults} adults and {classroom_students} students), for teachers, tutors and coaches. {price_classroom}. The group owner (the teacher) must be at least {classroom_owner_min_age}.',
                     'Every paid plan has all categories, unlimited goals, {family_second_chances} free second chances per member per day, chat kept {chat_family}, no ads and the paid plan worlds.',
                     'Each paid plan also comes with 6-month and annual options with a {trial_days}-day free trial. The app and the App Store or Google Play show the price in your currency.',
                 ],
@@ -544,7 +544,7 @@ return [
                 'summary' => 'Big Clan is for families and groups of families; Classroom is for one teacher and a class.',
                 'steps' => [
                     '**Big Clan** has room for {big_clan_members} members and any number of adults: grandparents, aunts and uncles each get their own account, and several adults can help run the group as co-admins.',
-                    '**Classroom** has room for {classroom_members} members but only {classroom_adults} adults: a teacher and a co-teacher, and up to {classroom_students} students. Once the {classroom_adults} adult seats are taken, you can still invite students but no more adults.',
+                    '**Classroom** has room for {classroom_members} members but only {classroom_adults} adults: a teacher and a co-teacher, and up to {classroom_students} students. The owner, who creates the group, must be at least {classroom_owner_min_age} (a family can be created from {family_owner_min_age}). Once the {classroom_adults} adult seats are taken, you can still invite students but no more adults.',
                     'Classroom will add teacher tools a family doesn’t need: a class roster you can paste in, printable sign-in code cards, a class summary export and a guided reset for the new school year. These tools are coming soon. Its chat modes (announcements only, or chat off) are already here.',
                     'Classroom is the most expensive plan. A large family or a homeschool group is usually happier with Big Clan.',
                 ],
@@ -561,7 +561,7 @@ return [
                     'Or subscribe on the web at **{web_checkout}** and pay by card or PayPal (handled by Paddle).',
                     'Everyone in the group, children included, gets the paid plan.',
                 ],
-                'tip' => 'Only an adult family admin can buy a plan. Children never see purchase screens or upgrade prompts: paid plan worlds and categories only show a neutral label.',
+                'tip' => 'Only an adult family admin can buy a plan, and Classroom also needs the group owner to be at least {classroom_owner_min_age}. Children never see purchase screens or upgrade prompts: paid plan worlds and categories only show a neutral label.',
                 'keywords' => ['subscribe', 'buy', 'purchase', 'pay', 'trial', 'app store', 'google play', 'paypal', 'card', 'web', 'big clan', 'classroom'],
             ],
             [
