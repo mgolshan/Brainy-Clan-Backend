@@ -21,7 +21,7 @@ return [
                     'Entrez votre nom, votre courriel, un mot de passe (au moins 8 caractères) et votre année et mois de naissance. Vous pouvez aussi **Continuer avec** Apple, Google ou Facebook. Il faut être âgé d’au moins {family_owner_min_age} ans pour créer une famille ; les plus jeunes rejoignent plutôt la famille d’un parent.',
                     'Donnez un nom à votre famille, vérifiez le fuseau horaire et le pays, puis touchez **Créer la famille**.',
                 ],
-                'tip' => 'Vous êtes maintenant l’administrateur de la famille : vous invitez les membres, créez les objectifs et gérez l’abonnement. Les objectifs quotidiens se terminent à minuit dans le fuseau horaire de la famille.',
+                'tip' => 'Vous êtes maintenant l’administrateur de la famille : vous invitez les membres, créez les objectifs et gérez l’abonnement. Les objectifs quotidiens se terminent à minuit dans le fuseau horaire de la famille. Enseignants : touchez plutôt **Je suis enseignant — créer une classe** (voir Créer une classe).',
                 'image' => 'create-family',
                 'alt' => 'L’écran Créer votre famille : nom de la famille, fuseau horaire et pays, avec le bouton Créer la famille (écran en anglais).',
                 'keywords' => ['inscription', 'créer un compte', 'nouveau compte', 'commencer', 'configurer', 'compte parent', 'admin', 'fuseau horaire'],
@@ -79,6 +79,19 @@ return [
                 ],
                 'tip' => 'Un appareil déconnecté pourra se reconnecter avec un code de connexion ou un mot de passe.',
                 'keywords' => ['perdu', 'volé', 'tablette', 'téléphone', 'déconnexion', 'déconnecter', 'sécurité'],
+            ],
+            [
+                'id' => 'getting-started-checklist',
+                'title' => 'La liste pour bien démarrer',
+                'summary' => 'Une courte liste sur l’Accueil pour tout préparer. Passez-la quand vous voulez.',
+                'steps' => [
+                    'Après l’inscription, la carte **Bien démarrer** sur l’**Accueil** propose quelques étapes (les enseignants voient **Préparez votre classe**). Elle compte celles qui sont faites.',
+                    'Touchez une étape pour la faire. Des étapes comme votre première partie ou votre premier objectif se cochent toutes seules une fois faites, sur tous vos appareils.',
+                    'Pas besoin ? Touchez **Masquer** sur la carte. Elle reste masquée sur tous vos appareils.',
+                ],
+                'tip' => 'Masquer la liste ne vous empêche jamais de jouer, et tout ce qu’elle contient se trouve aussi dans les onglets habituels. Les petites astuces sur Jouer, les objectifs et Messages s’affichent une seule fois. Une liste masquée ne peut pas encore être réaffichée dans l’app ; écrivez au soutien si vous voulez la retrouver.',
+                'keywords' => ['liste', 'bien démarrer', 'préparez votre classe', 'étapes', 'masquer', 'visite', 'bienvenue', 'nouveau compte', 'astuces'],
+                'links' => [['route' => 'website.support', 'anchor' => 'contact', 'label' => 'Nous joindre']],
             ],
         ],
     ],
@@ -615,6 +628,19 @@ return [
         'summary' => 'Préparer une classe, imprimer les cartes de connexion, suivre la classe et commencer une nouvelle année scolaire.',
         'icon' => 'clan/penguin.svg',
         'articles' => [
+            [
+                'id' => 'classroom-create',
+                'title' => 'Créer une classe',
+                'summary' => 'Les enseignants s’inscrivent par leur propre porte, avec le même type de compte.',
+                'steps' => [
+                    'Ouvrez Brainy Clan et touchez **Je suis enseignant — créer une classe**.',
+                    'Créez votre compte comme un parent : nom, courriel et mot de passe, ou **Continuer avec** Apple, Google ou Facebook. Il faut être âgé d’au moins {classroom_owner_min_age} ans pour gérer une classe.',
+                    'Entrez le **Nom de la classe** (vos élèves le voient ; vous pourrez le modifier plus tard), puis touchez **Créer la classe**.',
+                    'Les forfaits s’ouvrent sur Classe, pour que vous puissiez commencer tout de suite. Ensuite, la liste **Préparez votre classe** sur l’**Accueil** vous guide pour la suite.',
+                ],
+                'tip' => 'Un compte appartient à une seule famille ou à une seule classe. Si vous voulez aussi votre propre famille, utilisez un autre compte.',
+                'keywords' => ['classe', 'enseignant', 'professeur', 'créer une classe', 'nouvelle classe', 'inscription', 'créer un compte', 'école', 'tuteur', 'entraîneur'],
+            ],
             [
                 'id' => 'classroom-consent',
                 'title' => 'La déclaration de consentement de l’enseignant',

@@ -11,6 +11,7 @@ use App\Modules\Goals\Models\GoalPlan;
 use App\Modules\Goals\Models\GoalPlanMember;
 use App\Modules\Identity\Models\Consent;
 use App\Modules\Identity\Models\Device;
+use App\Modules\Identity\Models\OnboardingProgress;
 use App\Modules\Identity\Models\SocialAccount;
 use App\Modules\Identity\Models\User;
 use App\Modules\Notifications\Models\NotificationPreference;
@@ -101,6 +102,7 @@ class ExportUserData
         $consents = Consent::query()->where('user_id', $user->id)->orderBy('id')->get();
         $devices = Device::query()->where('user_id', $user->id)->orderBy('id')->get();
         $socialAccounts = SocialAccount::query()->where('user_id', $user->id)->orderBy('id')->get();
+        $onboarding = OnboardingProgress::query()->where('user_id', $user->id)->first();
 
         return [
             'exported_at' => Iso::format(now()),
@@ -224,6 +226,11 @@ class ExportUserData
                 'email' => $account->email,
                 'linked_at' => Iso::format($account->linked_at),
             ])->values()->all(),
+            // Onboarding (FTUE): the steps done (key → first done_at) and when the checklist was hidden.
+            'onboarding' => $onboarding instanceof OnboardingProgress ? [
+                'steps' => (object) $onboarding->steps,
+                'dismissed_at' => Iso::format($onboarding->dismissed_at),
+            ] : null,
         ];
     }
 }

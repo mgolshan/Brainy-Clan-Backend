@@ -306,6 +306,7 @@ members use their invite code (`/auth/join`). No shared passwords, no parent ema
   when `has_password` is true). 422 when the user has no email. → 204
 - `GET /me/stats` (auth, needs family) →
   `{ "data": { "points_today": 4, "points_week": 23, "points_total": 120, "streak": { "current": 3, "longest": 7 } } }`
+- Onboarding / FTUE progress: `GET /me/onboarding`, `POST /me/onboarding/{step}`, `POST /me/onboarding/dismiss` — see "Onboarding (FTUE)".
 
 **Account deletion** (App Store guideline 5.1.1(v); also on Android/web):
 - `GET /me/deletion-check` (auth) → `{ "data": { "can_delete": true, "blockers": [],
@@ -1086,6 +1087,124 @@ rule below says otherwise.
   (for `all` it is the season start, `null` without a season). Goal progress of open periods counts from the
   later of the period start and the season start (closed periods keep their stored results). Unchanged:
   `/me/stats` (all of it), world unlocks, `/me/export`.
+- **Teacher sign-up (app, 2026-11-21):** the app has a second sign-up door, "I'm a teacher — create a class".
+  It is the same account and the same calls (`POST /auth/register` or social sign-up, then `POST /families`
+  with the class name); the app then opens the paywall on Classroom. No API change.
+- **Known limit (accepted for launch):** one login belongs to one family **or** one class. A teacher who
+  also wants a family (or a second class) uses another login: `POST /families` answers 409
+  `already_in_family` for a user who already has an active membership (joining by invite always creates
+  a new account, so an existing email there is 422 on `email`).
+
+### Onboarding (FTUE) (B12 step 4, contract 2026-11-21; built 2026-11-21)
+The "Getting started" checklist, one-time coach marks and "what's new" sheets. The contract was written
+by the app (`Brainy-Clan-Frontend/docs/FTUE-CONTRACT.md`); the backend adds `flow`, `required_steps` and
+`optional_steps` (see "Built").
+
+All three routes: auth (Bearer), **no family needed** (without a family the family-derived steps are
+`null`), normal rate limit (120/min per token). Progress is stored **per user**, so a second device
+never repeats it.
+
+| Method + path | Body | Success |
+|---|---|---|
+| `GET /me/onboarding` | – | 200 `{ "data": Onboarding }` |
+| `POST /me/onboarding/{step}` | none (empty / `{}`) | 200 `{ "data": Onboarding }` (the whole object, after the change) |
+| `POST /me/onboarding/dismiss` | none | 200 `{ "data": Onboarding }` |
+
+`dismiss` is a reserved path segment, never a step key.
+
+**Onboarding object:**
+```json
+{
+  "steps": {
+    "welcome": "2026-11-21T10:00:00Z", "create_family": "2026-11-21T09:58:12Z", "pick_world": null,
+    "add_member": null, "co_admin": null, "first_game": null, "first_goal": null, "say_hi": null,
+    "welcome_family": null, "avatar_world": null, "family_goal": null,
+    "classroom_welcome": null, "class_details": null, "roster": null, "code_cards": null,
+    "chat_mode": null, "end_of_year": null, "code_sign_in": null,
+    "tip_play": null, "tip_goals": null, "tip_chat": null,
+    "upgrade_family": null, "upgrade_big_clan": null, "upgrade_classroom": null
+  },
+  "dismissed_at": null,
+  "flow": "owner",
+  "required_steps": ["welcome", "create_family", "pick_world", "add_member", "first_game", "first_goal", "say_hi"],
+  "optional_steps": []
+}
+```
+- `steps`: **every** key below, always present, in this order; value = ISO 8601 UTC `done_at` or `null`.
+  The app treats a missing key as `null`, so adding keys later is safe.
+- `dismissed_at`: when the user hid the checklist (`null` = shown). Dismissing hides the checklist and
+  the welcome sheet only; tips and the upgrade sheet keep working.
+- **manual** steps are set only by `POST /me/onboarding/{step}`. **derived** steps are computed by the
+  server on every call from real data; the first time one is true the server stores `done_at` (= now)
+  and it stays done, even if the data changes later (e.g. students removed by "new year").
+
+| key | kind | done when (derived) / meaning (manual) |
+|---|---|---|
+| `welcome` | manual | owner saw the 3 welcome cards (play together, family goals, safe chat) |
+| `create_family` | derived | the user has an active family membership |
+| `pick_world` | manual | owner opened "pick your world" |
+| `add_member` | derived | the family has ≥ 2 active members **or** ≥ 1 pending (unused, unexpired) invite |
+| `co_admin` | derived | the family has ≥ 2 active members with role `admin` |
+| `first_game` | derived | the user's member has ≥ 1 play session with status `completed` or `failed` |
+| `first_goal` | derived | the family has ≥ 1 goal plan (any; deleted ones count too) |
+| `say_hi` | derived | the user's member has posted ≥ 1 chat message (deleted ones count too) |
+| `welcome_family` | manual | invited member saw "Welcome to {family}" |
+| `avatar_world` | manual | member / student opened "avatar and world" |
+| `family_goal` | manual | member / student opened "here's your family (class) goal" |
+| `classroom_welcome` | manual | teacher saw the Classroom welcome |
+| `class_details` | derived | the family is on `classroom` and an active admin accepted the **current** classroom consent version (`GET /legal` `classroom_consent.version`) |
+| `roster` | derived | `classroom` tier and `family.classroom.students_count` ≥ 1 |
+| `code_cards` | derived | `classroom` tier and `family.classroom.codes_issued_at` is not null |
+| `chat_mode` | manual | teacher chose a chat mode in the FTUE sheet |
+| `end_of_year` | manual | teacher read "how the end of the year works" |
+| `code_sign_in` | derived | the user has an active family membership (same rule as `create_family`; label differs) |
+| `tip_play` / `tip_goals` / `tip_chat` | manual | one-time coach mark on Play / Goals / Chat was shown |
+| `upgrade_family` / `upgrade_big_clan` / `upgrade_classroom` | manual | the one-time "what's new for you" sheet for that tier was shown |
+
+**Errors:**
+
+| case | status | code |
+|---|---|---|
+| no / bad token | 401 | `unauthenticated` |
+| `{step}` is not a key of the table, or is a derived key | 422 | `validation_failed` with `errors.step` ("Unknown onboarding step." / "This step is done automatically.") |
+| too many requests | 429 | `rate_limited` |
+
+- `POST /me/onboarding/{step}` is idempotent: a done step keeps its first `done_at` (still 200).
+- `POST /me/onboarding/dismiss` is idempotent: keeps the first `dismissed_at`.
+- Older servers answer 404 on all three routes: the app then hides the checklist, coach marks, welcome
+  and upgrade sheets. No new error codes.
+
+**Flows** (`flow`, picked by the server from tier + role; the same rules the app can apply to `GET /me`):
+
+| flow | who | `required_steps` (in order) | `optional_steps` |
+|---|---|---|---|
+| `owner` | `user.id == family.owner_user_id`, tier ≠ `classroom`; also a user **without a family** | `welcome`, `create_family`, `pick_world`, `add_member`, `co_admin` (**big_clan only**), `first_game`, `first_goal`, `say_hi`¹ | – |
+| `member` | any other member, tier ≠ `classroom` (co-admins too) | `welcome_family`, `avatar_world`, `first_game`, `family_goal` | – |
+| `teacher` | tier `classroom`, role `admin` (teacher and co-teacher) | `classroom_welcome`, `class_details`, `roster`, `code_cards`, `chat_mode`, `first_goal`, `end_of_year` | `co_admin` |
+| `student` | tier `classroom`, role `member` | `code_sign_in`, `avatar_world`, `first_game`, `family_goal`, `say_hi`² | – |
+
+¹ only when the effective chat mode is not `off` and the member's `chat_enabled` is true (always listed without a family).
+² only when the effective chat mode is `normal` and the member's `chat_enabled` is true.
+
+- The welcome sheet = the flow's first manual step; students have none. On a paid tier the app also marks
+  `upgrade_{tier}` when the welcome closes. "What's new for you": family admins only, paid tier, welcome
+  done (or checklist dismissed) and no `upgrade_*` of the same or a higher tier done
+  (`family` < `big_clan` < `classroom`). Celebration when every required step is done; closing it calls
+  `dismiss`. Measured only with these server timestamps (no third-party SDK).
+
+**Built (2026-11-21) — details and decisions:**
+- **Additive fields:** `flow`, `required_steps`, `optional_steps`. The server picks the flow from tier +
+  role, so the app does not have to compute it; the rules are the ones in the table above.
+- **Query count:** the stored row (1), the active membership and family (as `GET /me`), at most **one**
+  query for all derived checks (only the derived keys not stored yet are checked; none once all are
+  stored), and a short locked write only when a step becomes done. Constant whatever the family size.
+- **Storage:** one row per user (`onboarding_progress`: `steps` = done key → first `done_at`,
+  `dismissed_at`). Derived steps are stored per user, so they stay done after leaving the family. Writes
+  lock the row, so two devices at once never lose a step.
+- **Privacy:** `/me/export` gains `onboarding: { "steps": { key: done_at }, "dismissed_at" } | null` (done
+  steps only). The row is deleted with the account (`DELETE /me`, `DELETE /family`, child removal).
+- `class_details` uses the same consent rule as the Classroom tools gate (an active admin, current
+  version), so a co-teacher's checklist shows it done once the teacher consented.
 
 ### Support messages (2026-11-08)
 Signed-in **family admins** can write to the Brainy Clan support team from the app (children and
@@ -1152,7 +1271,7 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
   → `{ "data": { "exported_at": "...", "user": {...}, "memberships": [...], "point_entries": [...],
   "sessions": [...], "goals": [...], "chat_messages": [{ "id", "family_id", "member_id", "body", "created_at" }],
   "consents": [...], "devices": [...] } }` (`chat_messages`: the user's own not-deleted messages; `chat_reactions: [{ "message_id", "key", "created_at" }]`: the user's own chat reactions (2026-11-11); devices without tokens,
-  social accounts without tokens) — right of access (PIPEDA / Quebec Law 25 / GDPR-style).
+  social accounts without tokens; `onboarding: { "steps": { key: done_at }, "dismissed_at" } | null`, 2026-11-21) — right of access (PIPEDA / Quebec Law 25 / GDPR-style).
   Rate-limited: 1 per hour → 429.
 
 ## Changelog
@@ -1219,3 +1338,5 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-11-20 — Adult seats (B12 step 3a, backend built): policy `limits.max_adults` (tier setting; `null` = unlimited for free / family / big_clan, `2` for classroom); `POST /family/invites` for an adult (band with `purchases_allowed`: adult, senior) → 403 `adult_limit_reached` when active adults + pending adult invites are at or over the limit (checked after `member_limit_reached`; members over the limit keep their seats); `PATCH /family/members/{member}` with `role: admin` for a child or teen → 422 on `role` ("Only adults can be family admins."), using the birth data sent in the same request, checked only when the role changes (existing child admins and `role: admin` sent for someone already admin are left alone).
 - 2026-11-20 — Owner ages: global settings `family.owner_min_age` (16) and `classroom.owner_min_age` (18). Self sign-up (`POST /auth/register`, social sign-up) now from 16 (was: adult bands, 18+); `POST /families` under 16 → 403 `owner_too_young` with `min_age: 16`; Classroom web checkout for a family owner under 18 → 403 `owner_too_young` with `min_age: 18` on `GET /family/web-checkout/availability?tier=classroom` (website: reason emailed, emailed link page 403); `GET /pricing` tiers gain `min_owner_age` (classroom 18, others null). RevenueCat store purchases are still granted (can't be refused after payment). New error code `owner_too_young` (403).
 - 2026-11-21 — Classroom tools (B12 step 3, backend built): `POST /family/classroom/consent`, `GET /legal` `classroom_consent` (`version`, `text_url`, plus `statement`), page `/legal/classroom` (en/fr draft), Family `classroom` setup state, 409 `classroom_consent_required`, `POST /family/classroom/roster`, `POST /family/classroom/sign-in-codes` (201, tier setting `sign_in_codes.card_ttl_days` 14, 10/h per family), `GET /family/classroom/summary` + `summary.csv`, `POST /family/classroom/new-year`, `families.season_started_at` (leaderboard and open goal periods count from the season). Clarifications in "Classroom tools" → "Built (2026-11-21)": gate order (403 `forbidden` → 403 `plan_required` → 409 before validation), `consent_version` is the newest version any active admin accepted, adult-aged roster students count against `max_adults`, `member_ids` must be active members (422), summary rows include admins, `accuracy_percent` null without answers, CSV format (BOM, headers en/fr, formula-safe cells), leaderboard `starts_at` clipped to the season.
+- 2026-11-21 — Onboarding / FTUE (B12 step 4, backend built): `GET /me/onboarding`, `POST /me/onboarding/{step}`, `POST /me/onboarding/dismiss` (auth, no family needed), Onboarding object `{ steps, dismissed_at, flow, required_steps, optional_steps }` with 24 step keys (manual and server-derived; derived steps are stored once true and stay done), unknown or derived `{step}` → 422 `validation_failed` on `step`; contract from the app's FTUE-CONTRACT.md plus the additive `flow` / `required_steps` / `optional_steps`; `/me/export` gains `onboarding`; the progress is erased with the account. No new error codes.
+- 2026-11-21 — Classroom notes (no shape change): the app's teacher sign-up door ("I'm a teacher — create a class") uses the same account and calls; known limit accepted for launch: one login belongs to one family or one class (`POST /families` → 409 `already_in_family`).

@@ -535,16 +535,16 @@ and both repos are committed.
          keeps age rules correct without asking for exact birthdays.
        - Code cards are one-time sign-in codes that last 14 days.
        - **Admins must be adults, on every plan.** This closes a gap: a child could be promoted to admin.
-  4. **FTUE (first-time user experience) per plan.** Planned here; to be built after steps 1–3.
+  4. **FTUE (first-time user experience) per plan.** Done 2026-11-21 (backend); contract in API.md "Onboarding (FTUE)".
 - **Status (2026-11-21):**
   - Step 1 is done (backend `11a0d7d`, app `db88b31`).
   - Step 2 is done (app `e44b646`, backend in the "Chat safety" commit).
   - Step 3 is done (backend 2026-11-21: adult seats, consent statement, setup state, roster, code cards, class summary JSON + CSV, archive & new year with points seasons; decisions in API.md "Classroom tools" → "Built").
-  - Step 4 (FTUE): planned, next.
+  - Step 4 is done (backend 2026-11-21: `GET /me/onboarding`, `POST /me/onboarding/{step}` and `/dismiss`, per-user progress, server-derived steps, server-picked flow; contract in API.md "Onboarding (FTUE)", from the app's FTUE-CONTRACT.md). B12 is done on the backend.
 - **Later, not planned yet:** changing the tier of a plan bought on the web (Paddle). For now it
   is cancel and resubscribe; store plans change tier inside the store.
 
-#### FTUE plan (step 4, not built yet)
+#### FTUE plan (step 4, built 2026-11-21)
 Goal: nobody feels lost after signing up. These are the principles; each plan and role then has its own flow.
 
 **Principles**
@@ -600,6 +600,16 @@ Goal: nobody feels lost after signing up. These are the principles; each plan an
     `/me` alone.
   - Classroom setup state (consent done, roster added, codes printed) must be readable from
     the API so FTUE can tick those steps.
+- **Built (2026-11-21) — decisions:**
+  - The app wrote the exact contract (`Brainy-Clan-Frontend/docs/FTUE-CONTRACT.md`, 24 step keys);
+    API.md "Onboarding (FTUE)" holds it now.
+  - Progress is per user (one row, `onboarding_progress`). Facts the server can see (family created,
+    member added, co-admin, first game, first goal, first chat message, Classroom consent, roster, code
+    cards, signed in with a code) are **derived** from real data, never trusted from the app; POSTing one
+    is 422. Once true they are stored and stay done.
+  - The server also picks the flow from tier + role (`flow`, `required_steps`, `optional_steps`, additive).
+  - Constant query count: at most one query for all derived checks.
+  - Erased with the account, part of `/me/export`.
 
 ## Open questions
 - **Answered by Moe (2026-10-22)** — see "Decisions (2026-10-22)" above: iPhone + iPad; Play

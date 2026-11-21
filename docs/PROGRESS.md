@@ -31,10 +31,11 @@ Milestones are defined in `docs/PLAN.md`.
 | B12 Plans — step 2 chat safety (2026-11-20) | Done | Bad-words filter (`ProfanityFilter`, en + fr lists in `resources/chat-filter/`, disguises, whole words only, ★ masking, `filtered`), Family `chat_filter` (every plan, default on) + `chat_mode` (Classroom via `chat.modes_allowed`, effective mode after downgrade), `announcements` (403 `chat_read_only`) and `off` (403 `chat_off`, unread 0, no pushes), errors `plan_required` / `chat_read_only` / `chat_off`, admin family view, help center, website line. Next: step 3 (Classroom tools) |
 | B12 Plans — step 3a adult seats (2026-11-20) | Done | Policy `limits.max_adults` (tier setting, classroom 2, others null), 403 `adult_limit_reached` on adult invites (active adults + pending adult invites, two count queries), admins must be adults on every tier (422 on `role`, on change only), help center lines. Next: rest of step 3 (consent, roster, code cards, summary, new year) |
 | B12 Plans — step 3 Classroom tools (2026-11-21) | Done | Consent statement (`POST /family/classroom/consent`, `GET /legal` `classroom_consent`, `/legal/classroom` en+fr draft, consent type `classroom`), Family `classroom` setup state, `classroom` middleware (403 `plan_required` / 409 `classroom_consent_required` before validation), roster bulk add, 14-day code cards (tier setting `sign_in_codes.card_ttl_days`, 10/h per family), class summary JSON + CSV (constant queries), archive & new year (`season_started_at`: leaderboard + goal progress count from the season, ledger untouched), admin Classroom section, help center section, landing card. Next: step 4 (FTUE) |
+| B12 Plans — step 4 FTUE / onboarding (2026-11-21) | Done | `GET /me/onboarding`, `POST /me/onboarding/{step}`, `POST /me/onboarding/dismiss` (auth, no family needed) per the app's FTUE-CONTRACT.md: per-user progress (`onboarding_progress`), 24 step keys (14 manual, 10 derived from real data, stored once true), 422 on unknown/derived keys, server-picked `flow` + `required_steps` / `optional_steps` (additive), constant queries (≤ 1 derive query), export + erasure, help center article. B12 done on the backend |
 
 ## Next up
 
-**B12 (2026-11-21):** steps 1 (plan tiers), 2 (chat safety) and 3 (Classroom tools: adult seats, consent statement, setup state, roster, code cards, class summary, new year) done — next is step 4 FTUE (docs/PLAN.md "FTUE plan"; server `GET /me/onboarding` + per-flow steps, Classroom flow reads `family.classroom`). Lawyer review of `/legal/classroom` (draft) before launch. Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
+**B12 (2026-11-21):** all four steps done on the backend (plan tiers, chat safety, Classroom tools, FTUE onboarding: `/me/onboarding`). Next: the app wires the checklist to `GET /me/onboarding` (it may use the server `flow` / `required_steps`); optional later: a "show the checklist again" endpoint (not in the contract yet). Lawyer review of `/legal/classroom` (draft) before launch. Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
 
 **Start of next session (2026-10-24 wrap-up):** run the full backend suite first — the last full run was cut short when Docker stopped. The order-dependent `WebCheckoutTest` / `AccountDeletionPageTest` failure after `WebsiteTest` is fixed (2026-10-25: Livewire's static "component rendered" flag leaked between tests; `TestCase` now calls `Livewire::flushState()`). Moe's open items: content audit decisions (docs/CONTENT_AUDIT_2026-10-24.md, 36 items), lawyer review (terms/privacy 2026-10-24, partner agreement), server region, accounts weekend, when /partners goes public.
 0. **State at last stop (session 17, 2026-10-17, launch question bank + French content):** done (see log). Dev DB:
@@ -175,6 +176,10 @@ Milestones are defined in `docs/PLAN.md`.
 
 ## Known issues and notes
 
+- **One login = one family or one class (accepted for launch, 2026-11-21):** `POST /families` → 409
+  `already_in_family` when the user already has an active membership. A teacher who also wants a family uses
+  another login (help center "Create a class" says so). The app's teacher door ("I'm a teacher — create a
+  class") uses the same account and calls; no API change.
 - **Performance on the Windows drive:** `.env` has `PHP_OPCACHE_VALIDATE_TIMESTAMPS=0` and config is cached.
   After changing PHP code: `docker compose restart app horizon`. After changing `.env` or `config/*`:
   `docker compose exec app php artisan config:cache` (or `config:clear`). First request per PHP-FPM worker
@@ -387,6 +392,35 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-11-21 B12 step 4: FTUE / onboarding
+- **Contract:** the app's `Brainy-Clan-Frontend/docs/FTUE-CONTRACT.md`, copied into API.md "Onboarding (FTUE)"
+  (endpoints, Onboarding object, 24 step keys, errors, flows) + "Built" notes and a changelog line. Full suite
+  before this step (step 3 work): 1406 passed (`storage/logs/suite-b12s3.txt`, EXIT=0).
+- **Migration:** `2026_11_21_200000_create_onboarding_progress_table` (one row per user: `steps` JSON map
+  key → first `done_at`, `dismissed_at`; FK cascade). Run on dev.
+- **Code (Identity module):** `OnboardingProgress` model, `Support/OnboardingSteps` (manual / derived / all keys,
+  flow names), actions `GetOnboarding` (derive + flow), `RecordOnboardingSteps` (idempotent, row locked while
+  merging, insert-or-ignore first), `MarkOnboardingStep`, `DismissOnboarding`; `OnboardingController`,
+  `MarkOnboardingStepRequest` (route `{step}` validated: 422 on `step` for unknown / derived keys),
+  `OnboardingResource`. Routes `GET /me/onboarding`, `POST /me/onboarding/dismiss` (registered before),
+  `POST /me/onboarding/{step}` — `auth:sanctum` + `throttle:api`, no family middleware.
+- **Derived steps** (never trusted from the app): `create_family` / `code_sign_in` (active membership),
+  `add_member` (≥ 2 active members or a pending invite), `co_admin` (≥ 2 active admins), `first_game` (a
+  completed or failed session of the member), `first_goal` (any goal plan, deleted too), `say_hi` (any chat
+  message of the member), `class_details` (classroom + an active admin's current-version consent, the same
+  rule as the Classroom gate), `roster` (classroom + an active student), `code_cards` (classroom +
+  `codes_issued_at`). Only the keys not stored yet are checked, in **one** query of sub-selects; once true
+  they are stored and stay done.
+- **Additions to the contract (additive):** `flow` (`owner` / `member` / `teacher` / `student`, from tier +
+  role; a user without a family gets `owner`), `required_steps` (with the big_clan `co_admin` and the chat
+  conditions for `say_hi`) and `optional_steps` (teacher: `co_admin`).
+- **Privacy:** `EraseUser` deletes the row; `/me/export` gains `onboarding` (done steps + `dismissed_at`, or null).
+- **Help center:** "The getting started checklist" (`getting-started-checklist`, en + fr) in Getting started; "Create a class" (`classroom-create`, en + fr, first in Classroom tools: the app's teacher door "I'm a teacher — create a class", class name, paywall on Classroom, one login = one family or class); the "Create your family" tip points teachers to it. Landing page unchanged (it does not describe how to start). Known limit "one login = one family or class" in API.md (Classroom tools → Built) and Known issues.
+- **Tests:** `tests/Feature/Api/OnboardingTest.php` (25 tests: shape, manual/derived, idempotency, 422s, 401,
+  derivations per step, stays done, classroom on/off tier, co-teacher, flows per tier/role, chat conditions,
+  per-user storage, export + erasure, constant query count for 2 vs 8 students on first and later calls).
+  Related files, Pint and Larastan clean.
 
 ### 2026-11-21 B12 step 3: Classroom tools
 - **Migrations:** `2026_11_21_100000_add_classroom_columns_to_families` (`season_started_at`, `codes_issued_at`) and

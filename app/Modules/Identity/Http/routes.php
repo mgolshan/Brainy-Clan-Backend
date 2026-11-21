@@ -3,6 +3,7 @@
 use App\Modules\Identity\Http\Controllers\AuthController;
 use App\Modules\Identity\Http\Controllers\LegalController;
 use App\Modules\Identity\Http\Controllers\MeController;
+use App\Modules\Identity\Http\Controllers\OnboardingController;
 use App\Modules\Identity\Http\Controllers\SocialAccountController;
 use App\Modules\Identity\Http\Controllers\SocialAuthController;
 use App\Modules\Identity\Models\SocialAccount;
@@ -22,6 +23,12 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::get('me', [MeController::class, 'show'])->name('api.v1.me.show');
     Route::patch('me', [MeController::class, 'update'])->name('api.v1.me.update');
     Route::put('me/password', [MeController::class, 'password'])->name('api.v1.me.password');
+
+    // Onboarding / FTUE (docs/API.md "Onboarding (FTUE)"): no family needed. `dismiss` is reserved
+    // (never a step key), so it is registered before `{step}`.
+    Route::get('me/onboarding', [OnboardingController::class, 'show'])->name('api.v1.me.onboarding.show');
+    Route::post('me/onboarding/dismiss', [OnboardingController::class, 'dismiss'])->name('api.v1.me.onboarding.dismiss');
+    Route::post('me/onboarding/{step}', [OnboardingController::class, 'store'])->name('api.v1.me.onboarding.store');
 
     Route::get('me/social-accounts', [SocialAccountController::class, 'index'])->name('api.v1.me.social-accounts.index');
     Route::post('me/social-accounts/{provider}', [SocialAccountController::class, 'store'])->whereIn('provider', SocialAccount::PROVIDERS)->name('api.v1.me.social-accounts.store');

@@ -8,6 +8,7 @@ use App\Modules\Chat\Models\ChatMessageReport;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Models\Invite;
 use App\Modules\Family\Models\SignInCode;
+use App\Modules\Identity\Models\OnboardingProgress;
 use App\Modules\Identity\Models\SocialAccount;
 use App\Modules\Identity\Models\User;
 use App\Modules\Notifications\Models\NotificationPreference;
@@ -21,7 +22,7 @@ use Laravel\Sanctum\PersonalAccessToken;
  * `DELETE /family` (children + optionally the owner) and removing a child member.
  *
  * Per user: every Sanctum token and device row (push tokens) goes; social accounts are unlinked
- * (Apple refresh tokens revoked with Apple after the commit); personal data is erased (display name
+ * (Apple refresh tokens revoked with Apple after the commit); onboarding (FTUE) progress is deleted; personal data is erased (display name
  * "Deleted player", email, password, birth data, avatar, staff role) and `erased_at` set. The user
  * row itself stays because the append-only points ledger references its memberships; their
  * nicknames become "Deleted player" and accessibility settings are cleared. Unused sign-in codes are
@@ -68,6 +69,7 @@ class EraseUser
                 ->whereIn('tokenable_id', $userIds)
                 ->delete();
             SocialAccount::query()->whereIn('user_id', $userIds)->delete();
+            OnboardingProgress::query()->whereIn('user_id', $userIds)->delete();
 
             $memberIds = FamilyMember::query()->whereIn('user_id', $userIds)->pluck('id')->all();
 

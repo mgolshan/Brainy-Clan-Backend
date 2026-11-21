@@ -27,7 +27,7 @@ return [
                     'Enter your name, email, a password (at least 8 characters) and your birth year and month. You can also **Continue with** Apple, Google or Facebook. You need to be at least {family_owner_min_age} to create a family; younger players join a parent’s family instead.',
                     'Name your family, check the time zone and country, then tap **Create family**.',
                 ],
-                'tip' => 'You are now the family admin: you invite members, set goals and manage the plan. Daily goals end at midnight in the family\'s time zone.',
+                'tip' => 'You are now the family admin: you invite members, set goals and manage the plan. Daily goals end at midnight in the family\'s time zone. Teachers: tap **I\'m a teacher — create a class** instead (see Create a class).',
                 'image' => 'create-family',
                 'alt' => 'The Create your family screen: family name, time zone and country, with the Create family button.',
                 'keywords' => ['sign up', 'register', 'new account', 'start', 'setup', 'parent account', 'admin', 'time zone'],
@@ -85,6 +85,19 @@ return [
                 ],
                 'tip' => 'A signed-out device can sign in again with a sign-in code or a password.',
                 'keywords' => ['lost', 'stolen', 'tablet', 'phone', 'log out', 'sign out', 'security'],
+            ],
+            [
+                'id' => 'getting-started-checklist',
+                'title' => 'The getting started checklist',
+                'summary' => 'A short list on Home that helps you set things up. Skip it any time.',
+                'steps' => [
+                    'After you sign up, the **Getting started** card on **Home** shows a few steps for you (teachers see **Set up your class**). It counts how many are done.',
+                    'Tap a step to do it. Steps like your first game or your first goal tick by themselves once you have done them, on any device.',
+                    'Not needed? Tap **Hide** on the card. It stays hidden on all your devices.',
+                ],
+                'tip' => 'Hiding the list never stops you from playing, and everything in it is also in the normal tabs. The small tips on Play, goals and Chat show once. A hidden list cannot be shown again in the app yet; ask support if you want it back.',
+                'keywords' => ['checklist', 'getting started', 'set up your class', 'steps', 'hide', 'tour', 'welcome', 'new account', 'tips'],
+                'links' => [['route' => 'website.support', 'anchor' => 'contact', 'label' => 'Contact support']],
             ],
         ],
     ],
@@ -621,6 +634,19 @@ return [
         'summary' => 'Set up a class, print sign-in cards, see how the class is doing and start a new school year.',
         'icon' => 'clan/penguin.svg',
         'articles' => [
+            [
+                'id' => 'classroom-create',
+                'title' => 'Create a class',
+                'summary' => 'Teachers sign up through their own door, with the same kind of account.',
+                'steps' => [
+                    'Open Brainy Clan and tap **I\'m a teacher — create a class**.',
+                    'Create your account like a parent does: name, email and password, or **Continue with** Apple, Google or Facebook. You need to be at least {classroom_owner_min_age} to run a class.',
+                    'Enter the **Class name** (your students see it; you can change it later) and tap **Create class**.',
+                    'The plans open on Classroom, so you can start it right away. Then the **Set up your class** checklist on **Home** walks you through the rest.',
+                ],
+                'tip' => 'One login belongs to one family or one class. If you also want a family of your own, use a different login for it.',
+                'keywords' => ['classroom', 'teacher', 'create class', 'new class', 'sign up', 'register', 'school', 'tutor', 'coach', 'account'],
+            ],
             [
                 'id' => 'classroom-consent',
                 'title' => 'The teacher’s consent statement',
