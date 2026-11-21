@@ -101,7 +101,7 @@ docker compose exec app php artisan migrate
 docker compose exec app php artisan make:model Example -m
 docker compose exec app php artisan tinker
 docker compose exec app composer require vendor/package
-docker compose exec app php artisan test                 # Pest test suite
+docker compose exec app php artisan test --compact --parallel   # full Pest suite, in parallel
 docker compose exec app ./vendor/bin/pest --filter=Example
 docker compose exec app ./vendor/bin/pint                # fix code style (--test to check only)
 docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=1G
@@ -125,7 +125,7 @@ After changing `docker/php/Dockerfile` or `docker/php/php.ini`, rebuild:
 Every change is done when all four are green (run from the repository root):
 
 ```powershell
-docker compose exec app php artisan test --compact                        # full Pest suite (~8 min on a Windows drive)
+docker compose exec app php artisan test --compact --parallel             # full Pest suite (~12 min with 12 processes; ~28 min without --parallel)
 docker compose exec app php artisan test --compact tests/Feature/Api/GoalsTest.php   # one file while working
 docker compose exec app ./vendor/bin/pint --dirty --format agent          # code style for changed files
 docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=1G    # Larastan, level 5

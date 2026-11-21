@@ -450,7 +450,7 @@ Full procedure: `docs/DEPLOY.md` §7. A deploy agent may deploy alone only when 
    values, `composer.json`/`composer.lock` (new packages), or `config/legal.php`.
 3. Tests green on that exact commit (developer Docker stack, from a checkout of `origin/main`):
    ```sh
-   docker compose exec app php artisan test --compact
+   docker compose exec app php artisan test --compact --parallel
    docker compose exec app ./vendor/bin/pint --test
    docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=1G
    ```

@@ -21,7 +21,7 @@ inside the `app` container, from the repository root:
 ```sh
 docker compose exec app php artisan <command>
 docker compose exec app composer <command>
-docker compose exec app php artisan test            # or: docker compose exec app ./vendor/bin/pest
+docker compose exec app php artisan test --compact --parallel   # full suite (~12 min, 12 processes); one file: drop --parallel
 docker compose exec app ./vendor/bin/pint           # code style (use --test to only check)
 docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=1G
 ```
