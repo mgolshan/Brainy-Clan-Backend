@@ -20,19 +20,22 @@ class LegalController
      * Current legal documents.
      *
      * Versions (opaque strings), page URLs and a short localized "what changed" `summary` for the
-     * re-acceptance screen. The texts are drafts until reviewed by a lawyer.
+     * re-acceptance screen, and the Classroom consent statement (`classroom_consent`: version, the
+     * `/legal/classroom` page URL and the localized statement for the checkbox). The texts are drafts
+     * until reviewed by a lawyer.
      *
      * @unauthenticated
      *
-     * @return array{data: array{terms: array{version: string, url: string, summary: string|null}, privacy: array{version: string, url: string, summary: string|null}}}
+     * @return array{data: array{terms: array{version: string, url: string, summary: string|null}, privacy: array{version: string, url: string, summary: string|null}, classroom_consent: array{version: string, text_url: string, statement: string}}}
      */
     #[QueryParameter('lang', 'Language of the summaries and page URLs.', type: 'string', default: 'en', example: 'fr')]
     public function show(Request $request): array
     {
+        $locale = LegalDocuments::locale($request->query('lang'));
         /** @var array{terms: array{version: string, url: string, summary: string|null}, privacy: array{version: string, url: string, summary: string|null}} $documents */
-        $documents = LegalDocuments::describe(LegalDocuments::locale($request->query('lang')));
+        $documents = LegalDocuments::describe($locale);
 
-        return ['data' => $documents];
+        return ['data' => [...$documents, 'classroom_consent' => LegalDocuments::describeClassroomConsent($locale)]];
     }
 
     /**

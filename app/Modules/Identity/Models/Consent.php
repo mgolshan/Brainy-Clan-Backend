@@ -42,7 +42,10 @@ class Consent extends Model
 
     public const string PARENTAL = 'parental';
 
-    public const array TYPES = [self::TERMS, self::PRIVACY, self::PARENTAL];
+    /** A teacher's Classroom consent statement (docs/API.md "Classroom tools"): version of the statement. */
+    public const string CLASSROOM = 'classroom';
+
+    public const array TYPES = [self::TERMS, self::PRIVACY, self::PARENTAL, self::CLASSROOM];
 
     public $timestamps = false;
 

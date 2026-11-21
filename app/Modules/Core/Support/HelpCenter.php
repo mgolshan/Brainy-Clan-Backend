@@ -4,6 +4,7 @@ namespace App\Modules\Core\Support;
 
 use App\Modules\Billing\Support\PaddleConfig;
 use App\Modules\Billing\Support\PricingCatalog;
+use App\Modules\Family\Http\Requests\ClassroomRosterRequest;
 use App\Modules\Family\Models\Family;
 use App\Modules\Policy\PolicyResolver;
 use App\Modules\Policy\Support\ThemeWorldCatalog;
@@ -267,6 +268,8 @@ class HelpCenter
             'family_owner_min_age' => (string) $this->policy->familyOwnerMinAge(),
             'classroom_owner_min_age' => (string) $this->policy->classroomOwnerMinAge(),
             'classroom_students' => (string) max(0, $this->policy->maxMembersFor(Family::TIER_CLASSROOM) - $classroomAdults),
+            'classroom_roster_max' => (string) ClassroomRosterRequest::MAX_STUDENTS,
+            'classroom_card_days' => (string) $this->policy->signInCodeCardTtlDays(Family::TIER_CLASSROOM),
             'price_family' => self::priceText(Family::TIER_FAMILY, $fr),
             'price_big_clan' => self::priceText(Family::TIER_BIG_CLAN, $fr),
             'price_classroom' => self::priceText(Family::TIER_CLASSROOM, $fr),

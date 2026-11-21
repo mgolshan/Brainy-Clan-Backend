@@ -245,7 +245,8 @@ it('refuses an emailed Classroom link with 403 once the owner is under 18, witho
 
     $owner->user->forceFill(['birth_year' => now()->year - 17, 'birth_month' => 1])->save();
 
-    $this->get('/subscribe/checkout?token='.$token)->assertStatus(403)->assertSee('Can’t subscribe right now');
+    $this->get('/subscribe/checkout?token='.$token)->assertStatus(403)->assertSee('Can’t subscribe right now')
+        ->assertSee('A Classroom needs a family owner who is at least 18.');
 
     Http::assertNothingSent();
     expect(WebCheckoutRequest::query()->sole()->transaction_id)->toBeNull();

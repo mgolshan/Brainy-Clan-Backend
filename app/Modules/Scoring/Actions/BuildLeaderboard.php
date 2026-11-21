@@ -9,7 +9,8 @@ use App\Modules\Family\Support\FamilyClock;
 use App\Modules\Scoring\Models\PointEntry;
 
 /**
- * Family leaderboard for today / week / month / all, from the ledger in the family's timezone.
+ * Family leaderboard for today / week / month / all, from the ledger in the family's timezone,
+ * counting only entries from the family's points season start (`season_started_at`) when there is one.
  * Ties share a rank (1, 1, 3).
  */
 class BuildLeaderboard
@@ -27,7 +28,18 @@ class BuildLeaderboard
 
         if ($period !== 'all') {
             [$start, $end] = FamilyClock::window($family, $period);
-            $query->where('created_at', '>=', $start)->where('created_at', '<', $end);
+            $query->where('created_at', '<', $end);
+        }
+
+        // A points season (Classroom new year) starts the family's totals again; the ledger is untouched.
+        $season = $family->season_started_at;
+
+        if ($season !== null && ($start === null || $season->gt($start))) {
+            $start = $season;
+        }
+
+        if ($start !== null) {
+            $query->where('created_at', '>=', $start);
         }
 
         /** @var array<int, int> $totals */

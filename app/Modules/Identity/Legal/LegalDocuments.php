@@ -47,6 +47,41 @@ final class LegalDocuments
         return Website::route("legal.{$document}", $locale === 'en' ? [] : ['lang' => $locale]);
     }
 
+    /**
+     * Version of the Classroom consent statement (`config/legal.php` `classroom_consent`).
+     */
+    public static function classroomConsentVersion(): string
+    {
+        return (string) config('legal.classroom_consent.version');
+    }
+
+    public static function classroomConsentStatement(string $locale): string
+    {
+        return (string) (config("legal.classroom_consent.statement.{$locale}") ?? config('legal.classroom_consent.statement.en'));
+    }
+
+    /**
+     * Absolute URL of the Classroom terms page (`/legal/classroom`) on the website host; French gets `?lang=fr`.
+     */
+    public static function classroomConsentUrl(string $locale = 'en'): string
+    {
+        return Website::route('legal.classroom', $locale === 'en' ? [] : ['lang' => $locale]);
+    }
+
+    /**
+     * `GET /legal` → `classroom_consent` (docs/API.md "Classroom tools" → "Consent statement").
+     *
+     * @return array{version: string, text_url: string, statement: string}
+     */
+    public static function describeClassroomConsent(string $locale): array
+    {
+        return [
+            'version' => self::classroomConsentVersion(),
+            'text_url' => self::classroomConsentUrl($locale),
+            'statement' => self::classroomConsentStatement($locale),
+        ];
+    }
+
     public static function isDraft(): bool
     {
         return (bool) config('legal.draft');

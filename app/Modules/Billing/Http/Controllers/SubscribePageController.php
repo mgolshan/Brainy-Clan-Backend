@@ -146,6 +146,7 @@ class SubscribePageController
             'selectedPlan' => 'annual',
             'selectedTier' => Family::TIER_FAMILY,
             'members' => $this->members(),
+            'classroomOwnerMinAge' => app(PolicyResolver::class)->classroomOwnerMinAge(),
             'code' => null,
             'src' => null,
             'reason' => null,

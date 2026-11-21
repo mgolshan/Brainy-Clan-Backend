@@ -23,6 +23,8 @@ use App\Modules\Family\Models\Invite;
 use App\Modules\Family\Models\SignInCode;
 use App\Modules\Goals\Models\GoalPeriod;
 use App\Modules\Goals\Models\GoalPlan;
+use App\Modules\Identity\Legal\LegalDocuments;
+use App\Modules\Identity\Models\Consent;
 use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\SocialAccount;
 use App\Modules\Identity\Models\User;
@@ -233,6 +235,33 @@ it('shows the subscription read-only on the family page', function () {
 
     $neverSubscribed = familyOwner();
     $this->get("/admin/families/{$neverSubscribed->family_id}")->assertOk()->assertSee('none');
+});
+
+it('shows the Classroom setup state on a Classroom family page with a constant number of queries', function () {
+    $queries = function (int $students): int {
+        $owner = familyOwner(['tier' => 'classroom']);
+        Consent::factory()->create(['user_id' => $owner->user_id, 'type' => Consent::CLASSROOM, 'version' => LegalDocuments::classroomConsentVersion()]);
+
+        for ($i = 0; $i < $students; $i++) {
+            addMember($owner->family, 9);
+        }
+
+        $this->get("/admin/families/{$owner->family_id}")->assertOk();
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->get("/admin/families/{$owner->family_id}")->assertOk()
+            ->assertSee('Consent accepted (current version)')
+            ->assertSee('Students')
+            ->assertSee('Points season since');
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
+    };
+
+    expect($queries(2))->toBe($queries(6));
+
+    $this->get('/admin/families/'.adminFamily(1)->family_id)->assertOk()->assertDontSee('Points season since');
 });
 
 it('lists webhook events with provider and outcome filters and shows the payload', function () {

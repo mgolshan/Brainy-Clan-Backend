@@ -2,6 +2,7 @@
 
 namespace App\Modules\Family\Http\Resources;
 
+use App\Modules\Family\Actions\ClassroomSetupState;
 use App\Modules\Family\Models\Family;
 use App\Modules\Identity\Models\User;
 use App\Modules\Policy\PolicyResolver;
@@ -32,6 +33,8 @@ class FamilyResource extends JsonResource
             // the plan allows modes; the stored value is kept for a later upgrade).
             'chat_filter' => (bool) $this->chat_filter,
             'chat_mode' => app(PolicyResolver::class)->effectiveChatMode($this->resource),
+            // Classroom setup state (B12 step 3, for FTUE): null on every other tier.
+            'classroom' => app(ClassroomSetupState::class)->forFamily($this->resource),
         ];
     }
 

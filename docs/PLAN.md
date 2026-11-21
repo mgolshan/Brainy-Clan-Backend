@@ -536,11 +536,11 @@ and both repos are committed.
        - Code cards are one-time sign-in codes that last 14 days.
        - **Admins must be adults, on every plan.** This closes a gap: a child could be promoted to admin.
   4. **FTUE (first-time user experience) per plan.** Planned here; to be built after steps 1–3.
-- **Status (2026-11-20):**
+- **Status (2026-11-21):**
   - Step 1 is done (backend `11a0d7d`, app `db88b31`).
   - Step 2 is done (app `e44b646`, backend in the "Chat safety" commit).
-  - Step 3: the contract is written, not built.
-  - Step 4: planned.
+  - Step 3 is done (backend 2026-11-21: adult seats, consent statement, setup state, roster, code cards, class summary JSON + CSV, archive & new year with points seasons; decisions in API.md "Classroom tools" → "Built").
+  - Step 4 (FTUE): planned, next.
 - **Later, not planned yet:** changing the tier of a plan bought on the web (Paddle). For now it
   is cancel and resubscribe; store plans change tier inside the store.
 

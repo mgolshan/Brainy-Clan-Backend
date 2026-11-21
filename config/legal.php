@@ -33,6 +33,20 @@ return [
         'privacy_officer' => env('LEGAL_PRIVACY_OFFICER', '[Name and title of the person in charge of personal information — to be completed]'),
     ],
 
+    /*
+     * The Classroom consent statement (docs/API.md "Classroom tools" → "Consent statement"): a
+     * teacher accepts it before adding students; the page `/legal/classroom` holds it with the
+     * Classroom terms (draft — the lawyer reviews it before launch). Bump `version` when the
+     * statement changes: teachers then accept again before using the Classroom tools.
+     */
+    'classroom_consent' => [
+        'version' => '2026-11-20',
+        'statement' => [
+            'en' => 'I’m a teacher, tutor or coach, and I am authorised by my school or organisation, or I have the parents’ or guardians’ consent, to add these students and their progress to Brainy Clan.',
+            'fr' => 'Je suis enseignant, tuteur ou entraîneur, et je suis autorisé par mon école ou mon organisme, ou j’ai le consentement des parents ou tuteurs, pour ajouter ces élèves et leurs progrès à Brainy Clan.',
+        ],
+    ],
+
     'documents' => [
         'terms' => [
             'version' => '2026-11-20',

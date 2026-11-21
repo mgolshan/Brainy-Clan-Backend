@@ -32,6 +32,8 @@ Route::middleware(RedirectToWebsiteHost::class)->group(function () {
         // Terms of service and privacy policy (docs/API.md "Legal, consent and privacy (B9)"); ?lang=fr.
         Route::get('terms', [LegalPageController::class, 'terms'])->name('legal.terms');
         Route::get('privacy', [LegalPageController::class, 'privacy'])->name('legal.privacy');
+        // Classroom terms + the teacher's consent statement (docs/API.md "Classroom tools"); draft for the lawyer.
+        Route::get('legal/classroom', [LegalPageController::class, 'classroom'])->name('legal.classroom');
         // Old URLs (before 2026-10-22) → 301 to the ones above, query string kept.
         Route::get('legal/{document}', [WebsiteController::class, 'legacyLegal'])->whereIn('document', ['terms', 'privacy'])->name('legal.legacy');
 

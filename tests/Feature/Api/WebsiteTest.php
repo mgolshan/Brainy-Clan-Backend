@@ -845,7 +845,7 @@ describe('plans and use cases (B12)', function () {
             ->toContain('<strong>$14.99</strong> / month')
             ->toContain('or $119.99 / year')
             ->toContain('As many adults and co-admins as you like')
-            ->toContain('Coming soon: teacher tools')
+            ->toContain('Teacher tools: paste-in class roster, printable sign-in code cards')
             ->toContain('/subscribe?lang=en&amp;tier=big_clan')
             ->toContain('/subscribe?lang=en&amp;tier=classroom')
             ->toContain('<a class="plan-cta" href="#get">Get the app</a>')

@@ -11,7 +11,9 @@ use App\Filament\Resources\Families\RelationManagers\InvitesRelationManager;
 use App\Filament\Support\PlanTiers;
 use App\Filament\Support\ReadOnlyForSupport;
 use App\Modules\Billing\Models\Subscription;
+use App\Modules\Family\Actions\ClassroomSetupState;
 use App\Modules\Family\Models\Family;
+use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Policy\PolicyResolver;
 use BackedEnum;
 use Filament\Actions\EditAction;
@@ -77,6 +79,17 @@ class FamilyResource extends Resource
                 ->helperText(fn (Family $record): ?string => app(PolicyResolver::class)->effectiveChatMode($record) !== $record->chat_mode
                     ? 'Stored: '.$record->chat_mode.' (applies again on a plan with chat modes)'
                     : null),
+            Section::make('Classroom')
+                ->description('Read-only setup state of the Classroom tools (consent statement, roster, code cards, points season).')
+                ->visible(fn (Family $record): bool => $record->tier === Family::TIER_CLASSROOM)
+                ->columnSpanFull()->columns(4)
+                ->schema([
+                    IconEntry::make('classroom_consent_accepted')->label('Consent accepted (current version)')->boolean()
+                        ->state(fn (Family $record): bool => app(ClassroomSetupState::class)->hasCurrentConsent($record)),
+                    TextEntry::make('students_count')->label('Students')->numeric()->default(0),
+                    TextEntry::make('codes_issued_at')->label('Code cards issued')->dateTime()->placeholder('—'),
+                    TextEntry::make('season_started_at')->label('Points season since')->dateTime()->placeholder('—'),
+                ]),
             Section::make('Subscription')
                 ->description('Read-only: the most recently updated plan, set by RevenueCat (store) or Paddle (web) webhooks, the app sync and the hourly reconciliation. Webhooks are under Billing → Webhook events.')
                 ->columnSpanFull()->columns(4)
@@ -115,7 +128,9 @@ class FamilyResource extends Resource
      */
     public static function getRecordRouteBindingEloquentQuery(): Builder
     {
-        return parent::getRecordRouteBindingEloquentQuery()->with(['owner', 'subscription', 'attribution.affiliateCode']);
+        return parent::getRecordRouteBindingEloquentQuery()
+            ->with(['owner', 'subscription', 'attribution.affiliateCode'])
+            ->withCount(['members as students_count' => fn (Builder $query) => $query->where('role', FamilyMember::ROLE_MEMBER)]);
     }
 
     public static function table(Table $table): Table

@@ -31,6 +31,7 @@ final class ErrorCodes
         'not_found' => ['status' => 404, 'meaning' => 'Not found'],
         'no_family' => ['status' => 409, 'meaning' => 'Endpoint needs a family membership and the user has none'],
         'already_in_family' => ['status' => 409, 'meaning' => 'User already belongs to a family'],
+        'classroom_consent_required' => ['status' => 409, 'meaning' => 'A teacher must accept the Classroom consent statement first (`POST /family/classroom/consent`)'],
         'social_account_taken' => ['status' => 409, 'meaning' => 'That Google/Facebook account is linked to another user'],
         'last_sign_in_method' => ['status' => 409, 'meaning' => 'Can\'t unlink the only way this user can sign in'],
         'family_owner_cannot_leave' => ['status' => 409, 'meaning' => 'The family owner must delete the family (or be its only member) to delete their account'],

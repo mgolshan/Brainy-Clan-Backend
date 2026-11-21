@@ -31,6 +31,8 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property string $chat_mode Stored chat mode ({@see self::CHAT_MODES}); the effective one is {@see PolicyResolver::effectiveChatMode()}
  * @property Carbon|null $deleted_at Set by `DELETE /family` (row kept for the ledger)
  * @property Carbon|null $first_paid_at First paid transaction, store or web (Billing; locks the referral code)
+ * @property Carbon|null $season_started_at Points season start (Classroom new year): family-scoped totals count ledger entries from it
+ * @property Carbon|null $codes_issued_at Last time Classroom sign-in code cards were issued
  * @property-read Subscription|null $subscription
  * @property-read FamilyAttribution|null $attribution
  */
@@ -143,6 +145,8 @@ class Family extends Model
         return [
             'deleted_at' => 'datetime',
             'first_paid_at' => 'datetime',
+            'season_started_at' => 'datetime',
+            'codes_issued_at' => 'datetime',
             'chat_filter' => 'boolean',
         ];
     }

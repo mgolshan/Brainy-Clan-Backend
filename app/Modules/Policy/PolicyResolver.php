@@ -37,6 +37,7 @@ class PolicyResolver
         'play.redemption_items' => 3,
         'invites.ttl_days' => 7,
         'sign_in_codes.ttl_minutes' => 15,
+        'sign_in_codes.card_ttl_days' => 14,
         'chat.retention_days' => 7,
         'chat.modes_allowed' => false,
         'family.owner_min_age' => 16,
@@ -410,6 +411,15 @@ class PolicyResolver
     public function signInCodeTtlMinutes(): int
     {
         return max(1, (int) $this->setting('sign_in_codes.ttl_minutes'));
+    }
+
+    /**
+     * Days a printed Classroom sign-in code card stays valid (tier setting
+     * `sign_in_codes.card_ttl_days`, seeded: classroom 14). At least 1.
+     */
+    public function signInCodeCardTtlDays(string $tier): int
+    {
+        return max(1, (int) $this->setting('sign_in_codes.card_ttl_days', $tier));
     }
 
     public function minAppVersion(): string

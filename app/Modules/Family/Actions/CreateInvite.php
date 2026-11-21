@@ -3,14 +3,12 @@
 namespace App\Modules\Family\Actions;
 
 use App\Modules\Core\Exceptions\ApiException;
-use App\Modules\Family\Models\Family;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Family\Models\Invite;
 use App\Modules\Identity\Actions\RecordConsent;
 use App\Modules\Identity\Legal\LegalDocuments;
 use App\Modules\Identity\Models\Consent;
 use App\Modules\Policy\PolicyResolver;
-use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -28,6 +26,7 @@ class CreateInvite
         private readonly PolicyResolver $policy,
         private readonly GenerateInviteCode $generateCode,
         private readonly RecordConsent $recordConsent,
+        private readonly CountAdultSeats $adultSeats,
     ) {}
 
     /**
@@ -53,7 +52,7 @@ class CreateInvite
 
             $maxAdults = $this->policy->maxAdultsFor($family->tier);
 
-            if ($isAdult && $maxAdults !== null && $this->adultSeatsUsed($family) >= $maxAdults) {
+            if ($isAdult && $maxAdults !== null && $this->adultSeats->handle($family) >= $maxAdults) {
                 throw ApiException::adultLimitReached();
             }
 
@@ -74,48 +73,5 @@ class CreateInvite
 
             return $invite;
         });
-    }
-
-    /**
-     * Active adult members + pending adult invites, in two count queries: an adult is anyone at
-     * least `adultMinAge()` old today; a user without birth data resolves to the adult band (like
-     * `PolicyResolver::bandForAge()`).
-     */
-    private function adultSeatsUsed(Family $family): int
-    {
-        $minAge = $this->policy->adultMinAge($family->country_code);
-
-        if ($minAge === null) {
-            return 0;
-        }
-
-        $adultMembers = $family->members()
-            ->whereHas('user', fn (Builder $query) => $query->where(
-                fn (Builder $query) => $this->bornAtLeastYearsAgo($query->whereNull('birth_year'), $minAge, 'or'),
-            ))
-            ->count();
-
-        $adultInvites = $this->bornAtLeastYearsAgo($family->pendingInvites()->getQuery(), $minAge)->count();
-
-        return $adultMembers + $adultInvites;
-    }
-
-    /**
-     * Birth year/month at least `$years` ago this month (the birthday counts as passed within the
-     * birth month; a missing month counts as January), i.e. `PolicyResolver::age() >= $years`.
-     *
-     * @template TBuilder of Builder
-     *
-     * @param  TBuilder  $query
-     * @return TBuilder
-     */
-    private function bornAtLeastYearsAgo(Builder $query, int $years, string $boolean = 'and'): Builder
-    {
-        $year = now()->year - $years;
-        $month = now()->month;
-
-        return $query->where(fn (Builder $query) => $query
-            ->where('birth_year', '<', $year)
-            ->orWhere(fn (Builder $query) => $query->where('birth_year', $year)->whereRaw('coalesce(birth_month, 1) <= ?', [$month])), boolean: $boolean);
     }
 }

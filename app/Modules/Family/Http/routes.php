@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Family\Http\Controllers\AccountDeletionController;
+use App\Modules\Family\Http\Controllers\ClassroomController;
 use App\Modules\Family\Http\Controllers\FamilyController;
 use App\Modules\Family\Http\Controllers\InviteController;
 use App\Modules\Family\Http\Controllers\MemberController;
@@ -44,5 +45,19 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::get('family/invites/preview', [InviteController::class, 'preview'])->name('api.v1.family.invites.preview');
         Route::post('family/invites', [InviteController::class, 'store'])->name('api.v1.family.invites.store');
         Route::delete('family/invites/{invite}', [InviteController::class, 'destroy'])->whereNumber('invite')->name('api.v1.family.invites.destroy');
+
+        // Classroom tools (docs/API.md "Classroom tools"): 403 `plan_required` on other tiers; all but
+        // the consent itself need the current consent statement (409 `classroom_consent_required`).
+        Route::prefix('family/classroom')->group(function () {
+            Route::post('consent', [ClassroomController::class, 'consent'])->middleware('classroom')->name('api.v1.family.classroom.consent');
+
+            Route::middleware('classroom:consent')->group(function () {
+                Route::post('roster', [ClassroomController::class, 'roster'])->name('api.v1.family.classroom.roster');
+                Route::post('sign-in-codes', [ClassroomController::class, 'codeCards'])->middleware('throttle:classroom-codes')->name('api.v1.family.classroom.sign-in-codes');
+                Route::get('summary', [ClassroomController::class, 'summary'])->name('api.v1.family.classroom.summary');
+                Route::get('summary.csv', [ClassroomController::class, 'summaryCsv'])->name('api.v1.family.classroom.summary-csv');
+                Route::post('new-year', [ClassroomController::class, 'newYear'])->name('api.v1.family.classroom.new-year');
+            });
+        });
     });
 });

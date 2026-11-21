@@ -4,17 +4,20 @@ namespace App\Modules\Goals\Actions;
 
 use App\Modules\Content\Support\CategoryTree;
 use App\Modules\Core\Support\Iso;
+use App\Modules\Family\Models\Family;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Goals\Models\GoalPeriod;
 use App\Modules\Goals\Models\GoalPlan;
 use App\Modules\Scoring\Actions\BuildLeaderboard;
 use App\Modules\Scoring\Models\PointEntry;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
 /**
  * GoalProgress (docs/API.md) for a period, always computed from the points ledger: points
  * inside the window, in the plan's scope subtrees (any category for `all_categories`), by the
- * period's members. Closed periods
+ * period's members, from the later of the period start and the family's points season start
+ * (`season_started_at`, Classroom new year; the ledger itself is never changed). Closed periods
  * return their stored result.
  *
  * - cooperation: `reached` when the team total meets the period target.
@@ -22,7 +25,7 @@ use Illuminate\Support\Collection;
  * Each entry's `target` is the member's snapshotted target (`target_override ?? target_points`).
  *
  * `many()` computes several open periods with a constant number of queries (one grouped ledger
- * query with a conditional sum per period, one member query), so listing plans never runs a
+ * query with a conditional sum per period, one member query, one season query), so listing plans never runs a
  * query per plan. Each period's `plan` relation must be set (with `categories` loaded, or it is
  * queried once per plan).
  */
@@ -59,8 +62,9 @@ class ComputeGoalProgress
             return $results;
         }
 
-        /** @var array<int, array{period: GoalPeriod, targets: array<int, int>, all: bool, categories: list<int>}> $windows */
+        /** @var array<int, array{period: GoalPeriod, start: CarbonInterface, targets: array<int, int>, all: bool, categories: list<int>}> $windows */
         $windows = [];
+        $seasons = $this->seasonStarts(array_map(fn (GoalPeriod $period): int => $period->plan->family_id, $open));
 
         foreach ($open as $period) {
             $plan = $period->plan;
@@ -70,8 +74,12 @@ class ComputeGoalProgress
                 default => $plan->categories()->pluck('categories.id'),
             };
 
+            $season = $seasons[$plan->family_id] ?? null;
+
             $windows[$period->id] = [
                 'period' => $period,
+                // A points season (Classroom new year) starting inside the period: count from it.
+                'start' => $season !== null && $season->gt($period->starts_at) ? $season : $period->starts_at,
                 'targets' => collect($period->member_targets)->mapWithKeys(fn ($target, $id) => [(int) $id => (int) $target])->all(),
                 'all' => $plan->all_categories,
                 'categories' => $categoryIds->flatMap(fn ($id) => $this->tree->subtreeIds((int) $id))->unique()->values()->all(),
@@ -90,12 +98,32 @@ class ComputeGoalProgress
     }
 
     /**
+     * Points season starts (`families.season_started_at`, Classroom new year) of these families, in
+     * one query; families without a season are left out.
+     *
+     * @param  list<int>  $familyIds
+     * @return array<int, CarbonInterface> family id => season start
+     */
+    private function seasonStarts(array $familyIds): array
+    {
+        $seasons = [];
+
+        foreach (Family::query()->whereIn('id', array_values(array_unique($familyIds)))->whereNotNull('season_started_at')->get(['id', 'season_started_at']) as $family) {
+            if ($family->season_started_at !== null) {
+                $seasons[$family->id] = $family->season_started_at;
+            }
+        }
+
+        return $seasons;
+    }
+
+    /**
      * Points per (period, member) in one grouped query: a conditional SUM per period over the
      * union of the periods' families, members and time ranges.
      *
      * An `all_categories` plan has no category condition.
      *
-     * @param  array<int, array{period: GoalPeriod, targets: array<int, int>, all: bool, categories: list<int>}>  $windows
+     * @param  array<int, array{period: GoalPeriod, start: CarbonInterface, targets: array<int, int>, all: bool, categories: list<int>}>  $windows
      * @return array<int, array<int, int>> period id => member id => points
      */
     private function ledgerTotals(array $windows): array
@@ -116,7 +144,7 @@ class ComputeGoalProgress
             $period = $window['period'];
             $memberIds = [...$memberIds, ...array_keys($window['targets'])];
             $familyIds[] = $period->plan->family_id;
-            $start = $start === null || $period->starts_at->lt($start) ? $period->starts_at : $start;
+            $start = $start === null || $window['start']->lt($start) ? $window['start'] : $start;
             $end = $end === null || $period->ends_at->gt($end) ? $period->ends_at : $end;
 
             $memberMarks = implode(',', array_fill(0, count($window['targets']), '?'));
@@ -124,7 +152,7 @@ class ComputeGoalProgress
 
             $query->selectRaw(
                 "SUM(CASE WHEN family_id = ? AND created_at >= ? AND created_at < ? AND member_id IN ({$memberMarks}){$categoryCondition} THEN amount ELSE 0 END) AS p{$periodId}",
-                [$period->plan->family_id, $period->starts_at, $period->ends_at, ...array_keys($window['targets']), ...($window['all'] ? [] : $window['categories'])],
+                [$period->plan->family_id, $window['start'], $period->ends_at, ...array_keys($window['targets']), ...($window['all'] ? [] : $window['categories'])],
             );
         }
 

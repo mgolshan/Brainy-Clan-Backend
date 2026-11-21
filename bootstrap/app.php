@@ -5,6 +5,7 @@ use App\Modules\Core\Http\Middleware\EnsureHasFamily;
 use App\Modules\Core\Http\Middleware\RouteByHost;
 use App\Modules\Core\Http\Middleware\TouchDevice;
 use App\Modules\Core\Support\ApiErrorRenderer;
+use App\Modules\Family\Http\Middleware\EnsureClassroom;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -39,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'family' => EnsureHasFamily::class,
+            'classroom' => EnsureClassroom::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

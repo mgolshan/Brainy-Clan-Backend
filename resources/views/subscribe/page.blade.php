@@ -240,6 +240,7 @@
             <p class="notice" role="status">{{ match ($reason) {
                 'store_plan_active' => $fr ? 'Votre famille a déjà un abonnement acheté dans l’App Store ou Google Play. Gérez-le à cet endroit.' : 'Your family already has a subscription bought in the App Store or Google Play. Manage it there.',
                 'web_plan_active' => $fr ? 'Votre famille a déjà un abonnement actif acheté sur le Web. Merci !' : 'Your family already has an active subscription bought on the web. Thank you!',
+                'owner_too_young' => $fr ? 'Le forfait Classe demande un propriétaire de famille d’au moins '.$classroomOwnerMinAge.' ans.' : 'A Classroom needs a family owner who is at least '.$classroomOwnerMinAge.'.',
                 default => $fr ? 'Seul un administrateur adulte de la famille peut s’abonner.' : 'Only an adult admin of the family can subscribe.',
             } }}</p>
         @elseif ($state === 'error')

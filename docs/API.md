@@ -39,7 +39,7 @@ and add a line to the changelog at the bottom.
 | `member_limit_reached` | 403 | Tier member limit reached |
 | `adult_limit_reached` | 403 | Tier adult-seat limit reached (Classroom: 2 adults) |
 | `owner_too_young` | 403 | Too young to own this: a family needs 16+, a Classroom 18+ (`family.owner_min_age` / `classroom.owner_min_age`); body has `min_age` |
-| `classroom_consent_required` | 409 | A teacher must accept the Classroom consent statement first — B12 step 3 |
+| `classroom_consent_required` | 409 | An admin of the Classroom must accept the current Classroom consent statement first (`POST /family/classroom/consent`) |
 | `category_not_allowed` | 403 | Category outside tier/age policy |
 | `no_family` | 409 | Endpoint needs a family membership and the user has none |
 | `already_in_family` | 409 | User already belongs to a family |
@@ -955,7 +955,7 @@ most 1 push per member per 2 minutes, collapsed). The push **never contains mess
 through Expo/Apple/Google): title "Brainy Clan", body "Sam sent a message" (localized), `data`
 `{ "type": "family_chat", "message_id": 812 }`.
 
-### Classroom tools (B12 step 3, contract 2026-11-20; adult seats built 2026-11-20, the rest not built yet)
+### Classroom tools (B12 step 3, contract 2026-11-20; built 2026-11-21)
 Classroom is a family whose `tier` is `classroom`. The family `name` is the class name. Family
 admins are the teachers. Everything here returns 403 `plan_required` on any other tier, unless a
 rule below says otherwise.
@@ -1045,6 +1045,48 @@ rule below says otherwise.
 - It cannot be undone. The app offers the summary export first.
 - New error codes: `adult_limit_reached` (403) and `classroom_consent_required` (409).
 
+**Built (2026-11-21) — details and decisions:**
+- **Gate order:** every `/family/classroom/*` route is `family:admin` (403 `forbidden` for others), then 403
+  `plan_required` on another tier, then (all but `consent`) 409 `classroom_consent_required` — all before the
+  body is validated, so a wrong body on a gated call still gets 403/409 first.
+- **Consent:** counts when an **active admin** of the family (teacher or co-teacher) accepted the **current**
+  version; a consent by someone who is no longer an admin, or of an older version, does not. Accepting a
+  version the same user already accepted adds no second row. Consent rows have type `classroom` (in `/me/export`
+  `consents` like the others). `GET /legal` `classroom_consent` also has `statement` (the localized statement
+  text, for the checkbox); `text_url` is `https://brainyclan.com/legal/classroom` (`?lang=fr`).
+- **Setup state:** `consent_version` / `consent_accepted_at` are the newest classroom consent of any active
+  admin of the family (any version, `null` when none); the app compares `consent_version` with `GET /legal`
+  `classroom_consent.version`. `students_count` = active members with role `member`.
+- **Roster:** nicknames are trimmed, unique case-insensitively (in the family and in the list; 422 on
+  `students.N.nickname`); `birth_year` 1900–this year; students old enough to be adults (18+ from the birth
+  year + June) also count against `max_adults` (403 `adult_limit_reached`); users get the teacher's `locale`.
+  Students join `everyone` goal plans like any newcomer. Response Members as in `GET /family` (admin view).
+- **Code cards:** 201. `member_ids` (optional, distinct ids) must all be active members of the family (any
+  member, admins too), else 422 on `member_ids`; no students → `{ data: [] }`, `codes_issued_at` unchanged.
+  Sorted by nickname. Same code format and `POST /auth/code` redemption (and lockout) as other sign-in codes.
+  The rate limit counts every call that passes the gates (429 `rate_limited` + `Retry-After`).
+- **Summary:** one row per **active** member (teachers too), sorted by nickname. `points`: ledger sum in the
+  family within the period (corrections included); `games`: play sessions with an answer in the period;
+  `accuracy_percent`: correct ÷ answered regular items (redemption items left out), rounded, `null` without
+  answers; `last_played_at`: latest answer in the period (`null` without); streaks are the member's current
+  record (not period-bound; `current_streak` is 0 after a missed day, like `/me/stats`). `period` other than
+  `season`/`all` → 422.
+- **CSV:** `text/csv; charset=UTF-8` with a BOM, `Content-Disposition: attachment; filename=class-summary-YYYY-MM-DD.csv`,
+  `Cache-Control: no-store`. Columns in this order: member_id, nickname, role, points, games, accuracy_percent,
+  current_streak, longest_streak, last_played_at (headers en: "Member ID, Nickname, Role, Points, Games,
+  Accuracy (%), Current streak (days), Longest streak (days), Last played (UTC)"; fr from the user's `locale`).
+  Empty cell for `null`. A text cell starting with `= + - @`, tab or CR gets a leading `'` (formula injection).
+- **New year:** `clear` flags are booleans (missing = false); no true flag → 422 on `clear`; a wrong name → 422
+  on `confirm_name`. `students` removes members with role `member` only (teacher and co-teacher stay).
+  `points` with a season already running moves the start to now. Response is the Family (with the new
+  `classroom` state). Activity log: event `classroom_new_year` on the family, causer = the admin, properties
+  `clear` + counts (`students_removed`, `chat_messages_deleted`, `goal_plans_deleted`), no names.
+- **Seasons in other endpoints:** `GET /family/leaderboard` counts only entries at or after
+  `season_started_at`, for every period; its `starts_at` is the later of the window start and the season start
+  (for `all` it is the season start, `null` without a season). Goal progress of open periods counts from the
+  later of the period start and the season start (closed periods keep their stored results). Unchanged:
+  `/me/stats` (all of it), world unlocks, `/me/export`.
+
 ### Support messages (2026-11-08)
 Signed-in **family admins** can write to the Brainy Clan support team from the app (children and
 other members cannot: support replies go to an email address, and we don't collect contact details
@@ -1081,6 +1123,7 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
   "summary": "What changed in this version" | null }, "privacy": { ... same } } }`. Versions are opaque
   strings (currently dates); `summary` is a short localized "what changed" text for re-acceptance. Pages at `/terms`
   and `/privacy` on the website host (HTML, `?lang=fr` for French; the old `/legal/terms` and `/legal/privacy` redirect there).
+  Since 2026-11-21 the payload also has `classroom_consent: { version, text_url, statement }` (see "Classroom tools"; page `/legal/classroom`).
 - `POST /auth/register` and adult `POST /auth/social/{provider}` sign-ups require `accept_terms: true`
   (422 on `accept_terms` otherwise); the server records a consent row (user, type `terms`+`privacy`,
   versions, time, IP hash). Joining by invite as an adult with email (`/auth/join` with email) also
@@ -1175,3 +1218,4 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-11-20 — Classroom tools contract (B12 step 3, **not built yet**): policy `limits.max_adults` (classroom 2) + 403 `adult_limit_reached`; admins must be adults; classroom consent statement (`POST /family/classroom/consent`, `GET /legal` `classroom_consent`, 409 `classroom_consent_required`); Family `classroom` setup state; roster bulk add; card sign-in codes (14 days); class summary JSON + CSV; `POST /family/classroom/new-year` (students / points season / chat / goals).
 - 2026-11-20 — Adult seats (B12 step 3a, backend built): policy `limits.max_adults` (tier setting; `null` = unlimited for free / family / big_clan, `2` for classroom); `POST /family/invites` for an adult (band with `purchases_allowed`: adult, senior) → 403 `adult_limit_reached` when active adults + pending adult invites are at or over the limit (checked after `member_limit_reached`; members over the limit keep their seats); `PATCH /family/members/{member}` with `role: admin` for a child or teen → 422 on `role` ("Only adults can be family admins."), using the birth data sent in the same request, checked only when the role changes (existing child admins and `role: admin` sent for someone already admin are left alone).
 - 2026-11-20 — Owner ages: global settings `family.owner_min_age` (16) and `classroom.owner_min_age` (18). Self sign-up (`POST /auth/register`, social sign-up) now from 16 (was: adult bands, 18+); `POST /families` under 16 → 403 `owner_too_young` with `min_age: 16`; Classroom web checkout for a family owner under 18 → 403 `owner_too_young` with `min_age: 18` on `GET /family/web-checkout/availability?tier=classroom` (website: reason emailed, emailed link page 403); `GET /pricing` tiers gain `min_owner_age` (classroom 18, others null). RevenueCat store purchases are still granted (can't be refused after payment). New error code `owner_too_young` (403).
+- 2026-11-21 — Classroom tools (B12 step 3, backend built): `POST /family/classroom/consent`, `GET /legal` `classroom_consent` (`version`, `text_url`, plus `statement`), page `/legal/classroom` (en/fr draft), Family `classroom` setup state, 409 `classroom_consent_required`, `POST /family/classroom/roster`, `POST /family/classroom/sign-in-codes` (201, tier setting `sign_in_codes.card_ttl_days` 14, 10/h per family), `GET /family/classroom/summary` + `summary.csv`, `POST /family/classroom/new-year`, `families.season_started_at` (leaderboard and open goal periods count from the season). Clarifications in "Classroom tools" → "Built (2026-11-21)": gate order (403 `forbidden` → 403 `plan_required` → 409 before validation), `consent_version` is the newest version any active admin accepted, adult-aged roster students count against `max_adults`, `member_ids` must be active members (422), summary rows include admins, `accuracy_percent` null without answers, CSV format (BOM, headers en/fr, formula-safe cells), leaderboard `starts_at` clipped to the season.

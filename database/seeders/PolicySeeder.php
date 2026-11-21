@@ -156,6 +156,7 @@ class PolicySeeder extends Seeder
             ['tier', 'classroom', 'ads.enabled', false, 'Paying plans never see ads.'],
             ['tier', 'classroom', 'chat.retention_days', 365, 'Classroom plan: chat messages are deleted after this many days.'],
             ['tier', 'classroom', 'chat.modes_allowed', true, 'Classroom plan: the teacher can set the chat to announcements only or turn it off.'],
+            ['tier', 'classroom', 'sign_in_codes.card_ttl_days', 14, 'Classroom plan: days a printed sign-in code card stays valid (one-time use).'],
         ];
     }
 }

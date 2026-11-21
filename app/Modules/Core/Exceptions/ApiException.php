@@ -214,6 +214,15 @@ class ApiException extends RuntimeException
     }
 
     /**
+     * The Classroom tools need an admin's acceptance of the current consent statement first
+     * (docs/API.md "Classroom tools" → "Consent statement").
+     */
+    public static function classroomConsentRequired(): self
+    {
+        return new self('classroom_consent_required', 'Please accept the Classroom consent statement first.', 409);
+    }
+
+    /**
      * The family already has an active plan from a store or the web (docs/API.md "Web checkout").
      */
     public static function subscriptionExists(string $message = 'Your family already has an active plan.'): self

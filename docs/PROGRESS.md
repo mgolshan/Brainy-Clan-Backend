@@ -30,10 +30,11 @@ Milestones are defined in `docs/PLAN.md`.
 | B12 Plans — step 1 plan tiers (2026-11-20) | Done | Tiers `big_clan` / `classroom` (+ rank helpers), per-tier settings (Family 7 → 6), RevenueCat entitlement → tier map (highest rank wins, `entitlement` in the subscription), Paddle prices per tier, web subscribe + availability with `tier`, `GET /pricing` `tiers[]`, any paid tier unlocks `family_plan` worlds, admin badges/filter/metrics, website plans (4 cards) + use-case slider + subscribe tier picker, help center, terms 2026-11-20, README. Next: step 2 (chat safety) |
 | B12 Plans — step 2 chat safety (2026-11-20) | Done | Bad-words filter (`ProfanityFilter`, en + fr lists in `resources/chat-filter/`, disguises, whole words only, ★ masking, `filtered`), Family `chat_filter` (every plan, default on) + `chat_mode` (Classroom via `chat.modes_allowed`, effective mode after downgrade), `announcements` (403 `chat_read_only`) and `off` (403 `chat_off`, unread 0, no pushes), errors `plan_required` / `chat_read_only` / `chat_off`, admin family view, help center, website line. Next: step 3 (Classroom tools) |
 | B12 Plans — step 3a adult seats (2026-11-20) | Done | Policy `limits.max_adults` (tier setting, classroom 2, others null), 403 `adult_limit_reached` on adult invites (active adults + pending adult invites, two count queries), admins must be adults on every tier (422 on `role`, on change only), help center lines. Next: rest of step 3 (consent, roster, code cards, summary, new year) |
+| B12 Plans — step 3 Classroom tools (2026-11-21) | Done | Consent statement (`POST /family/classroom/consent`, `GET /legal` `classroom_consent`, `/legal/classroom` en+fr draft, consent type `classroom`), Family `classroom` setup state, `classroom` middleware (403 `plan_required` / 409 `classroom_consent_required` before validation), roster bulk add, 14-day code cards (tier setting `sign_in_codes.card_ttl_days`, 10/h per family), class summary JSON + CSV (constant queries), archive & new year (`season_started_at`: leaderboard + goal progress count from the season, ledger untouched), admin Classroom section, help center section, landing card. Next: step 4 (FTUE) |
 
 ## Next up
 
-**B12 (2026-11-20):** steps 1 (plan tiers), 2 (chat safety) and 3a (adult seats + adults-only admins) done — next is the rest of step 3 (Classroom tools: consent statement, setup state, roster, code cards, class summary, new year; contract in docs/API.md "Classroom tools", backend + app in parallel), then step 4 FTUE (docs/PLAN.md "FTUE plan"). Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
+**B12 (2026-11-21):** steps 1 (plan tiers), 2 (chat safety) and 3 (Classroom tools: adult seats, consent statement, setup state, roster, code cards, class summary, new year) done — next is step 4 FTUE (docs/PLAN.md "FTUE plan"; server `GET /me/onboarding` + per-flow steps, Classroom flow reads `family.classroom`). Lawyer review of `/legal/classroom` (draft) before launch. Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
 
 **Start of next session (2026-10-24 wrap-up):** run the full backend suite first — the last full run was cut short when Docker stopped. The order-dependent `WebCheckoutTest` / `AccountDeletionPageTest` failure after `WebsiteTest` is fixed (2026-10-25: Livewire's static "component rendered" flag leaked between tests; `TestCase` now calls `Livewire::flushState()`). Moe's open items: content audit decisions (docs/CONTENT_AUDIT_2026-10-24.md, 36 items), lawyer review (terms/privacy 2026-10-24, partner agreement), server region, accounts weekend, when /partners goes public.
 0. **State at last stop (session 17, 2026-10-17, launch question bank + French content):** done (see log). Dev DB:
@@ -386,6 +387,44 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-11-21 B12 step 3: Classroom tools
+- **Migrations:** `2026_11_21_100000_add_classroom_columns_to_families` (`season_started_at`, `codes_issued_at`) and
+  `2026_11_21_100100_add_card_ttl_tier_settings` (tier setting `sign_in_codes.card_ttl_days` = 14 for classroom,
+  insert-or-ignore; same row in `PolicySeeder`; resolver default 14, `PolicyResolver::signInCodeCardTtlDays()`).
+  Run on dev.
+- **Consent statement:** `config/legal.php` `classroom_consent` (version `2026-11-20`, statement en/fr),
+  `LegalDocuments::classroomConsent*()`, `GET /legal` → `classroom_consent { version, text_url, statement }`,
+  page `/legal/classroom` (en + fr, draft banner + "[DRAFT FOR LAWYER REVIEW]"), consent type `classroom`
+  (append-only row per user, hashed IP, no duplicate for the same user + version). `POST /family/classroom/consent`
+  (`AcceptClassroomConsent`, 422 on a stale `version`).
+- **Gate:** `classroom` / `classroom:consent` route middleware (`EnsureClassroom` → `ClassroomSetupState::ensure()`),
+  after `family:admin`: 403 `plan_required` on other tiers, 409 `classroom_consent_required` until an active admin
+  accepted the current version; runs before Form Requests. New `ApiException::classroomConsentRequired()`, `ErrorCodes`.
+- **Setup state:** Family object `classroom` (`ClassroomSetupState::forFamily()`; null on other tiers; 2 queries on
+  Classroom). `consent_version` = newest version any active admin accepted (aligned with the app; the app compares it
+  with `GET /legal`).
+- **Roster:** `POST /family/classroom/roster` (`AddClassroomRoster`): 1–35 students, trimmed case-insensitive unique
+  nicknames, class `birth_year` + per-student override, June, users without email/password in the teacher's locale,
+  `MemberJoined` per student, family row locked; 403 `member_limit_reached` (pending invites count) and
+  `adult_limit_reached` for adult-aged students. Adult-seat counting moved from `CreateInvite` to `CountAdultSeats`.
+- **Code cards:** `POST /family/classroom/sign-in-codes` (`IssueClassroomCodeCards`, 201): default every non-admin
+  member, `member_ids` must be active members (422), one void UPDATE + one INSERT (constant queries), 14 days, sets
+  `codes_issued_at`, sorted by nickname; limiter `classroom-codes` 10/h per family (`FamilyServiceProvider`).
+- **Summary:** `GET /family/classroom/summary` + `summary.csv` (`BuildClassroomSummary`, `ClassroomSummaryCsv`):
+  4 queries for any class; CSV with BOM, en/fr headers, formula-safe cells, `no-store`.
+- **New year:** `POST /family/classroom/new-year` (`StartClassroomNewYear`): `confirm_name` check, `students` through
+  `RemoveMember` (roster users erased), `points` → `season_started_at = now` (ledger untouched), `chat` deletes
+  messages (reactions/reports cascade), `goals` soft-deletes plans, one activity log entry without names.
+- **Seasons:** `BuildLeaderboard` and `ComputeGoalProgress` (open periods; +1 query for the season starts) count from
+  `season_started_at`; `/me/stats`, world unlocks and export unchanged.
+- **Admin:** family view gets a "Classroom" section (consent accepted, students via `withCount`, codes issued, season).
+- **Website/help:** help center section "Classroom tools" (5 articles, en + fr, placeholders `{classroom_roster_max}`,
+  `{classroom_card_days}`), "coming soon" removed from the Big Clan/Classroom article and the landing Classroom card;
+  subscribe page "can't subscribe" gets the `owner_too_young` line with the resolver's age.
+- **Tests:** new `tests/Feature/Api/ClassroomToolsTest.php` (27 tests incl. query-count tests for the summary + CSV,
+  family view and code cards), admin Classroom section query-count test, `OwnerAgeTest` and `WebsiteTest` updates.
+- **Open for Moe:** lawyer review of `/legal/classroom`; consent statement version bump process (config).
 
 ### 2026-11-20 Owner ages: family 16+, Classroom 18+
 - **Settings** (global, through the PolicyResolver): `family.owner_min_age` = 16, `classroom.owner_min_age` = 18.

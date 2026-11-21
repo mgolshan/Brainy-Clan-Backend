@@ -873,8 +873,8 @@
                             @if ($tier === 'classroom')
                                 <li>{{ $fr ? 'Modes de clavardage : annonces seulement ou désactivé' : 'Chat modes: announcements only, or chat off' }}</li>
                                 <li>{{ $fr
-                                    ? 'Bientôt : outils pour l’enseignant (liste d’élèves, cartes de codes de connexion, export et remise à zéro pour la nouvelle année)'
-                                    : 'Coming soon: teacher tools (class roster, sign-in code cards, export and new-year reset)' }}</li>
+                                    ? 'Outils pour l’enseignant : liste d’élèves à coller, cartes de codes de connexion à imprimer, résumé de classe à exporter et remise à zéro pour la nouvelle année'
+                                    : 'Teacher tools: paste-in class roster, printable sign-in code cards, class summary export and new-year reset' }}</li>
                             @endif
                         </ul>
                         <a class="plan-cta" href="{{ route('website.subscribe', [...$lang, 'tier' => $tier, ...($pricing['currency'] !== 'USD' ? ['currency' => $pricing['currency']] : [])]) }}">{{ $fr ? 'Choisir '.$planName($tier) : 'Choose '.$planName($tier) }}</a>
