@@ -37,6 +37,8 @@ and add a line to the changelog at the bottom.
 | `invalid_credentials` | 401 | Wrong email/password |
 | `forbidden` | 403 | Not allowed (e.g. non-admin calling an admin endpoint) |
 | `member_limit_reached` | 403 | Tier member limit reached |
+| `adult_limit_reached` | 403 | Tier adult-seat limit reached (Classroom: 2 adults) — B12 step 3 |
+| `classroom_consent_required` | 409 | A teacher must accept the Classroom consent statement first — B12 step 3 |
 | `category_not_allowed` | 403 | Category outside tier/age policy |
 | `no_family` | 409 | Endpoint needs a family membership and the user has none |
 | `already_in_family` | 409 | User already belongs to a family |
@@ -164,7 +166,7 @@ and add a line to the changelog at the bottom.
   "ad_request": { "non_personalized": true, "under_age_of_consent": false, "max_ad_content_rating": "G" },
   "limits": { "max_members": 2, "max_categories": 3, "max_active_goals": 1 },
   "accessibility_defaults": { "text_scale": 1.0, "reduced_motion": false, "calm_timers": false, "sound_effects": true },
-  "chat": { "retention_days": 7 },
+  "chat": { "retention_days": 7, "modes_allowed": false },
   "feature_flags": {}
 }
 ```
@@ -924,6 +926,96 @@ most 1 push per member per 2 minutes, collapsed). The push **never contains mess
 through Expo/Apple/Google): title "Brainy Clan", body "Sam sent a message" (localized), `data`
 `{ "type": "family_chat", "message_id": 812 }`.
 
+### Classroom tools (B12 step 3, contract 2026-11-20, not built yet)
+Classroom is a family whose `tier` is `classroom`. The family `name` is the class name. Family
+admins are the teachers. Everything here returns 403 `plan_required` on any other tier, unless a
+rule below says otherwise.
+
+**Adult seats (every tier):**
+- Policy `limits` gains `"max_adults"` (tier setting `limits.max_adults`): `null` (unlimited) for
+  free, family and big_clan, and **2** for classroom.
+- An adult is a member whose age band has `purchases_allowed`, i.e. adult or senior.
+- `POST /family/invites` for an adult, when active adults plus pending adult invites are already
+  at or over the limit, returns 403 `adult_limit_reached`.
+- Members over the limit after a plan change keep their seats; the limit applies to new invites only.
+- **Admins must be adults (every tier):**
+  - `PATCH /family/members/{member}` with `role: admin` for a child or teen returns 422 on `role`.
+  - Existing child admins are left as they are; this is checked on change only.
+
+**Consent statement:**
+- `GET /legal` gains `classroom_consent: { version, text_url }`.
+- `POST /family/classroom/consent` (admin, classroom) — Body `{ version }` → 200 `{ data: Family }`.
+  It is stored per user: user, version and time, with the IP hashed like the other consents.
+- A stale `version` → 422.
+- The page `/legal/classroom` (en and fr) holds the statement and the Classroom terms. **Draft — the
+  lawyer reviews it before launch.** The statement reads: "I'm a teacher, tutor or coach, and I am
+  authorised by my school or organisation, or I have the parents' or guardians' consent, to add
+  these students and their progress to Brainy Clan."
+
+**Setup state (for FTUE):**
+- The Family object gains `"classroom"`, set only on the classroom tier, else `null`:
+```json
+"classroom": { "consent_version": "2026-11-20" | null, "consent_accepted_at": "…" | null,
+  "students_count": 28, "codes_issued_at": "…" | null, "season_started_at": "…" | null }
+```
+- Roster, code cards, export and new-year all return 409 `classroom_consent_required` until an
+  admin of the family has accepted the current consent version.
+
+**Roster:**
+- `POST /family/classroom/roster` (admin) adds students in one go, with no invites.
+  - Body: `{ "birth_year": 2016, "students": [ { "nickname": "Ava", "birth_year"?: 2015 } ] }`.
+  - 1–35 students per call, nicknames 1–40 characters and unique in the family.
+  - `birth_year` is the year most of the class was born, and a student may override it.
+  - Birth month is taken as June (mid-year) when unknown.
+- Students become active members with role `member` and no email or password. Each gets a user
+  without an email, like children who join by invite.
+- → 201 `{ data: Member[] }`.
+- 403 `member_limit_reached` when the roster would pass `max_members`, counting pending invites.
+- No `parental_consent` is needed per child: the teacher's consent statement covers them.
+
+**Code cards:**
+- `POST /family/classroom/sign-in-codes` (admin) — Body `{ member_ids?: [] }`, where the default
+  is every non-admin member.
+  - → `{ data: [ { member_id, nickname, avatar, code, expires_at } ] }`.
+- The codes are the normal one-time sign-in codes (`POST /auth/code`), but with the tier setting
+  `sign_in_codes.card_ttl_days` (14) instead of the minutes TTL. Issuing a code voids that
+  member's older codes.
+- Sets `classroom.codes_issued_at`.
+- The app prints the cards (PDF); codes never go into URLs.
+- Rate limit: 10 per hour per family.
+
+**Class summary export:**
+- `GET /family/classroom/summary?period=season|all` (admin) returns one row per member:
+```json
+{ "data": { "generated_at": "…", "season_started_at": "…" | null, "rows": [
+  { "member_id": 9, "nickname": "Ava", "role": "member", "points": 412, "games": 37,
+    "accuracy_percent": 81, "current_streak": 3, "longest_streak": 9, "last_played_at": "…" } ] } }
+```
+- `period` defaults to `season`, which counts from `season_started_at`, or everything when there
+  is none.
+- `GET /family/classroom/summary.csv?period=…` (Bearer auth; the app downloads it as a file)
+  returns the same rows, with headers in the requester's locale. The app makes the PDF.
+- Constant query count.
+
+**Archive & start a new year:**
+- `POST /family/classroom/new-year` (admin). Body:
+  `{ "confirm_name": "Grade 4B", "clear": { "students": true, "points": true, "chat": true, "goals": true } }`.
+  - At least one `clear` flag must be true.
+  - `confirm_name` must equal the class name, ignoring case and surrounding spaces; otherwise 422.
+- **What each flag clears:**
+  - `students` removes every non-admin member through the normal member-removal path (their
+    data goes as it does today). Roster-created student users with no other family are erased.
+  - `points` starts a new **season**: `families.season_started_at = now`. The ledger stays
+    append-only and nothing is deleted.
+    - Family-scoped totals count only entries at or after the season start: leaderboards, member
+      points on family screens, the class summary and goal progress.
+    - Lifetime values (world unlocks, `/me/stats` lifetime) don't change.
+  - `chat` deletes every message and reaction of the family for good.
+  - `goals` deletes all goal plans (soft delete, as `DELETE /goals/{plan}` does).
+- → 200 `{ data: Family }`. The action is written to the activity log, without names.
+- It cannot be undone. The app offers the summary export first.
+- New error codes: `adult_limit_reached` (403) and `classroom_consent_required` (409).
+
 ### Support messages (2026-11-08)
 Signed-in **family admins** can write to the Brainy Clan support team from the app (children and
 other members cannot: support replies go to an email address, and we don't collect contact details
@@ -1050,4 +1142,5 @@ before store submission** (the pages show a "Draft" banner until `LEGAL_DRAFT=fa
 - 2026-11-08 — Support messages clarifications (backend built, no shape change): `client_id` is required (UUID, case-insensitive) and unique per user — a retry returns the existing message with 200 and does not count against the limits; only created messages count (5 per rolling hour, 20 per rolling day) and the 429 `rate_limited` carries `retry_after` + `Retry-After`; the 403 check runs before validation (a non-admin gets 403 even with an invalid body), and a family admin whose account has no email also gets 403 `forbidden` (message says to add an email); `message` is normalized like chat text (NFC, CRLF → LF, control characters removed, at most 2 empty lines in a row, trimmed) before the 10–5000 code-point check; `app_version` / `device` are stored on one line (line breaks removed). `/me/export` `support_messages`: `[{ "id", "topic", "message", "status", "app_version", "platform", "device", "created_at", "answered_at", "closed_at", "replies": [{ "body", "sent_at" }] }]` (the user's app messages; staff names not included). Website form messages are not linked to an account: they are not in the export and not deleted with it (they follow the same retention).
 - 2026-11-11 — Goals: GoalPlan gains `everyone` (whole family, newcomers join automatically, default when `members` is absent) and `all_categories` (any category counts, `scopes: []`); POST/PATCH accept both. Chat: Message gains `reactions`; `PUT`/`DELETE /family/chat/messages/{id}/reaction`; `GET /family/chat/reactions?since=` for polling. Clarifications (backend built, no shape change): **goals** — `everyone` defaults to `true` when `members` is absent, `null` or `[]`; `everyone: false` without members → 422 `members`; with `everyone: true` a sent `members` list is the full set of overrides (members not listed get `target_override: null`); newcomers also join paused (not deleted) `everyone` plans, so they are on the team when it resumes; switching `everyone` off keeps the current team until `members` is sent; `all_categories: true` with a non-empty `category_ids` → 422 `category_ids`; on PATCH, sending `category_ids` alone turns `all_categories` off, and `all_categories: false` on a plan without scopes needs `category_ids` (422 otherwise). **reactions** — `PUT` on a deleted message → 422 `validation_failed` (`errors.message`), `DELETE` there → 200 no-op (`reactions: []`); a message past retention → 404; setting the same key again changes nothing; the 60/min limit is shared by `PUT` and `DELETE`; `GET /family/chat/reactions` may list a message again for about 2 s after a change (rows are full snapshots, apply them idempotently; this catches changes that commit late), and the cursor without `since` is "now"; a member who leaves the family loses their reactions (the messages are listed as changed). `/me/export` gains `chat_reactions: [{ "message_id", "key", "created_at" }]` (the user's own reactions).
 - 2026-11-20 — Plans (B12 step 1): tiers `big_clan` and `classroom` next to `free` / `family` (Family now 6 members, Big Clan 12, Classroom 37); per-tier settings table; RevenueCat entitlements and offerings per tier, product ids `brainyclan_{tier}_{period}`; `GET /family/subscription` gains `entitlement`; `GET /pricing` returns `tiers[]` (breaking, website-only consumer); `POST /web/subscribe` and `/family/web-checkout/availability` take `tier`; Paddle prices per tier; `family_plan` world unlock = any paid plan. Clarifications (backend built): `GET /family/subscription` `entitlement` is null unless the shown row is entitled; a RevenueCat event with an empty `entitlement_ids` keeps the stored entitlement (a new row takes the tier named in `product_id` — `brainyclan_{tier}_…` or Play's `brainyclan_{tier}:{base plan}` — else `family`); the RevenueCat sync picks the highest-ranked entitlement that is still on (else the one that ended last); a Paddle event with an unknown price is `ignored` unless it is for the family's stored Paddle subscription (it keeps its tier); `POST /web/subscribe` with an unknown `tier` → 422 (form error), with a tier that has no web prices → the "coming soon" page; the availability endpoint → 422 for an unknown `tier`, `link_allowed: false` for a tier without web prices; `url` is `/subscribe?tier=…&plan=annual&src=app`; `GET /pricing` keeps `currency` and lists the tiers in rank order (USD `per_month`/`saving_percent` computed as before). Terms version bumped to `2026-11-20` (re-acceptance; multiple plans, changing plans).
-- 2026-11-20 — Chat safety (B12 step 2): Family gains `chat_filter` (profanity filter, default on, every plan) and `chat_mode` (`normal` | `announcements` | `off`, Classroom only via `policy.chat.modes_allowed`); Message gains `filtered`; errors `plan_required`, `chat_read_only`, `chat_off`.
+- 2026-11-20 — Chat safety (B12 step 2): Family gains `chat_filter` (profanity filter, default on, every plan) and `chat_mode` (`normal` | `announcements` | `off`, Classroom only via `policy.chat.modes_allowed`); Message gains `filtered`; errors `plan_required`, `chat_read_only`, `chat_off`. Clarifications (backend built): `PATCH /family { chat_mode: "normal" }` on a plan without modes is a 200 no-op (the stored mode is kept), any other `chat_mode` there is 403 `plan_required` and nothing in the request is saved; bad `chat_mode` / non-boolean `chat_filter` → 422. With chat `off`, `chat_off` comes before `chat_disabled` (unread is `{ unread: 0 }` for every member, chat-disabled ones too) and no `family_chat` / `family_chat_report` pushes go out. In `announcements`, a non-admin's post is 403 `chat_read_only` even when retrying an existing `client_id`. The filter runs on the normalized body; inside a match letters, digits and disguise symbols become `★` while separators, spaces and combining marks stay; a letter doubled (not 3+) is not a disguise, so "cul" never matches "cull"; a few listed phrases are never masked ("cul-de-sac", "cul sec").
+- 2026-11-20 — Classroom tools contract (B12 step 3, **not built yet**): policy `limits.max_adults` (classroom 2) + 403 `adult_limit_reached`; admins must be adults; classroom consent statement (`POST /family/classroom/consent`, `GET /legal` `classroom_consent`, 409 `classroom_consent_required`); Family `classroom` setup state; roster bulk add; card sign-in codes (14 days); class summary JSON + CSV; `POST /family/classroom/new-year` (students / points season / chat / goals).

@@ -3,8 +3,10 @@
 namespace App\Modules\Notifications\Listeners;
 
 use App\Modules\Chat\Events\MessagePosted;
+use App\Modules\Family\Models\Family;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Notifications\Actions\SendMemberNotification;
+use App\Modules\Policy\PolicyResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Cache;
@@ -15,7 +17,7 @@ use Illuminate\Support\Facades\Cache;
  * travels through Expo/Apple/Google): title "Brainy Clan", body "Sam sent a message" in the
  * recipient's language, data `{ type: "family_chat", message_id }`. At most one per recipient per
  * {@see self::THROTTLE_SECONDS} (atomic `Cache::add`); preferences and quiet hours via
- * {@see SendMemberNotification}. Two queries: the family's members and their preferences.
+ * {@see SendMemberNotification}. Nothing goes out while the family's chat mode is `off`. Two queries: the family's members and their preferences.
  */
 class NotifyFamilyChat implements ShouldQueue
 {
@@ -31,7 +33,10 @@ class NotifyFamilyChat implements ShouldQueue
 
     public bool $afterCommit = true;
 
-    public function __construct(private readonly SendMemberNotification $send) {}
+    public function __construct(
+        private readonly SendMemberNotification $send,
+        private readonly PolicyResolver $policy,
+    ) {}
 
     public function handle(MessagePosted $event): void
     {
@@ -43,7 +48,7 @@ class NotifyFamilyChat implements ShouldQueue
 
         $author = $members->firstWhere('id', $event->memberId);
 
-        if ($author === null) {
+        if ($author === null || $this->policy->effectiveChatMode($author->family) === Family::CHAT_MODE_OFF) {
             return;
         }
 

@@ -63,11 +63,13 @@ class FamilyController
     /**
      * Update the family (admin).
      *
-     * Name and/or timezone.
+     * Name, timezone, the chat's bad-words filter (`chat_filter`, every plan) and the chat mode
+     * (`chat_mode`: Classroom only, else 403 `plan_required`).
      */
+    #[ApiErrors('plan_required')]
     public function update(UpdateFamilyRequest $request, UpdateFamily $update): FamilyResource
     {
-        /** @var array{name?: string, timezone?: string} $data */
+        /** @var array{name?: string, timezone?: string, chat_filter?: bool, chat_mode?: string} $data */
         $data = $request->validated();
 
         return new FamilyResource($update->handle($this->currentMember($request)->family, $data));

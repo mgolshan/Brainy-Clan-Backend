@@ -3,8 +3,10 @@
 namespace App\Modules\Notifications\Listeners;
 
 use App\Modules\Chat\Events\MessageReported;
+use App\Modules\Family\Models\Family;
 use App\Modules\Family\Models\FamilyMember;
 use App\Modules\Notifications\Actions\SendMemberNotification;
+use App\Modules\Policy\PolicyResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 
@@ -13,7 +15,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
  * chat message (`family_chat_report`, docs/API.md "Family chat", Apple guideline 1.2). Never staff,
  * and the push **never contains the message text**: title "Brainy Clan", body "Sam reported a
  * message in the family chat" in the recipient's language, data `{ type: "family_chat_report",
- * message_id }`. Preferences and quiet hours via {@see SendMemberNotification}. Two queries: the
+ * message_id }`. Preferences and quiet hours via {@see SendMemberNotification}. Nothing goes out while the family's chat mode is `off`. Two queries: the
  * family's admins (+ the reporter) and their preferences.
  */
 class NotifyFamilyChatReport implements ShouldQueue
@@ -28,7 +30,10 @@ class NotifyFamilyChatReport implements ShouldQueue
 
     public bool $afterCommit = true;
 
-    public function __construct(private readonly SendMemberNotification $send) {}
+    public function __construct(
+        private readonly SendMemberNotification $send,
+        private readonly PolicyResolver $policy,
+    ) {}
 
     public function handle(MessageReported $event): void
     {
@@ -41,7 +46,7 @@ class NotifyFamilyChatReport implements ShouldQueue
 
         $reporter = $members->firstWhere('id', $event->reporterMemberId);
 
-        if ($reporter === null) {
+        if ($reporter === null || $this->policy->effectiveChatMode($reporter->family) === Family::CHAT_MODE_OFF) {
             return;
         }
 

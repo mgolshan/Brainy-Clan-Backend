@@ -6,6 +6,7 @@ use App\Modules\Billing\Models\FamilyAttribution;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Identity\Models\Consent;
 use App\Modules\Identity\Models\User;
+use App\Modules\Policy\PolicyResolver;
 use Database\Factories\FamilyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
@@ -26,12 +27,14 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property string $timezone
  * @property string $country_code
  * @property string $tier
+ * @property bool $chat_filter Profanity filter for the family chat (every plan, default on)
+ * @property string $chat_mode Stored chat mode ({@see self::CHAT_MODES}); the effective one is {@see PolicyResolver::effectiveChatMode()}
  * @property Carbon|null $deleted_at Set by `DELETE /family` (row kept for the ledger)
  * @property Carbon|null $first_paid_at First paid transaction, store or web (Billing; locks the referral code)
  * @property-read Subscription|null $subscription
  * @property-read FamilyAttribution|null $attribution
  */
-#[Fillable(['owner_user_id', 'name', 'timezone', 'country_code', 'tier'])]
+#[Fillable(['owner_user_id', 'name', 'timezone', 'country_code', 'tier', 'chat_filter', 'chat_mode'])]
 #[UseFactory(FamilyFactory::class)]
 class Family extends Model
 {
@@ -39,6 +42,27 @@ class Family extends Model
     use HasFactory, LogsActivity;
 
     public const string TIER_FREE = 'free';
+
+    /** Chat modes (docs/API.md "Chat safety"): everyone posts. */
+    public const string CHAT_MODE_NORMAL = 'normal';
+
+    /** Only family admins post; everyone else reads, reacts and reports. */
+    public const string CHAT_MODE_ANNOUNCEMENTS = 'announcements';
+
+    /** No chat at all: every chat endpoint answers 403 `chat_off`, no pushes. */
+    public const string CHAT_MODE_OFF = 'off';
+
+    public const array CHAT_MODES = [self::CHAT_MODE_NORMAL, self::CHAT_MODE_ANNOUNCEMENTS, self::CHAT_MODE_OFF];
+
+    /**
+     * Column defaults, so a new model has them before it is refreshed.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'chat_filter' => true,
+        'chat_mode' => self::CHAT_MODE_NORMAL,
+    ];
 
     public const string TIER_FAMILY = 'family';
 
@@ -119,6 +143,7 @@ class Family extends Model
         return [
             'deleted_at' => 'datetime',
             'first_paid_at' => 'datetime',
+            'chat_filter' => 'boolean',
         ];
     }
 
@@ -209,6 +234,6 @@ class Family extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logOnly(['name', 'timezone', 'country_code', 'tier'])->logOnlyDirty()->useLogName('family');
+        return LogOptions::defaults()->logOnly(['name', 'timezone', 'country_code', 'tier', 'chat_filter', 'chat_mode'])->logOnlyDirty()->useLogName('family');
     }
 }

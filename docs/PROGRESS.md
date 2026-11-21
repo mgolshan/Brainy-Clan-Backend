@@ -28,10 +28,11 @@ Milestones are defined in `docs/PLAN.md`.
 | Support inbox (2026-11-08) | Done | In-app support messages (family admins), website contact form (no mailto), Filament Support inbox + dashboard card, export/erasure/retention. Moe: set up the `support@` mailbox |
 | Everyone goals + chat reactions (2026-11-11) | Done | Goal plans `everyone` (newcomers join plan + open period via `MemberJoined`) and `all_categories`; chat reactions (fixed set of 6), `PUT`/`DELETE …/reaction`, cursor polling `GET /family/chat/reactions`, export, cleanup on leave/erase |
 | B12 Plans — step 1 plan tiers (2026-11-20) | Done | Tiers `big_clan` / `classroom` (+ rank helpers), per-tier settings (Family 7 → 6), RevenueCat entitlement → tier map (highest rank wins, `entitlement` in the subscription), Paddle prices per tier, web subscribe + availability with `tier`, `GET /pricing` `tiers[]`, any paid tier unlocks `family_plan` worlds, admin badges/filter/metrics, website plans (4 cards) + use-case slider + subscribe tier picker, help center, terms 2026-11-20, README. Next: step 2 (chat safety) |
+| B12 Plans — step 2 chat safety (2026-11-20) | Done | Bad-words filter (`ProfanityFilter`, en + fr lists in `resources/chat-filter/`, disguises, whole words only, ★ masking, `filtered`), Family `chat_filter` (every plan, default on) + `chat_mode` (Classroom via `chat.modes_allowed`, effective mode after downgrade), `announcements` (403 `chat_read_only`) and `off` (403 `chat_off`, unread 0, no pushes), errors `plan_required` / `chat_read_only` / `chat_off`, admin family view, help center, website line. Next: step 3 (Classroom tools) |
 
 ## Next up
 
-**B12 (2026-11-20):** step 1 (plan tiers) done — next is step 2 (chat safety: profanity filter en/fr, Classroom chat modes), then step 3 (Classroom tools). Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
+**B12 (2026-11-20):** steps 1 (plan tiers) and 2 (chat safety) done — next is step 3 (Classroom tools: the contract is already written in docs/API.md "Classroom tools", backend + app in parallel), then step 4 FTUE (docs/PLAN.md "FTUE plan"). Moe: create the 9 store products, 3 RevenueCat entitlements/offerings and the 3 Paddle products × 3 prices (README), lawyer review of terms 2026-11-20.
 
 **Start of next session (2026-10-24 wrap-up):** run the full backend suite first — the last full run was cut short when Docker stopped. The order-dependent `WebCheckoutTest` / `AccountDeletionPageTest` failure after `WebsiteTest` is fixed (2026-10-25: Livewire's static "component rendered" flag leaked between tests; `TestCase` now calls `Livewire::flushState()`). Moe's open items: content audit decisions (docs/CONTENT_AUDIT_2026-10-24.md, 36 items), lawyer review (terms/privacy 2026-10-24, partner agreement), server region, accounts weekend, when /partners goes public.
 0. **State at last stop (session 17, 2026-10-17, launch question bank + French content):** done (see log). Dev DB:
@@ -384,6 +385,30 @@ curl http://localhost:8080/api/v1/health
 - Production image: see `docs/DEPLOY.md` "Local test of the production image"; backups: DEPLOY.md section 9.
 
 ## Log
+
+### 2026-11-20 B12 step 2: chat safety (bad-words filter, Classroom chat modes)
+- **Migration** `2026_11_20_200000_add_chat_safety_columns`: `families.chat_filter` (bool, default true),
+  `families.chat_mode` (string 20, default `normal`), `chat_messages.filtered` (bool, default false) and
+  the tier setting `chat.modes_allowed` (true for `classroom` only; insert-or-ignore). `PolicySeeder` has
+  the same rows; `PolicyResolver` default false, `chatModesAllowed()`, `effectiveChatMode()` (stored mode
+  only while the tier allows it), policy `chat.modes_allowed`.
+- **Filter:** `Chat/Support/ProfanityFilter` with word lists `resources/chat-filter/en.php` and `fr.php`
+  (`words` + `allow`, e.g. "cul-de-sac"). One-code-point-per-code-point fold (lowercase, accents off,
+  combining/zero-width → separator), leet classes, 1-or-3+ repeats, inner separators, spaced single
+  letters; whole words only. Patterns compiled once per process, longest entry first, in chunks of 50.
+  `PostChatMessage` masks when `chat_filter` is on and stores `filtered`; Message `filtered`.
+- **Modes:** `ResolveChatMember` → 403 `chat_off` (before `chat_disabled`); `unlessOff()` for
+  `GET /family/chat/unread` (`{ unread: 0 }`); `PostChatMessage` → 403 `chat_read_only` for non-admins
+  in announcements; `NotifyFamilyChat` / `NotifyFamilyChatReport` skip while off. `PATCH /family`
+  `chat_filter` + `chat_mode` (`UpdateFamily`: 403 `plan_required`, `normal` a no-op without modes);
+  Family resource `chat_filter`, `chat_mode` (effective). Errors in `ErrorCodes`/`ApiException` and the
+  `#[ApiErrors]` attributes. Family activity log records both fields.
+- **Admin:** family view shows the filter and the effective mode (stored mode as a hint after a downgrade).
+- **Help/website:** help articles `bad-words-filter` and `chat-modes` (en + fr), chat article line,
+  Classroom article; home chat perk line and a Classroom plan-card line (chat modes are no longer "coming soon").
+- **Tests:** `tests/Feature/Api/ChatSafetyTest.php` (disguises, ~80 false-positive words/names in en + fr,
+  masking length, 1000 characters, toggle, PATCH rules, downgrade, announcements/off across every endpoint,
+  pushes, query counts, admin page). API.md changelog line has the clarifications.
 
 ### 2026-11-20 B12 step 1: plan tiers (Family, Big Clan, Classroom)
 - **Tiers:** `Family::TIER_BIG_CLAN`, `TIER_CLASSROOM`, `TIERS`, `PAID_TIERS`, `TIER_LABELS(_FR)`,

@@ -46,6 +46,8 @@ class ChatMessageResource extends JsonResource
             'avatar' => $current ? $author->user->avatar : null,
             'body' => $message->isDeleted() ? null : $message->body,
             'deleted' => $message->isDeleted(),
+            // True when the family's profanity filter masked words in the body (B12).
+            'filtered' => (bool) $message->filtered,
             'client_id' => $message->client_id,
             // Loaded (withExists) only when the viewer is an admin of the family; everyone else
             // always sees false.

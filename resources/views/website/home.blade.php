@@ -737,7 +737,7 @@
                 <ul class="perks">
                     <li><span class="ico" aria-hidden="true">🔒</span><span><strong>{{ $fr ? 'Seulement votre famille' : 'Only your family' }}</strong><span>{{ $fr ? 'Seuls les membres de votre famille peuvent lire le clavardage. Aucun inconnu, jamais.' : 'Only the members of your family can read it. No strangers, ever.' }}</span></span></li>
                     <li><span class="ico" aria-hidden="true">🛡️</span><span><strong>{{ $fr ? 'Les parents décident' : 'Parents are in control' }}</strong><span>{{ $fr ? 'Un parent peut désactiver le clavardage pour un enfant ou retirer n’importe quel message.' : 'A parent can turn chat off for a child or remove any message.' }}</span></span></li>
-                    <li><span class="ico" aria-hidden="true">💬</span><span><strong>{{ $fr ? 'Du texte et des émojis' : 'Just text and emoji' }}</strong><span>{{ $fr ? 'Pas de liens cliquables, pas de photos, pas de fichiers.' : 'No clickable links, no photos, no files.' }}</span></span></li>
+                    <li><span class="ico" aria-hidden="true">💬</span><span><strong>{{ $fr ? 'Du texte et des émojis' : 'Just text and emoji' }}</strong><span>{{ $fr ? 'Pas de liens cliquables, pas de photos, pas de fichiers. Les gros mots sont masqués automatiquement, avec tous les forfaits.' : 'No clickable links, no photos, no files. Bad words are hidden automatically, on every plan.' }}</span></span></li>
                     <li><span class="ico" aria-hidden="true">🕒</span><span><strong>{{ $fr ? 'Des messages qui ne s’accumulent pas' : 'Messages don’t pile up' }}</strong><span>{{ $fr ? 'Gardés '.$chatFree.' avec le forfait gratuit et '.($chatPaid ?? $chatFamily).' avec les forfaits payants, puis supprimés.' : 'Kept for '.$chatFree.' on the free plan and '.($chatPaid ?? $chatFamily).' on paid plans, then deleted.' }}</span></span></li>
                 </ul>
             </div>
@@ -891,9 +891,10 @@
                                 <li>{{ ($fr ? 'Mondes exclusifs : ' : 'Exclusive worlds: ').implode(', ', $byUnlock['family_plan']) }}</li>
                             @endif
                             @if ($tier === 'classroom')
+                                <li>{{ $fr ? 'Modes de clavardage : annonces seulement ou désactivé' : 'Chat modes: announcements only, or chat off' }}</li>
                                 <li>{{ $fr
-                                    ? 'Bientôt : outils pour l’enseignant (liste d’élèves, cartes de codes de connexion, export, remise à zéro pour la nouvelle année et clavardage en mode annonces)'
-                                    : 'Coming soon: teacher tools (class roster, sign-in code cards, export, new-year reset and announcement-only chat)' }}</li>
+                                    ? 'Bientôt : outils pour l’enseignant (liste d’élèves, cartes de codes de connexion, export et remise à zéro pour la nouvelle année)'
+                                    : 'Coming soon: teacher tools (class roster, sign-in code cards, export and new-year reset)' }}</li>
                             @endif
                         </ul>
                         <a class="plan-cta" href="{{ route('website.subscribe', [...$lang, 'tier' => $tier, ...($pricing['currency'] !== 'USD' ? ['currency' => $pricing['currency']] : [])]) }}">{{ $fr ? 'Choisir '.$planName($tier) : 'Choose '.$planName($tier) }}</a>

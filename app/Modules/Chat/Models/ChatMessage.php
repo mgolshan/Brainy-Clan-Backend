@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property int $family_id
  * @property int|null $family_member_id
  * @property string|null $body
+ * @property bool $filtered True when the profanity filter masked words in the body
  * @property string $client_id
  * @property Carbon|null $deleted_at
  * @property Carbon|null $created_at
@@ -36,7 +37,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, ChatMessageReaction> $reactions
  * @property-read Family $family
  */
-#[Fillable(['family_id', 'family_member_id', 'body', 'client_id', 'deleted_at', 'reactions_changed_at'])]
+#[Fillable(['family_id', 'family_member_id', 'body', 'filtered', 'client_id', 'deleted_at', 'reactions_changed_at'])]
 #[UseFactory(ChatMessageFactory::class)]
 class ChatMessage extends Model
 {
@@ -56,6 +57,7 @@ class ChatMessage extends Model
     {
         return [
             'body' => 'encrypted',
+            'filtered' => 'boolean',
             'deleted_at' => 'datetime',
         ];
     }

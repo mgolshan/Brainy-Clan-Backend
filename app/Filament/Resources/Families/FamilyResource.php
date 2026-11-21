@@ -12,6 +12,7 @@ use App\Filament\Support\PlanTiers;
 use App\Filament\Support\ReadOnlyForSupport;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Family\Models\Family;
+use App\Modules\Policy\PolicyResolver;
 use BackedEnum;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
@@ -68,6 +69,14 @@ class FamilyResource extends Resource
             TextEntry::make('timezone'),
             TextEntry::make('country_code'),
             TextEntry::make('created_at')->dateTime(),
+            IconEntry::make('chat_filter')->label('Chat bad-words filter')->boolean(),
+            TextEntry::make('chat_mode')->label('Chat mode')->badge()
+                ->state(fn (Family $record): string => app(PolicyResolver::class)->effectiveChatMode($record))
+                ->formatStateUsing(fn (string $state): string => ucfirst($state))
+                ->color(fn (string $state): string => $state === Family::CHAT_MODE_NORMAL ? 'gray' : 'warning')
+                ->helperText(fn (Family $record): ?string => app(PolicyResolver::class)->effectiveChatMode($record) !== $record->chat_mode
+                    ? 'Stored: '.$record->chat_mode.' (applies again on a plan with chat modes)'
+                    : null),
             Section::make('Subscription')
                 ->description('Read-only: the most recently updated plan, set by RevenueCat (store) or Paddle (web) webhooks, the app sync and the hourly reconciliation. Webhooks are under Billing → Webhook events.')
                 ->columnSpanFull()->columns(4)

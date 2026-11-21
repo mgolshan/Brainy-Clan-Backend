@@ -528,7 +528,19 @@ and both repos are committed.
      - The teacher's consent statement at Classroom sign-up ("I'm authorised by my school, or I
        have parents' consent"), stored with a version.
      - A draft Classroom terms page. **The lawyer reviews it before launch.**
+     - **Decisions written into the contract (API.md "Classroom tools"):**
+       - "Clear points" starts a **season** (`season_started_at`). Family totals count from it.
+         The ledger stays append-only, so this never deletes or rewrites point entries.
+       - Roster students get one class-wide birth year, and each student can override it. This
+         keeps age rules correct without asking for exact birthdays.
+       - Code cards are one-time sign-in codes that last 14 days.
+       - **Admins must be adults, on every plan.** This closes a gap: a child could be promoted to admin.
   4. **FTUE (first-time user experience) per plan.** Planned here; to be built after steps 1–3.
+- **Status (2026-11-20):**
+  - Step 1 is done (backend `11a0d7d`, app `db88b31`).
+  - Step 2 is done (app `e44b646`, backend in the "Chat safety" commit).
+  - Step 3: the contract is written, not built.
+  - Step 4: planned.
 - **Later, not planned yet:** changing the tier of a plan bought on the web (Paddle). For now it
   is cancel and resubscribe; store plans change tier inside the store.
 

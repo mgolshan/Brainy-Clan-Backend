@@ -30,7 +30,9 @@ use Illuminate\Http\Response;
 
 /**
  * Only active members of the family can use its chat; everyone else (no family, staff, removed
- * members) gets 404. A member with chat turned off gets 403 `chat_disabled`.
+ * members) gets 404. A member with chat turned off gets 403 `chat_disabled`. While a Classroom
+ * admin has the chat `off`, every endpoint answers 403 `chat_off` (unread: `{ unread: 0 }`); in
+ * `announcements` mode only family admins post (others get 403 `chat_read_only`).
  */
 #[Group('Chat', 'Family group chat: plain text with emoji, polling by id cursors. Clients must render messages as plain text.', 8)]
 class ChatController
@@ -46,7 +48,7 @@ class ChatController
      * `has_more`, `retention_days`, `last_read_id` and `unread`. Messages past the family's
      * retention are not returned.
      */
-    #[ApiErrors('chat_disabled')]
+    #[ApiErrors('chat_disabled', 'chat_off')]
     public function index(ListChatMessagesRequest $request, ListChatMessages $list): AnonymousResourceCollection
     {
         $member = $this->chatMember($request);
@@ -69,9 +71,11 @@ class ChatController
      * Post a chat message.
      *
      * 201 with the new message; re-sending the same `client_id` returns the existing message with
-     * 200 (retries never duplicate). 20 messages per minute per member (429 `rate_limited`).
+     * 200 (retries never duplicate). 20 messages per minute per member (429 `rate_limited`). With
+     * the family's profanity filter on, blocked words are masked with ★ before storing
+     * (`filtered: true`). In announcements mode only family admins post (403 `chat_read_only`).
      */
-    #[ApiErrors('chat_disabled')]
+    #[ApiErrors('chat_disabled', 'chat_off', 'chat_read_only')]
     public function store(PostChatMessageRequest $request, PostChatMessage $post): JsonResponse
     {
         $result = $post->handle($this->chatMember($request), $request->string('body')->value(), $request->string('client_id')->value());
@@ -84,7 +88,7 @@ class ChatController
      *
      * The author or a family admin; the message stays as a tombstone (`deleted: true`, `body: null`).
      */
-    #[ApiErrors('chat_disabled', 'forbidden')]
+    #[ApiErrors('chat_disabled', 'chat_off', 'forbidden')]
     public function destroy(Request $request, int $message, DeleteChatMessage $delete): Response
     {
         $delete->handle($this->chatMember($request), $message);
@@ -100,7 +104,7 @@ class ChatController
      * and message (204 again); own message → 422; another family's id → 404. 10 reports per hour
      * per member (429 `rate_limited`).
      */
-    #[ApiErrors('chat_disabled', 'validation_failed')]
+    #[ApiErrors('chat_disabled', 'chat_off', 'validation_failed')]
     public function report(Request $request, int $message, ReportChatMessage $report): Response
     {
         $report->handle($this->chatMember($request), $message);
@@ -115,7 +119,7 @@ class ChatController
      * an earlier one; returns the message. Unknown key or deleted message → 422; another family's id
      * → 404. No push, unread unchanged. 60 per minute per member (429 `rate_limited`).
      */
-    #[ApiErrors('chat_disabled', 'validation_failed')]
+    #[ApiErrors('chat_disabled', 'chat_off', 'validation_failed')]
     public function react(ReactToChatMessageRequest $request, int $message, ReactToChatMessage $react): ChatMessageResource
     {
         return new ChatMessageResource($react->set($this->chatMember($request), $message, $request->string('key')->value()));
@@ -126,7 +130,7 @@ class ChatController
      *
      * Idempotent: without a reaction it still answers 200 with the message.
      */
-    #[ApiErrors('chat_disabled')]
+    #[ApiErrors('chat_disabled', 'chat_off')]
     public function unreact(Request $request, int $message, ReactToChatMessage $react): ChatMessageResource
     {
         return new ChatMessageResource($react->remove($this->chatMember($request), $message));
@@ -139,7 +143,7 @@ class ChatController
      * change first, at most 200 rows: call again with `meta.cursor` until fewer come back. Without
      * `since`: no rows and the current cursor. Malformed cursor → 422.
      */
-    #[ApiErrors('chat_disabled', 'validation_failed')]
+    #[ApiErrors('chat_disabled', 'chat_off', 'validation_failed')]
     public function reactions(ListChatReactionsRequest $request, ListChatReactionChanges $list): JsonResponse
     {
         $member = $this->chatMember($request);
@@ -159,7 +163,7 @@ class ChatController
      *
      * Moves my read marker forward to `last_read_id` (never back).
      */
-    #[ApiErrors('chat_disabled')]
+    #[ApiErrors('chat_disabled', 'chat_off')]
     public function read(MarkChatReadRequest $request, MarkChatRead $mark): Response
     {
         $mark->handle($this->chatMember($request), $request->integer('last_read_id'));
@@ -170,12 +174,14 @@ class ChatController
     /**
      * Unread chat messages.
      *
-     * Cheap count for the tab badge: `{ "data": { "unread": 3 } }`.
+     * Cheap count for the tab badge: `{ "data": { "unread": 3 } }`. Always 0 while the chat is off.
      */
     #[ApiErrors('chat_disabled')]
     public function unread(Request $request, CountUnreadChatMessages $count): JsonResponse
     {
-        return response()->json(['data' => ['unread' => $count->handle($this->chatMember($request))]]);
+        $member = $this->resolve->unlessOff($this->currentUser($request));
+
+        return response()->json(['data' => ['unread' => $member === null ? 0 : $count->handle($member)]]);
     }
 
     private function chatMember(Request $request): FamilyMember

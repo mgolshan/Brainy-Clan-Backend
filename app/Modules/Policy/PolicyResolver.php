@@ -37,6 +37,7 @@ class PolicyResolver
         'invites.ttl_days' => 7,
         'sign_in_codes.ttl_minutes' => 15,
         'chat.retention_days' => 7,
+        'chat.modes_allowed' => false,
         'feature_flags' => [],
     ];
 
@@ -116,7 +117,7 @@ class PolicyResolver
                 'max_active_goals' => $this->maxActiveGoalsFor($tier),
             ],
             'accessibility_defaults' => $this->accessibilityDefaults($band),
-            'chat' => ['retention_days' => $this->chatRetentionDays($tier)],
+            'chat' => ['retention_days' => $this->chatRetentionDays($tier), 'modes_allowed' => $this->chatModesAllowed($tier)],
             'feature_flags' => (object) $this->featureFlags($tier, $band?->code),
         ];
     }
@@ -275,6 +276,28 @@ class PolicyResolver
     public function chatRetentionDays(string $tier): int
     {
         return max(1, (int) $this->setting('chat.retention_days', $tier));
+    }
+
+    /**
+     * Whether a family admin may change the chat mode (tier setting `chat.modes_allowed`, seeded:
+     * true for `classroom` only).
+     */
+    public function chatModesAllowed(string $tier): bool
+    {
+        return (bool) $this->setting('chat.modes_allowed', $tier);
+    }
+
+    /**
+     * The family's effective chat mode: the stored one while the tier allows modes, else `normal`
+     * (e.g. after a downgrade; the stored value is kept for a later upgrade).
+     */
+    public function effectiveChatMode(Family $family): string
+    {
+        if (! in_array($family->chat_mode, Family::CHAT_MODES, true) || ! $this->chatModesAllowed($family->tier)) {
+            return Family::CHAT_MODE_NORMAL;
+        }
+
+        return $family->chat_mode;
     }
 
     public function inviteTtlDays(): int

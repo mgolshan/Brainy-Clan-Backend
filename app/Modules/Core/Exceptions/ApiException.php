@@ -172,6 +172,30 @@ class ApiException extends RuntimeException
     }
 
     /**
+     * The family chat is in announcements mode: only family admins post (docs/API.md "Chat safety").
+     */
+    public static function chatReadOnly(): self
+    {
+        return new self('chat_read_only', 'Only the family admins can post in this chat.', 403);
+    }
+
+    /**
+     * A family admin turned the whole family chat off (Classroom chat mode `off`).
+     */
+    public static function chatOff(): self
+    {
+        return new self('chat_off', 'The chat is turned off for this group.', 403);
+    }
+
+    /**
+     * The feature needs a different plan (e.g. chat modes need Classroom).
+     */
+    public static function planRequired(string $message = 'This needs a different plan.'): self
+    {
+        return new self('plan_required', $message, 403);
+    }
+
+    /**
      * The family already has an active plan from a store or the web (docs/API.md "Web checkout").
      */
     public static function subscriptionExists(string $message = 'Your family already has an active plan.'): self

@@ -125,6 +125,7 @@ class PolicySeeder extends Seeder
             ['tier', 'free', 'second_chance.free_per_day', 0, 'Free second chances per member per day.'],
             ['tier', 'free', 'ads.enabled', true, 'Rewarded ads allowed on this tier (age band must allow too).'],
             ['tier', 'free', 'chat.retention_days', 7, 'Free tier: family chat messages are deleted after this many days.'],
+            ['tier', 'free', 'chat.modes_allowed', false, 'Free tier: chat modes (announcements only, chat off) are a Classroom tool.'],
 
             ['tier', 'family', 'limits.max_members', 6, 'Family plan: up to 6 members (parents + kids).'],
             ['tier', 'family', 'limits.max_categories', 100, 'Family plan: all categories.'],
@@ -132,6 +133,7 @@ class PolicySeeder extends Seeder
             ['tier', 'family', 'second_chance.free_per_day', 3, 'Free second chances per member per day.'],
             ['tier', 'family', 'ads.enabled', false, 'Paying families never see ads.'],
             ['tier', 'family', 'chat.retention_days', 365, 'Family plan: family chat messages are deleted after this many days.'],
+            ['tier', 'family', 'chat.modes_allowed', false, 'Family plan: chat modes (announcements only, chat off) are a Classroom tool.'],
 
             ['tier', 'big_clan', 'limits.max_members', 12, 'Big Clan plan: up to 12 members (grandparents, cousins, homeschool groups).'],
             ['tier', 'big_clan', 'limits.max_categories', 100, 'Big Clan plan: all categories.'],
@@ -139,6 +141,7 @@ class PolicySeeder extends Seeder
             ['tier', 'big_clan', 'second_chance.free_per_day', 3, 'Free second chances per member per day.'],
             ['tier', 'big_clan', 'ads.enabled', false, 'Paying families never see ads.'],
             ['tier', 'big_clan', 'chat.retention_days', 365, 'Big Clan plan: family chat messages are deleted after this many days.'],
+            ['tier', 'big_clan', 'chat.modes_allowed', false, 'Big Clan plan: chat modes (announcements only, chat off) are a Classroom tool.'],
 
             ['tier', 'classroom', 'limits.max_members', 37, 'Classroom plan: 1 teacher + 1 co-teacher + 35 students.'],
             ['tier', 'classroom', 'limits.max_categories', 100, 'Classroom plan: all categories.'],
@@ -146,6 +149,7 @@ class PolicySeeder extends Seeder
             ['tier', 'classroom', 'second_chance.free_per_day', 3, 'Free second chances per member per day.'],
             ['tier', 'classroom', 'ads.enabled', false, 'Paying plans never see ads.'],
             ['tier', 'classroom', 'chat.retention_days', 365, 'Classroom plan: chat messages are deleted after this many days.'],
+            ['tier', 'classroom', 'chat.modes_allowed', true, 'Classroom plan: the teacher can set the chat to announcements only or turn it off.'],
         ];
     }
 }

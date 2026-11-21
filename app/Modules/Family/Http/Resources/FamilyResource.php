@@ -4,6 +4,7 @@ namespace App\Modules\Family\Http\Resources;
 
 use App\Modules\Family\Models\Family;
 use App\Modules\Identity\Models\User;
+use App\Modules\Policy\PolicyResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -27,6 +28,10 @@ class FamilyResource extends JsonResource
             'member_count' => $this->members()->count(),
             // The affiliate code the family came with (B10): the real value only for its admins.
             'referral_code' => $this->referralCodeFor($request),
+            // Chat safety (B12): the bad-words filter and the effective chat mode (`normal` unless
+            // the plan allows modes; the stored value is kept for a later upgrade).
+            'chat_filter' => (bool) $this->chat_filter,
+            'chat_mode' => app(PolicyResolver::class)->effectiveChatMode($this->resource),
         ];
     }
 
